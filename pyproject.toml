@@ -76,7 +76,7 @@ dev = [
 Homepage = "https://github.com/mhatim99/vegz"
 Documentation = "https://github.com/mhatim99/vegz/tree/main/docs"
 Repository = "https://github.com/mhatim99/vegz.git"
-Bug Reports = "https://github.com/mhatim99/vegz/issues"
+"Bug Reports" = "https://github.com/mhatim99/vegz/issues"
 Changelog = "https://github.com/mhatim99/vegz/blob/main/CHANGELOG.md"
 
 [project.scripts]
