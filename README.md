@@ -352,17 +352,6 @@ If you use VegZ in your research, please cite:
     url = {https://github.com/mhatim99/vegz}
 }
 ```
-
-## Why Choose VegZ?
-
-- **Comprehensive**: All major vegetation analysis methods in one package
-- **Professional**: Production-ready code with extensive testing
-- **Scientifically Rigorous**: Based on peer-reviewed methods and algorithms
-- **User-Friendly**: Intuitive API with quick-start functions
-- **Well-Documented**: Extensive documentation with examples
-- **Actively Maintained**: Regular updates and community support
-- **Performance Optimized**: Efficient implementations for large datasets
-
 ---
 
 **VegZ** - *Empowering ecological research with comprehensive vegetation analysis tools.*
