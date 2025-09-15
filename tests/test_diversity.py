@@ -6,7 +6,7 @@ import pytest
 import pandas as pd
 import numpy as np
 
-from vegz.diversity import DiversityAnalyzer
+from VegZ.diversity import DiversityAnalyzer
 
 
 class TestDiversityAnalyzer:

@@ -10,7 +10,7 @@ Author: Mohamed Z. Hatim
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from vegz import VegZ, quick_elbow_analysis, VegetationClustering
+from VegZ import VegZ, quick_elbow_analysis, VegetationClustering
 
 def demonstrate_elbow_analysis():
     """Demonstrate comprehensive elbow analysis functionality."""

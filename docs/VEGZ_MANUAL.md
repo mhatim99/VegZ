@@ -1,6 +1,6 @@
 # VegZ: Complete User Manual
 
-**Version 1.0.0**  
+**Version 1.0.2**  
 **Author: Mohamed Z. Hatim**  
 **Date: September 2025**
 
@@ -50,26 +50,26 @@ VegZ is a comprehensive Python package designed for vegetation data analysis and
 ### Basic Installation
 
 ```bash
-pip install vegz
+pip install VegZ
 ```
 
 ### Extended Installation
 
 ```bash
 # With spatial analysis support
-pip install vegz[spatial]
+pip install VegZ[spatial]
 
 # With remote sensing capabilities
-pip install vegz[remote-sensing]
+pip install VegZ[remote-sensing]
 
 # Complete installation with all features
-pip install vegz[spatial,remote-sensing,fuzzy,interactive]
+pip install VegZ[spatial,remote-sensing,fuzzy,interactive]
 ```
 
 ### Development Installation
 
 ```bash
-pip install git+https://github.com/mhatim99/vegz.git
+pip install git+https://github.com/mhatim99/VegZ.git
 ```
 
 ## Quick Start
@@ -79,7 +79,7 @@ pip install git+https://github.com/mhatim99/vegz.git
 ```python
 import pandas as pd
 import numpy as np
-from vegz import VegZ
+from VegZ import VegZ
 
 # Initialize VegZ
 veg = VegZ()
@@ -117,7 +117,7 @@ The main `VegZ` class provides the primary interface for vegetation data analysi
 ### Initialization
 
 ```python
-from vegz import VegZ
+from VegZ import VegZ
 
 # Basic initialization
 veg = VegZ()
@@ -204,7 +204,7 @@ standardized_data = veg.transform_data(method='standardize')
 ### Basic Diversity Indices
 
 ```python
-from vegz import DiversityAnalyzer
+from VegZ import DiversityAnalyzer
 
 diversity = DiversityAnalyzer()
 
@@ -320,7 +320,7 @@ accumulation = diversity.species_accumulation_curves(
 ### Principal Component Analysis (PCA)
 
 ```python
-from vegz import MultivariateAnalyzer
+from VegZ import MultivariateAnalyzer
 
 multivar = MultivariateAnalyzer()
 
@@ -458,7 +458,7 @@ for var in vector_fit:
 ### TWINSPAN Analysis
 
 ```python
-from vegz import VegetationClustering
+from VegZ import VegetationClustering
 
 clustering = VegetationClustering()
 
@@ -602,7 +602,7 @@ print("Gap statistic optimal k:", gap_stat['optimal_k'])
 ### PERMANOVA
 
 ```python
-from vegz import EcologicalStatistics
+from VegZ import EcologicalStatistics
 
 stats = EcologicalStatistics()
 
@@ -732,7 +732,7 @@ print(simper_results['between_groups'].head())
 ### Generalized Additive Models (GAMs)
 
 ```python
-from vegz import EnvironmentalModeler
+from VegZ import EnvironmentalModeler
 
 env_model = EnvironmentalModeler()
 
@@ -826,7 +826,7 @@ for species in list(species_niches.keys())[:3]:
 ### Phenology Modeling
 
 ```python
-from vegz import TemporalAnalyzer
+from VegZ import TemporalAnalyzer
 import datetime
 
 temporal = TemporalAnalyzer()
@@ -889,7 +889,7 @@ print(f"  Seasonal strength: {decomposition['seasonal_strength']:.3f}")
 ### Spatial Interpolation
 
 ```python
-from vegz import SpatialAnalyzer
+from VegZ import SpatialAnalyzer
 
 spatial = SpatialAnalyzer()
 
@@ -974,7 +974,7 @@ print(f"Geary's C: {gearys_c['statistic']:.4f}")
 ### Trait Analysis
 
 ```python
-from vegz import FunctionalTraitAnalyzer
+from VegZ import FunctionalTraitAnalyzer
 
 # Create trait data
 trait_data = pd.DataFrame({
@@ -1047,7 +1047,7 @@ print(significant[['trait', 'environment', 'correlation', 'p_value']])
 ### Phylogenetic Diversity
 
 ```python
-from vegz import PhylogeneticDiversityAnalyzer
+from VegZ import PhylogeneticDiversityAnalyzer
 
 # Create mock phylogenetic tree (distances)
 phylo_distances = np.random.exponential(1, (n_species, n_species))
@@ -1076,7 +1076,7 @@ print(f"Phylogenetic endemism range: {phylo_endemism.min():.3f} - {phylo_endemis
 ### Metacommunity Analysis
 
 ```python
-from vegz import MetacommunityAnalyzer
+from VegZ import MetacommunityAnalyzer
 
 metacommunity = MetacommunityAnalyzer()
 
@@ -1095,7 +1095,7 @@ print(f"  Boundary clumping: {ems_results['boundary_clumping']:.3f}")
 ### Network Analysis
 
 ```python
-from vegz import NetworkAnalyzer
+from VegZ import NetworkAnalyzer
 
 network = NetworkAnalyzer()
 
@@ -1122,7 +1122,7 @@ print(f"  Number of modules: {modularity['n_modules']}")
 ### Species Distribution Modeling
 
 ```python
-from vegz import MachineLearningAnalyzer
+from VegZ import MachineLearningAnalyzer
 
 ml = MachineLearningAnalyzer()
 
@@ -1274,7 +1274,7 @@ plt.show()
 ### Interactive Dashboards
 
 ```python
-from vegz import InteractiveVisualizer
+from VegZ import InteractiveVisualizer
 
 interactive = InteractiveVisualizer()
 
@@ -1300,7 +1300,7 @@ interactive.interactive_accumulation_curves(
 ### Report Generation
 
 ```python
-from vegz import ReportGenerator
+from VegZ import ReportGenerator
 
 report = ReportGenerator()
 
@@ -1333,7 +1333,7 @@ print("Reports generated successfully!")
 ### Spatial Validation
 
 ```python
-from vegz import data_quality
+from VegZ import data_quality
 
 # Validate coordinates
 coord_validation = data_quality.validate_coordinates(
@@ -1395,7 +1395,7 @@ VegZ provides quick functions for immediate results:
 ### Quick Diversity Analysis
 
 ```python
-from vegz import quick_diversity_analysis
+from VegZ import quick_diversity_analysis
 
 # Instant diversity calculation
 quick_diversity = quick_diversity_analysis(
@@ -1410,7 +1410,7 @@ print(f"Average Shannon diversity: {quick_diversity['shannon'].mean():.3f}")
 ### Quick Ordination
 
 ```python
-from vegz import quick_ordination
+from VegZ import quick_ordination
 
 # Rapid PCA
 quick_pca = quick_ordination(
@@ -1427,7 +1427,7 @@ print(f"Explained variance: {quick_pca['explained_variance_ratio']}")
 ### Quick Clustering
 
 ```python
-from vegz import quick_clustering
+from VegZ import quick_clustering
 
 # Fast clustering
 quick_clusters = quick_clustering(
@@ -1444,7 +1444,7 @@ print(f"Cluster sizes: {np.bincount(quick_clusters['cluster_labels'])}")
 ### Quick Elbow Analysis
 
 ```python
-from vegz import quick_elbow_analysis
+from VegZ import quick_elbow_analysis
 
 # Rapid optimal k determination
 quick_elbow = quick_elbow_analysis(
@@ -1573,10 +1573,10 @@ def handle_large_dataset(data, chunk_size=1000):
 ```python
 # Check if VegZ is properly installed
 try:
-    import vegz
-    print(f"VegZ version: {vegz.__version__}")
+    import VegZ
+    print(f"VegZ version: {VegZ.__version__}")
 except ImportError:
-    print("VegZ not installed. Run: pip install vegz")
+    print("VegZ not installed. Run: pip install VegZ")
 ```
 
 2. **Data Format Issues**
@@ -1709,4 +1709,4 @@ def robust_nmds(data, max_attempts=5):
 
 **VegZ Manual Version 1.0.0**  
 **Copyright (c) 2025 Mohamed Z. Hatim**  
-**For support: https://github.com/mhatim99/vegz/issues**
+**For support: https://github.com/mhatim99/VegZ/issues**

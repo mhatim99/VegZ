@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 
-from vegz import VegZ, quick_diversity_analysis, quick_elbow_analysis
+from VegZ import VegZ, quick_diversity_analysis, quick_elbow_analysis
 
 
 class TestVegZCore:

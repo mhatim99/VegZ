@@ -5,6 +5,15 @@ All notable changes to VegZ will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2025-09-15
+
+### Fixed
+- **Documentation**: Corrected all import statements from `from vegz import` to `from VegZ import` across all documentation files
+- **Documentation**: Fixed installation commands from `pip install vegz` to `pip install VegZ` in all documentation
+- **Examples**: Updated import statements in demo.py and elbow_analysis_example.py
+- **Tests**: Corrected import statements in test_core.py
+- **Package consistency**: Ensured all documentation matches the correct PyPI package name 'VegZ'
+
 ## [1.0.0] - 2025-09-12
 
 ### Added

@@ -5,7 +5,7 @@ VegZ Demo Script
 This script demonstrates the main functionality of VegZ including
 the comprehensive elbow analysis for optimal cluster determination.
 
-Run with: vegz-demo
+Run with: VegZ-demo
 """
 
 import pandas as pd
@@ -20,7 +20,7 @@ def main():
     print("=" * 60)
     
     try:
-        from vegz import VegZ, quick_elbow_analysis
+        from VegZ import VegZ, quick_elbow_analysis
         print("✓ VegZ imported successfully")
     except ImportError as e:
         print(f"✗ Could not import VegZ: {e}")
@@ -145,7 +145,7 @@ def main():
     print("\n" + "=" * 60)
     print("✅ VegZ demonstration completed successfully!")
     print("📚 For more examples, see: https://vegz.readthedocs.io/")
-    print("🐛 Report issues: https://github.com/mhatim99/vegz/issues")
+    print("🐛 Report issues: https://github.com/mhatim99/VegZ/issues")
     print("=" * 60)
 
 

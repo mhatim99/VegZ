@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "VegZ"
-version = "1.0.1"
+version = "1.0.2"
 authors = [
   {name="Mohamed Z. Hatim", email="mhatim4040@gmail.com"},
 ]
@@ -73,14 +73,14 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/mhatim99/vegz"
-Documentation = "https://github.com/mhatim99/vegz/tree/main/docs"
-Repository = "https://github.com/mhatim99/vegz.git"
-"Bug Reports" = "https://github.com/mhatim99/vegz/issues"
-Changelog = "https://github.com/mhatim99/vegz/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/mhatim99/VegZ"
+Documentation = "https://github.com/mhatim99/VegZ/tree/main/docs"
+Repository = "https://github.com/mhatim99/VegZ.git"
+"Bug Reports" = "https://github.com/mhatim99/VegZ/issues"
+Changelog = "https://github.com/mhatim99/VegZ/blob/main/CHANGELOG.md"
 
 [project.scripts]
-vegz-demo = "VegZ.examples.demo:main"
+VegZ-demo = "VegZ.examples.demo:main"
 
 [tool.hatch.version]
 path = "src/VegZ/__init__.py"
@@ -88,16 +88,8 @@ path = "src/VegZ/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/VegZ"]
 
-[tool.hatch.build.targets.sdist]
-include = [
-    "/src",
-    "/tests",
-    "/docs",
-    "/examples",
-    "README.md",
-    "LICENSE",
-    "CHANGELOG.md",
-]
+[tool.hatch.metadata]
+allow-direct-references = true
 
 # Black code formatting
 [tool.black]

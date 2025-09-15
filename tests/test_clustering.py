@@ -6,7 +6,7 @@ import pytest
 import pandas as pd
 import numpy as np
 
-from vegz.clustering import VegetationClustering
+from VegZ.clustering import VegetationClustering
 
 
 class TestVegetationClustering:

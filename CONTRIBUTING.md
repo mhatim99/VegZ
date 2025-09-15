@@ -35,7 +35,7 @@ Brief description of the bug.
 **Reproducible Example:**
 ```python
 # Minimal code to reproduce the issue
-import vegz
+import VegZ
 # ... your code here
 ```
 
@@ -91,7 +91,7 @@ How does this affect existing code?
 ### 1. Fork and Clone
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/vegz.git
+git clone https://github.com/YOUR-USERNAME/VegZ.git
 cd vegz
 ```
 
@@ -205,7 +205,7 @@ def my_function(data: pd.DataFrame, parameter: str = 'default') -> Dict[str, Any
     Examples
     --------
     >>> import pandas as pd
-    >>> from vegz import MyClass
+    >>> from VegZ import MyClass
     >>> data = pd.DataFrame(...)
     >>> result = my_function(data, parameter='custom')
     >>> print(result.keys())
