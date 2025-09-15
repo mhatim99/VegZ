@@ -16,7 +16,7 @@ This package provides tools for:
 - Visualization and reporting
 """
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 __author__ = "Mohamed Z. Hatim"
 __email__ = ""
 __copyright__ = "Copyright (c) 2025 Mohamed Z. Hatim"
