@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "VegZ"
-version = "1.0.2"
+version = "1.0.3"
 authors = [
   {name="Mohamed Z. Hatim", email="mhatim4040@gmail.com"},
 ]
