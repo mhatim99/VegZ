@@ -192,19 +192,19 @@
 ### Installation
 
 ```bash
-pip install vegz
+pip install VegZ
 ```
 
 For extended functionality:
 ```bash
 # With spatial analysis support
-pip install vegz[spatial]
+pip install VegZ[spatial]
 
 # With remote sensing capabilities  
-pip install vegz[remote-sensing]
+pip install VegZ[remote-sensing]
 
 # Complete installation with all features
-pip install vegz[spatial,remote-sensing,fuzzy,interactive]
+pip install VegZ[spatial,remote-sensing,fuzzy,interactive]
 ```
 
 ### Basic Usage
