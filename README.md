@@ -344,7 +344,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 If you use VegZ in your research, please cite:
 
 ```bibtex
-@software{VegZ2025,
+@software{VegZ,
     author = {Hatim, Mohamed Z.},
     title = {VegZ: A comprehensive Python package for vegetation data analysis and environmental modeling},
     year = {2025},
