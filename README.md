@@ -1,7 +1,7 @@
 # VegZ: Comprehensive Vegetation Data Analysis Package
 
-[![PyPI version](https://badge.fury.io/py/vegz.svg)](https://badge.fury.io/py/vegz)
-[![Python versions](https://img.shields.io/pypi/pyversions/vegz.svg)](https://pypi.org/project/vegz/)
+[![PyPI version](https://badge.fury.io/py/VegZ.svg)](https://badge.fury.io/py/VegZ)
+[![Python versions](https://img.shields.io/pypi/pyversions/VegZ.svg)](https://pypi.org/project/VegZ/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **VegZ** is a comprehensive, professional-grade Python package designed specifically for vegetation data analysis and environmental modeling. It provides a complete suite of tools for ecologists, environmental scientists, and researchers working with biodiversity and vegetation data.
@@ -200,7 +200,7 @@ For extended functionality:
 # With spatial analysis support
 pip install VegZ[spatial]
 
-# With remote sensing capabilities  
+# With remote sensing capabilities
 pip install VegZ[remote-sensing]
 
 # Complete installation with all features
@@ -211,7 +211,7 @@ pip install VegZ[spatial,remote-sensing,fuzzy,interactive]
 
 ```python
 import pandas as pd
-from vegz import VegZ
+from VegZ import VegZ
 
 # Initialize VegZ
 veg = VegZ()
@@ -246,7 +246,7 @@ veg.plot_ordination(pca_results, color_by=clusters['cluster_labels'])
 ### Quick Functions for Immediate Results
 
 ```python
-from vegz import quick_diversity_analysis, quick_ordination, quick_elbow_analysis
+from VegZ import quick_diversity_analysis, quick_ordination, quick_elbow_analysis
 
 # Instant analyses
 diversity = quick_diversity_analysis(data, species_cols=['sp1', 'sp2', 'sp3'])
@@ -257,7 +257,7 @@ elbow_results = quick_elbow_analysis(data, max_k=10, plot_results=True)
 ### Advanced TWINSPAN Analysis
 
 ```python
-from vegz import VegetationClustering
+from VegZ.clustering import VegetationClustering
 
 clustering = VegetationClustering()
 
@@ -344,14 +344,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 If you use VegZ in your research, please cite:
 
 ```bibtex
-@software{vegz2025,
+@software{VegZ2025,
     author = {Hatim, Mohamed Z.},
     title = {VegZ: A comprehensive Python package for vegetation data analysis and environmental modeling},
     year = {2025},
-    version = {1.0.0},
-    url = {https://github.com/mhatim99/vegz}
+    version = {1.0.2},
+    url = {https://github.com/mhatim99/VegZ}
 }
 ```
+
 ---
 
 **VegZ** - *Empowering ecological research with comprehensive vegetation analysis tools.*
