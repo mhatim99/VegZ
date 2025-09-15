@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "VegZ"
-version = "1.0.0"
+version = "1.0.1"
 authors = [
   {name="Mohamed Z. Hatim", email="mhatim4040@gmail.com"},
 ]
@@ -80,13 +80,13 @@ Repository = "https://github.com/mhatim99/vegz.git"
 Changelog = "https://github.com/mhatim99/vegz/blob/main/CHANGELOG.md"
 
 [project.scripts]
-vegz-demo = "vegz.examples.demo:main"
+vegz-demo = "VegZ.examples.demo:main"
 
 [tool.hatch.version]
-path = "src/vegz/__init__.py"
+path = "src/VegZ/__init__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/vegz"]
+packages = ["src/VegZ"]
 
 [tool.hatch.build.targets.sdist]
 include = [
