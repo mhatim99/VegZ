@@ -28,6 +28,14 @@
 - Transposed coordinate detection
 - Country boundary consistency checks
 - Automated quality reporting
+- **Enhanced Species Name Error Detection** (New in v1.1.0):
+  - 10+ error categories: incomplete binomial, formatting issues, author citations
+  - Hybrid marker detection and validation
+  - Infraspecific rank validation (var., subsp., f., cv.)
+  - Placeholder name detection (sp., cf., aff., indet.)
+  - Invalid character identification
+  - Comprehensive error reporting with actionable suggestions
+  - Batch processing capabilities for large datasets
 
 ### Diversity Analysis (15+ Indices)
 - **Basic indices**: Shannon, Simpson, Simpson inverse, richness, evenness
@@ -273,6 +281,29 @@ print("Site classification:", twinspan_results['site_classification'])
 print("Indicator species:", twinspan_results['classification_tree']['indicator_species'])
 ```
 
+### Enhanced Species Name Error Detection (New in v1.1.0)
+
+```python
+from VegZ.data_management.standardization import SpeciesNameStandardizer
+
+standardizer = SpeciesNameStandardizer()
+
+# Validate individual species names
+result = standardizer.validate_species_name("Quercus alba L.")
+print(f"Valid: {result['is_valid']}")
+print(f"Errors: {result['errors']}")
+print(f"Suggestions: {result['suggestions']}")
+
+# Batch validation of species names
+import pandas as pd
+df = pd.DataFrame({'species': ['Quercus alba', 'quercus sp.', 'Pinus × strobus']})
+validated_df = standardizer.batch_validate_names(df['species'].tolist())
+
+# Generate comprehensive error report
+report = standardizer.generate_error_report(df, species_column='species')
+print(f"Validity rate: {report['summary']['validity_percentage']}%")
+```
+
 ## Data Format Requirements
 
 VegZ expects data in **site-by-species matrix format**:
@@ -307,6 +338,7 @@ SITE_001,44.2619,-72.5806,850,6.2,18.5,...
 - SciPy >= 1.7.0
 - Matplotlib >= 3.4.0
 - scikit-learn >= 1.0.0
+- Seaborn >= 0.11.0
 
 **Optional (for extended functionality):**
 - GeoPandas (spatial analysis)
@@ -314,6 +346,10 @@ SITE_001,44.2619,-72.5806,850,6.2,18.5,...
 - Earth Engine API (remote sensing)
 - FuzzyWuzzy (fuzzy string matching)
 - Plotly/Bokeh (interactive visualizations)
+
+**Tested with:**
+- Python 3.8 - 3.13
+- All major operating systems (Windows, macOS, Linux)
 
 ## Scientific Background
 
@@ -327,11 +363,11 @@ VegZ implements methods from key ecological and statistical literature:
 
 ## Contributing
 
-We welcome contributions! Please see the [Contributing Guide](CONTRIBUTING.md) for details.
+We welcome contributions! Please see the [Contributing Guide](https://github.com/mhatim99/VegZ/blob/main/CONTRIBUTING.md) for details.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/mhatim99/VegZ/blob/main/LICENSE) file for details.
 
 ## Support
 
@@ -348,7 +384,7 @@ If you use VegZ in your research, please cite:
     author = {Hatim, Mohamed Z.},
     title = {VegZ: A comprehensive Python package for vegetation data analysis and environmental modeling},
     year = {2025},
-    version = {1.0.2},
+    version = {1.1.0},
     url = {https://github.com/mhatim99/VegZ}
 }
 ```

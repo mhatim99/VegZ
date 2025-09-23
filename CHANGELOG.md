@@ -5,6 +5,85 @@ All notable changes to VegZ will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-09-23
+
+### Added
+
+#### Comprehensive Species Name Error Detection & Classification
+- **Complete error detection system** for taxonomic names with 10+ error categories
+- **SpeciesNameStandardizer enhancements**:
+  - `validate_species_name()` - Individual name validation with detailed error reporting
+  - `classify_name_type()` - Taxonomic name type classification (binomial, hybrid, placeholder, etc.)
+  - `batch_validate_names()` - Efficient batch processing with pandas DataFrame output
+  - `generate_error_report()` - Statistical analysis and recommendations for datasets
+  - `detect_errors()` - Core error detection with comprehensive classification
+
+#### Error Detection Capabilities
+- **Incomplete binomial names**: Detects genus-only and species-only entries
+- **Formatting issues**: Identifies capitalization, spacing, and special character problems
+- **Author citations**: Flags and removes 12+ different author citation patterns
+- **Hybrid markers**: Handles ×, x, and text hybrid markers with malformation detection
+- **Infraspecific ranks**: Validates var., subsp., f., cv., etc. with proper formatting checks
+- **Anonymous/placeholder names**: Detects sp., cf., aff., indet., unknown, and 11+ similar patterns
+- **Invalid characters**: Identifies numbers, symbols, and non-standard Unicode characters
+- **Missing components**: Flags names with missing genus or species epithets
+
+#### Enhanced DataFrame Processing
+- **Optional error detection columns** in `standardize_dataframe()` method
+- **16+ new columns** with detailed validation results:
+  - `name_is_valid`, `name_error_count`, `name_severity`, `name_type`
+  - Individual error category flags (e.g., `name_has_placeholder_names`)
+  - `name_errors_summary` and `name_suggestions` for actionable insights
+- **Backward compatibility mode** preserving original functionality
+
+#### Advanced Pattern Recognition
+- **Enhanced author patterns**: 12+ regex patterns for various citation formats
+- **Infraspecific validation**: Dictionary-based marker validation with proper formatting
+- **Hybrid detection**: Multiple hybrid marker patterns with malformation detection
+- **Placeholder recognition**: 11+ patterns for anonymous/placeholder names
+- **Unicode-aware validation**: Handles international characters and symbols
+
+#### Error Classification System
+- **Multi-level severity assessment**: Critical, High, Medium, Low, None
+- **Detailed error categorization** with specific error types within categories
+- **Actionable suggestions** for fixing detected errors
+- **Statistical reporting** with error distribution analysis
+
+#### Quality Assurance
+- **100% backward compatibility** maintained - all existing functionality preserved
+- **Comprehensive testing**: 53+ test cases covering all error types and edge cases
+- **Performance optimization**: Efficient batch processing for large datasets
+- **Integration testing**: Verified compatibility with main VegZ package ecosystem
+
+### Enhanced
+
+#### Data Management
+- **SpeciesNameStandardizer class** significantly enhanced with error detection capabilities
+- **DataStandardizer integration** automatically uses enhanced species name validation
+- **Improved pattern matching** with optimized regex patterns for better performance
+
+#### Documentation
+- **Comprehensive examples** demonstrating new error detection features
+- **Integration guides** for using enhanced functionality with existing workflows
+- **Performance benchmarks** and usage recommendations
+
+### Technical Improvements
+- **Optimized regex patterns** for efficient pattern matching
+- **Memory-efficient processing** for large datasets
+- **Vectorized operations** where possible for improved performance
+- **Modular architecture** allowing for future enhancements
+
+### Documentation Updates
+- **README.md**: Enhanced with comprehensive v1.1.0 feature documentation
+- **VEGZ_MANUAL.md**: Added complete section on Enhanced Species Name Error Detection
+- **Code examples**: Updated with new error detection functionality demonstrations
+- **API documentation**: Expanded to cover all new validation methods
+
+### Code Quality & Maintenance
+- **Copyright standardization**: Updated all Python file comments to standardized copyright notices
+- **Consistent licensing**: Ensured uniform copyright attribution across all source files
+- **Package integrity**: Verified all files contain proper copyright and licensing information
+
 ## [1.0.3] - 2025-09-15
 
 ### Fixed

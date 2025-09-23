@@ -91,7 +91,7 @@ How does this affect existing code?
 ### 1. Fork and Clone
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/VegZ.git
+git clone https://github.com/mhatim99/VegZ.git
 cd vegz
 ```
 
@@ -345,4 +345,4 @@ Please be respectful and constructive in all interactions. I aim to create a wel
 
 ---
 
-Thank you for contributing to VegZ and advancing ecological data analysis tools!
+Thank you for contributing to VegZ!
