@@ -77,7 +77,7 @@ class FunctionalTraitAnalyzer:
         self.trait_data = trait_data.set_index(species_column) if species_column in trait_data.columns else trait_data
         self.abundance_data = abundance_data
         
-        # Validate data
+# Copyright (c) 2025 Mohamed Z. Hatim
         if self.abundance_data is not None:
             common_species = set(self.trait_data.index) & set(self.abundance_data.columns)
             if len(common_species) == 0:
@@ -110,16 +110,16 @@ class FunctionalTraitAnalyzer:
         if self.trait_data is None:
             raise ValueError("Trait data not loaded. Use load_trait_data() first.")
         
-        # Select traits
+# Copyright (c) 2025 Mohamed Z. Hatim
         if traits is None:
             traits = self.trait_data.select_dtypes(include=[np.number]).columns.tolist()
         
         trait_matrix = self.trait_data[traits].copy()
         
-        # Handle missing data
+# Copyright (c) 2025 Mohamed Z. Hatim
         trait_matrix = trait_matrix.fillna(trait_matrix.mean())
         
-        # Standardize traits
+# Copyright (c) 2025 Mohamed Z. Hatim
         if standardize:
             scaler = StandardScaler()
             trait_matrix_scaled = pd.DataFrame(
@@ -130,7 +130,7 @@ class FunctionalTraitAnalyzer:
         else:
             trait_matrix_scaled = trait_matrix
         
-        # Calculate distance matrix
+# Copyright (c) 2025 Mohamed Z. Hatim
         trait_distances = pdist(trait_matrix_scaled.values, metric='euclidean')
         trait_dist_matrix = squareform(trait_distances)
         trait_dist_df = pd.DataFrame(
@@ -145,7 +145,7 @@ class FunctionalTraitAnalyzer:
             'traits_used': traits
         }
         
-        # Calculate site-level functional diversity if abundance data available
+# Copyright (c) 2025 Mohamed Z. Hatim
         if self.abundance_data is not None:
             if sites is None:
                 sites = self.abundance_data.index.tolist()
@@ -161,12 +161,12 @@ class FunctionalTraitAnalyzer:
                 if len(present_species) == 0:
                     continue
                 
-                # Get traits for present species
+# Copyright (c) 2025 Mohamed Z. Hatim
                 site_traits = trait_matrix_scaled.loc[present_species]
                 site_weights = site_abundances.loc[present_species]
                 site_weights = site_weights / site_weights.sum()  # Normalize
                 
-                # Calculate functional diversity indices
+# Copyright (c) 2025 Mohamed Z. Hatim
                 fd_indices = self._calculate_fd_indices(
                     site_traits, site_weights, trait_dist_df.loc[present_species, present_species]
                 )
@@ -184,11 +184,11 @@ class FunctionalTraitAnalyzer:
         """Calculate functional diversity indices for a single site."""
         indices = {}
         
-        # Functional Richness (FRic) - volume of functional space
+# Copyright (c) 2025 Mohamed Z. Hatim
         if len(traits) >= len(traits.columns) + 1 and CONVEX_HULL_AVAILABLE:
             try:
                 if len(traits) > 3:
-                    # Use PCA to reduce dimensionality for ConvexHull
+# Copyright (c) 2025 Mohamed Z. Hatim
                     pca = PCA(n_components=min(3, len(traits.columns)))
                     traits_pca = pca.fit_transform(traits.values)
                     hull = ConvexHull(traits_pca)
@@ -199,13 +199,13 @@ class FunctionalTraitAnalyzer:
             except:
                 indices['FRic'] = 0
         else:
-            # Alternative FRic calculation using trait range
+# Copyright (c) 2025 Mohamed Z. Hatim
             trait_ranges = traits.max() - traits.min()
             indices['FRic'] = trait_ranges.prod()
         
-        # Functional Evenness (FEve) - regularity of abundance distribution in functional space
+# Copyright (c) 2025 Mohamed Z. Hatim
         if len(traits) > 1:
-            # Calculate minimum spanning tree
+# Copyright (c) 2025 Mohamed Z. Hatim
             try:
                 mst_distances = []
                 for i in range(len(traits)):
@@ -230,21 +230,21 @@ class FunctionalTraitAnalyzer:
         else:
             indices['FEve'] = 0
         
-        # Functional Divergence (FDiv) - degree of divergence from center of functional space
+# Copyright (c) 2025 Mohamed Z. Hatim
         if len(traits) > 0:
-            # Calculate community-weighted mean traits
+# Copyright (c) 2025 Mohamed Z. Hatim
             cwm_traits = (traits * weights.values.reshape(-1, 1)).sum(axis=0)
             
-            # Calculate distances to centroid
+# Copyright (c) 2025 Mohamed Z. Hatim
             centroid_distances = np.sqrt(((traits - cwm_traits) ** 2).sum(axis=1))
             
-            # Calculate weighted mean distance to centroid
+# Copyright (c) 2025 Mohamed Z. Hatim
             mean_dist = (centroid_distances * weights).sum()
             
-            # Calculate absolute deviations
+# Copyright (c) 2025 Mohamed Z. Hatim
             abs_deviations = np.abs(centroid_distances - mean_dist)
             
-            # FDiv calculation
+# Copyright (c) 2025 Mohamed Z. Hatim
             if mean_dist > 0:
                 indices['FDiv'] = (abs_deviations * weights).sum() / mean_dist
             else:
@@ -252,7 +252,7 @@ class FunctionalTraitAnalyzer:
         else:
             indices['FDiv'] = 0
         
-        # Functional Dispersion (FDis) - weighted mean distance to centroid
+# Copyright (c) 2025 Mohamed Z. Hatim
         if len(traits) > 0:
             cwm_traits = (traits * weights.values.reshape(-1, 1)).sum(axis=0)
             centroid_distances = np.sqrt(((traits - cwm_traits) ** 2).sum(axis=1))
@@ -260,7 +260,7 @@ class FunctionalTraitAnalyzer:
         else:
             indices['FDis'] = 0
         
-        # Rao's Quadratic Entropy (RaoQ) - abundance-weighted trait diversity
+# Copyright (c) 2025 Mohamed Z. Hatim
         indices['RaoQ'] = 0
         for i in range(len(weights)):
             for j in range(len(weights)):
@@ -292,14 +292,14 @@ class FunctionalTraitAnalyzer:
         if self.trait_data is None:
             raise ValueError("Trait data not loaded. Use load_trait_data() first.")
         
-        # Select traits
+# Copyright (c) 2025 Mohamed Z. Hatim
         if traits is None:
             traits = self.trait_data.select_dtypes(include=[np.number]).columns.tolist()
         
         trait_matrix = self.trait_data[traits].copy()
         trait_matrix = trait_matrix.fillna(trait_matrix.mean())
         
-        # Standardize traits
+# Copyright (c) 2025 Mohamed Z. Hatim
         scaler = StandardScaler()
         trait_matrix_scaled = pd.DataFrame(
             scaler.fit_transform(trait_matrix),
@@ -308,13 +308,13 @@ class FunctionalTraitAnalyzer:
         )
         
         if method == 'hierarchical':
-            # Hierarchical clustering
+# Copyright (c) 2025 Mohamed Z. Hatim
             distances = pdist(trait_matrix_scaled.values, metric='euclidean')
             linkage_matrix = linkage(distances, method='ward')
             
-            # Determine optimal number of clusters if not provided
+# Copyright (c) 2025 Mohamed Z. Hatim
             if n_groups is None:
-                # Use silhouette analysis or elbow method
+# Copyright (c) 2025 Mohamed Z. Hatim
                 from sklearn.metrics import silhouette_score
                 silhouette_scores = []
                 K_range = range(2, min(11, len(trait_matrix) // 2))
@@ -333,7 +333,7 @@ class FunctionalTraitAnalyzer:
             
         elif method == 'kmeans':
             if n_groups is None:
-                # Elbow method
+# Copyright (c) 2025 Mohamed Z. Hatim
                 inertias = []
                 K_range = range(2, min(11, len(trait_matrix) // 2))
                 for k in K_range:
@@ -341,7 +341,7 @@ class FunctionalTraitAnalyzer:
                     kmeans.fit(trait_matrix_scaled)
                     inertias.append(kmeans.inertia_)
                 
-                # Simple elbow detection
+# Copyright (c) 2025 Mohamed Z. Hatim
                 deltas = np.diff(inertias)
                 delta_deltas = np.diff(deltas)
                 n_groups = K_range[np.argmax(delta_deltas) + 2] if len(delta_deltas) > 0 else 3
@@ -354,10 +354,10 @@ class FunctionalTraitAnalyzer:
         else:
             raise ValueError(f"Unknown clustering method: {method}")
         
-        # Create functional group assignments
+# Copyright (c) 2025 Mohamed Z. Hatim
         functional_groups = pd.Series(cluster_labels, index=trait_matrix.index, name='functional_group')
         
-        # Calculate group characteristics
+# Copyright (c) 2025 Mohamed Z. Hatim
         group_characteristics = {}
         for group in range(1, n_groups + 1):
             group_species = functional_groups[functional_groups == group].index
@@ -408,16 +408,16 @@ class FunctionalTraitAnalyzer:
         if self.trait_data is None or self.abundance_data is None:
             raise ValueError("Both trait and abundance data required. Use load_trait_data() first.")
         
-        # Select traits and environmental variables
+# Copyright (c) 2025 Mohamed Z. Hatim
         if traits is None:
             traits = self.trait_data.select_dtypes(include=[np.number]).columns.tolist()
         if env_variables is None:
             env_variables = environmental_data.select_dtypes(include=[np.number]).columns.tolist()
         
-        # Calculate community-weighted mean traits for each site
+# Copyright (c) 2025 Mohamed Z. Hatim
         cwm_traits = self._calculate_cwm_traits(traits)
         
-        # Merge with environmental data
+# Copyright (c) 2025 Mohamed Z. Hatim
         common_sites = set(cwm_traits.index) & set(environmental_data.index)
         if len(common_sites) == 0:
             raise ValueError("No common sites found between CWM traits and environmental data")
@@ -425,7 +425,7 @@ class FunctionalTraitAnalyzer:
         cwm_traits_common = cwm_traits.loc[list(common_sites)]
         env_data_common = environmental_data.loc[list(common_sites), env_variables]
         
-        # Calculate correlations
+# Copyright (c) 2025 Mohamed Z. Hatim
         correlations = {}
         p_values = {}
         
@@ -442,11 +442,11 @@ class FunctionalTraitAnalyzer:
                     correlations[trait][env_var] = corr
                     p_values[trait][env_var] = p_val
         
-        # Convert to DataFrames
+# Copyright (c) 2025 Mohamed Z. Hatim
         corr_df = pd.DataFrame(correlations).T
         pval_df = pd.DataFrame(p_values).T
         
-        # Perform RDA (Redundancy Analysis) if possible
+# Copyright (c) 2025 Mohamed Z. Hatim
         rda_results = None
         try:
             rda_results = self._perform_rda(cwm_traits_common, env_data_common)
@@ -476,12 +476,12 @@ class FunctionalTraitAnalyzer:
                 cwm_traits.append({trait: np.nan for trait in traits})
                 continue
             
-            # Get traits for present species
+# Copyright (c) 2025 Mohamed Z. Hatim
             site_traits = self.trait_data.loc[present_species, traits]
             site_weights = site_abundances.loc[present_species]
             site_weights = site_weights / site_weights.sum()  # Normalize
             
-            # Calculate weighted means
+# Copyright (c) 2025 Mohamed Z. Hatim
             cwm_site = {}
             for trait in traits:
                 if trait in site_traits.columns:
@@ -499,7 +499,7 @@ class FunctionalTraitAnalyzer:
         from sklearn.linear_model import LinearRegression
         from sklearn.decomposition import PCA
         
-        # Remove missing data
+# Copyright (c) 2025 Mohamed Z. Hatim
         complete_data = pd.concat([traits, env_data], axis=1).dropna()
         if len(complete_data) == 0:
             return None
@@ -507,14 +507,14 @@ class FunctionalTraitAnalyzer:
         traits_complete = complete_data[traits.columns]
         env_complete = complete_data[env_data.columns]
         
-        # Standardize data
+# Copyright (c) 2025 Mohamed Z. Hatim
         scaler_traits = StandardScaler()
         scaler_env = StandardScaler()
         
         traits_scaled = scaler_traits.fit_transform(traits_complete)
         env_scaled = scaler_env.fit_transform(env_complete)
         
-        # Fit linear regression for each trait
+# Copyright (c) 2025 Mohamed Z. Hatim
         explained_variance = []
         canonical_axes = []
         
@@ -523,13 +523,13 @@ class FunctionalTraitAnalyzer:
             reg.fit(env_scaled, traits_scaled[:, i])
             predicted = reg.predict(env_scaled)
             
-            # Calculate explained variance
+# Copyright (c) 2025 Mohamed Z. Hatim
             ss_res = np.sum((traits_scaled[:, i] - predicted) ** 2)
             ss_tot = np.sum((traits_scaled[:, i] - np.mean(traits_scaled[:, i])) ** 2)
             r2 = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0
             explained_variance.append(r2)
         
-        # PCA on predicted trait values
+# Copyright (c) 2025 Mohamed Z. Hatim
         predicted_traits = np.column_stack([
             LinearRegression().fit(env_scaled, traits_scaled[:, i]).predict(env_scaled)
             for i in range(traits_scaled.shape[1])
@@ -572,7 +572,7 @@ class FunctionalTraitAnalyzer:
         if traits is None:
             traits = self.trait_data.select_dtypes(include=[np.number]).columns.tolist()
         
-        # Calculate functional diversity for each site
+# Copyright (c) 2025 Mohamed Z. Hatim
         fd_results = self.calculate_functional_diversity(sites, traits)
         
         if 'site_diversity' not in fd_results:
@@ -580,10 +580,10 @@ class FunctionalTraitAnalyzer:
         
         site_fd = fd_results['site_diversity']
         
-        # Calculate beta diversity components
+# Copyright (c) 2025 Mohamed Z. Hatim
         beta_diversity = {}
         
-        # Total functional diversity (gamma)
+# Copyright (c) 2025 Mohamed Z. Hatim
         all_species = []
         all_abundances = []
         
@@ -595,16 +595,16 @@ class FunctionalTraitAnalyzer:
                 all_abundances.extend(site_abundances.loc[present_species].tolist())
         
         if all_species:
-            # Create pooled community
+# Copyright (c) 2025 Mohamed Z. Hatim
             pooled_abundances = pd.Series(all_abundances, index=all_species)
             pooled_abundances = pooled_abundances.groupby(pooled_abundances.index).sum()
             pooled_abundances = pooled_abundances / pooled_abundances.sum()
             
-            # Calculate gamma diversity
+# Copyright (c) 2025 Mohamed Z. Hatim
             pooled_traits = self.trait_data.loc[pooled_abundances.index, traits]
             pooled_traits = pooled_traits.fillna(pooled_traits.mean())
             
-            # Standardize
+# Copyright (c) 2025 Mohamed Z. Hatim
             scaler = StandardScaler()
             pooled_traits_scaled = pd.DataFrame(
                 scaler.fit_transform(pooled_traits),
@@ -624,10 +624,10 @@ class FunctionalTraitAnalyzer:
                 pooled_traits_scaled, pooled_abundances, pooled_dist_df
             )
         
-        # Calculate mean alpha diversity
+# Copyright (c) 2025 Mohamed Z. Hatim
         mean_alpha_fd = site_fd.mean().to_dict()
         
-        # Calculate beta diversity (gamma - mean alpha)
+# Copyright (c) 2025 Mohamed Z. Hatim
         for index in gamma_fd:
             if index in mean_alpha_fd:
                 beta_diversity[f'beta_{index}'] = gamma_fd[index] - mean_alpha_fd[index]
@@ -669,17 +669,17 @@ class FunctionalTraitAnalyzer:
         
         trait_matrix = self.trait_data[traits].fillna(self.trait_data[traits].mean())
         
-        # Standardize and perform PCA
+# Copyright (c) 2025 Mohamed Z. Hatim
         scaler = StandardScaler()
         trait_matrix_scaled = scaler.fit_transform(trait_matrix)
         
         pca = PCA(n_components=n_components)
         pca_scores = pca.fit_transform(trait_matrix_scaled)
         
-        # Create plot
+# Copyright (c) 2025 Mohamed Z. Hatim
         fig, ax = plt.subplots(figsize=(10, 8))
         
-        # Color points
+# Copyright (c) 2025 Mohamed Z. Hatim
         if color_by == 'functional_group' and self.functional_groups is not None:
             colors = self.functional_groups['functional_groups']
             scatter = ax.scatter(pca_scores[:, 0], pca_scores[:, 1], c=colors, cmap='tab10')
@@ -687,7 +687,7 @@ class FunctionalTraitAnalyzer:
         else:
             ax.scatter(pca_scores[:, 0], pca_scores[:, 1], alpha=0.7)
         
-        # Add species labels
+# Copyright (c) 2025 Mohamed Z. Hatim
         for i, species in enumerate(trait_matrix.index):
             ax.annotate(species, (pca_scores[i, 0], pca_scores[i, 1]), 
                        xytext=(5, 5), textcoords='offset points', fontsize=8, alpha=0.7)
@@ -734,14 +734,14 @@ class FunctionalTraitAnalyzer:
             axes[i].set_ylabel('Frequency')
             axes[i].set_title(f'Distribution of {trait}')
             
-            # Add statistics
+# Copyright (c) 2025 Mohamed Z. Hatim
             mean_val = trait_values.mean()
             std_val = trait_values.std()
             axes[i].axvline(mean_val, color='red', linestyle='--', 
                           label=f'Mean: {mean_val:.2f}')
             axes[i].legend()
         
-        # Remove empty subplots
+# Copyright (c) 2025 Mohamed Z. Hatim
         for i in range(n_traits, len(axes)):
             axes[i].remove()
         
@@ -786,7 +786,7 @@ class TraitSyndromes:
             self.trait_analyzer.trait_data[traits].mean()
         )
         
-        # Standardize traits
+# Copyright (c) 2025 Mohamed Z. Hatim
         scaler = StandardScaler()
         trait_matrix_scaled = pd.DataFrame(
             scaler.fit_transform(trait_matrix),
@@ -798,18 +798,18 @@ class TraitSyndromes:
             pca = PCA()
             pca_scores = pca.fit_transform(trait_matrix_scaled)
             
-            # Identify significant components (>1 eigenvalue or >5% variance)
+# Copyright (c) 2025 Mohamed Z. Hatim
             significant_pcs = (pca.explained_variance_ > 1) | (pca.explained_variance_ratio_ > 0.05)
             n_significant = np.sum(significant_pcs)
             
-            # Create loadings DataFrame
+# Copyright (c) 2025 Mohamed Z. Hatim
             loadings = pd.DataFrame(
                 pca.components_[:n_significant].T,
                 index=traits,
                 columns=[f'PC{i+1}' for i in range(n_significant)]
             )
             
-            # Identify trait syndromes based on high loadings
+# Copyright (c) 2025 Mohamed Z. Hatim
             syndromes = {}
             for pc in loadings.columns:
                 high_positive = loadings[loadings[pc] > 0.6][pc].index.tolist()
@@ -840,7 +840,7 @@ class TraitSyndromes:
     
     def _interpret_syndrome(self, positive_traits: List[str], negative_traits: List[str]) -> str:
         """Provide biological interpretation of trait syndrome."""
-        # This is a simplified interpretation - in practice, this would be more sophisticated
+# Copyright (c) 2025 Mohamed Z. Hatim
         interpretations = {
             'acquisitive': ['leaf_area', 'sla', 'leaf_n', 'leaf_p'],
             'conservative': ['leaf_thickness', 'ldmc', 'wood_density'],
@@ -848,7 +848,7 @@ class TraitSyndromes:
             'reproductive': ['seed_mass', 'seed_number', 'reproductive_height']
         }
         
-        # Simple matching - could be improved with more sophisticated logic
+# Copyright (c) 2025 Mohamed Z. Hatim
         for syndrome_name, syndrome_traits in interpretations.items():
             if len(set(positive_traits) & set(syndrome_traits)) >= 2:
                 return f"Likely represents {syndrome_name} strategy"
@@ -876,7 +876,7 @@ class TraitSyndromes:
         numeric_traits = self.trait_analyzer.trait_data.select_dtypes(include=[np.number]).columns.tolist()
         
         if trait_pairs is None:
-            # Generate all possible pairs
+# Copyright (c) 2025 Mohamed Z. Hatim
             trait_pairs = [(t1, t2) for i, t1 in enumerate(numeric_traits) 
                           for t2 in numeric_traits[i+1:]]
         
@@ -886,16 +886,16 @@ class TraitSyndromes:
             if trait1 not in self.trait_analyzer.trait_data.columns or trait2 not in self.trait_analyzer.trait_data.columns:
                 continue
             
-            # Get trait values
+# Copyright (c) 2025 Mohamed Z. Hatim
             data_subset = self.trait_analyzer.trait_data[[trait1, trait2]].dropna()
             
             if len(data_subset) < 3:
                 continue
             
-            # Calculate correlation
+# Copyright (c) 2025 Mohamed Z. Hatim
             corr, p_value = stats.pearsonr(data_subset[trait1], data_subset[trait2])
             
-            # Classify trade-off
+# Copyright (c) 2025 Mohamed Z. Hatim
             if p_value < 0.05:
                 if corr < -0.3:
                     trade_off_type = "Strong trade-off"
@@ -950,7 +950,7 @@ class TraitSyndromes:
         return summary
 
 
-# Quick analysis functions
+# Copyright (c) 2025 Mohamed Z. Hatim
 def quick_functional_diversity(trait_data: pd.DataFrame,
                              abundance_data: pd.DataFrame,
                              species_column: str = 'species') -> Dict[str, Any]:

@@ -56,9 +56,9 @@ class SpatialAnalyzer:
             'evenness': self._landscape_evenness
         }
     
-    # =============================================================================
-    # VEGETATION MAPPING AND SPATIAL INTERPOLATION
-    # =============================================================================
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def spatial_interpolation(self, data: pd.DataFrame,
                             x_col: str = 'longitude',
@@ -92,21 +92,21 @@ class SpatialAnalyzer:
         dict
             Interpolation results including grid and statistics
         """
-        # Clean data
+# Copyright (c) 2025 Mohamed Z. Hatim
         clean_data = data.dropna(subset=[x_col, y_col, z_col])
         
         if len(clean_data) < 3:
             raise ValueError("Need at least 3 valid data points for interpolation")
         
-        # Extract coordinates and values
+# Copyright (c) 2025 Mohamed Z. Hatim
         points = clean_data[[x_col, y_col]].values
         values = clean_data[z_col].values
         
-        # Create interpolation grid
+# Copyright (c) 2025 Mohamed Z. Hatim
         x_min, x_max = points[:, 0].min(), points[:, 0].max()
         y_min, y_max = points[:, 1].min(), points[:, 1].max()
         
-        # Expand bounds slightly
+# Copyright (c) 2025 Mohamed Z. Hatim
         x_buffer = (x_max - x_min) * 0.1
         y_buffer = (y_max - y_min) * 0.1
         
@@ -116,17 +116,17 @@ class SpatialAnalyzer:
         X_grid, Y_grid = np.meshgrid(x_grid, y_grid)
         grid_points = np.column_stack([X_grid.ravel(), Y_grid.ravel()])
         
-        # Perform interpolation
+# Copyright (c) 2025 Mohamed Z. Hatim
         if method not in self.interpolation_methods:
             raise ValueError(f"Unknown interpolation method: {method}")
         
         interp_func = self.interpolation_methods[method]
         interpolated_values = interp_func(points, values, grid_points, **kwargs)
         
-        # Reshape to grid
+# Copyright (c) 2025 Mohamed Z. Hatim
         Z_grid = interpolated_values.reshape(X_grid.shape)
         
-        # Calculate interpolation statistics
+# Copyright (c) 2025 Mohamed Z. Hatim
         stats_dict = self._calculate_interpolation_stats(
             points, values, grid_points, interpolated_values, method
         )
@@ -157,7 +157,7 @@ class SpatialAnalyzer:
         for i, grid_point in enumerate(grid_points):
             distances = np.sqrt(np.sum((points - grid_point)**2, axis=1))
             
-            # Handle coincident points
+# Copyright (c) 2025 Mohamed Z. Hatim
             if np.any(distances == 0):
                 zero_idx = np.where(distances == 0)[0][0]
                 interpolated[i] = values[zero_idx]
@@ -171,21 +171,21 @@ class SpatialAnalyzer:
                        grid_points: np.ndarray, variogram_model: str = 'gaussian',
                        **kwargs) -> np.ndarray:
         """Simple kriging interpolation (simplified implementation)."""
-        # Simplified kriging - in practice would use specialized libraries like PyKrige
-        # This is a basic implementation using RBF as approximation
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
         
         try:
             from scipy.spatial.distance import pdist, squareform
             
-            # Calculate distances between points
+# Copyright (c) 2025 Mohamed Z. Hatim
             point_distances = squareform(pdist(points))
             
-            # Simple exponential variogram model
+# Copyright (c) 2025 Mohamed Z. Hatim
             nugget = kwargs.get('nugget', 0.1)
             sill = kwargs.get('sill', np.var(values))
             range_param = kwargs.get('range', np.max(point_distances) / 3)
             
-            # Variogram function
+# Copyright (c) 2025 Mohamed Z. Hatim
             def variogram(h):
                 if variogram_model == 'exponential':
                     return nugget + sill * (1 - np.exp(-h / range_param))
@@ -195,11 +195,11 @@ class SpatialAnalyzer:
                     h = np.minimum(h, range_param)
                     return nugget + sill * (1.5 * h / range_param - 0.5 * (h / range_param)**3)
             
-            # Build covariance matrix
+# Copyright (c) 2025 Mohamed Z. Hatim
             gamma = variogram(point_distances)
             cov_matrix = sill - gamma + np.eye(len(points)) * nugget
             
-            # Solve kriging system for each grid point
+# Copyright (c) 2025 Mohamed Z. Hatim
             interpolated = np.zeros(len(grid_points))
             
             for i, grid_point in enumerate(grid_points):
@@ -211,7 +211,7 @@ class SpatialAnalyzer:
                     weights = np.linalg.solve(cov_matrix, cov_grid)
                     interpolated[i] = np.sum(weights * values)
                 except np.linalg.LinAlgError:
-                    # Fallback to IDW
+# Copyright (c) 2025 Mohamed Z. Hatim
                     if np.any(distances_to_grid == 0):
                         zero_idx = np.where(distances_to_grid == 0)[0][0]
                         interpolated[i] = values[zero_idx]
@@ -230,7 +230,7 @@ class SpatialAnalyzer:
                               **kwargs) -> np.ndarray:
         """Radial basis function interpolation."""
         try:
-            # Map function names to scipy RBF functions
+# Copyright (c) 2025 Mohamed Z. Hatim
             if function == 'thin_plate_spline':
                 rbf = RBFInterpolator(points, values, kernel='thin_plate_spline')
             elif function == 'multiquadric':
@@ -267,11 +267,11 @@ class SpatialAnalyzer:
                                      grid_points: np.ndarray, interpolated_values: np.ndarray,
                                      method: str) -> Dict[str, float]:
         """Calculate interpolation quality statistics."""
-        # Cross-validation RMSE
+# Copyright (c) 2025 Mohamed Z. Hatim
         try:
             cv_errors = []
             for i in range(len(points)):
-                # Leave-one-out cross-validation
+# Copyright (c) 2025 Mohamed Z. Hatim
                 train_points = np.delete(points, i, axis=0)
                 train_values = np.delete(values, i)
                 test_point = points[i:i+1]
@@ -286,7 +286,7 @@ class SpatialAnalyzer:
         except:
             cv_rmse = np.nan
         
-        # Basic statistics
+# Copyright (c) 2025 Mohamed Z. Hatim
         stats_dict = {
             'cv_rmse': cv_rmse,
             'min_interpolated': np.nanmin(interpolated_values),
@@ -300,9 +300,9 @@ class SpatialAnalyzer:
         
         return stats_dict
     
-    # =============================================================================
-    # HABITAT SUITABILITY MODELING
-    # =============================================================================
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def habitat_suitability_modeling(self, presence_data: pd.DataFrame,
                                    environmental_data: pd.DataFrame,
@@ -334,11 +334,11 @@ class SpatialAnalyzer:
         dict
             Habitat suitability model results
         """
-        # Merge presence and environmental data
+# Copyright (c) 2025 Mohamed Z. Hatim
         merged_data = pd.merge(presence_data, environmental_data, 
                               on=[x_col, y_col], how='inner')
         
-        # Prepare predictor variables
+# Copyright (c) 2025 Mohamed Z. Hatim
         env_cols = [col for col in environmental_data.columns 
                    if col not in [x_col, y_col]]
         X = merged_data[env_cols].dropna()
@@ -347,7 +347,7 @@ class SpatialAnalyzer:
         if len(X) < 10:
             raise ValueError("Insufficient data points for modeling")
         
-        # Fit habitat suitability model
+# Copyright (c) 2025 Mohamed Z. Hatim
         if method == 'random_forest':
             model_results = self._fit_random_forest_hsm(X, y, **kwargs)
         elif method == 'glm':
@@ -357,12 +357,12 @@ class SpatialAnalyzer:
         else:
             raise ValueError(f"Unknown method: {method}")
         
-        # Calculate variable importance
+# Copyright (c) 2025 Mohamed Z. Hatim
         var_importance = self._calculate_variable_importance(
             model_results['model'], X, y, method
         )
         
-        # Generate prediction map if environmental grid provided
+# Copyright (c) 2025 Mohamed Z. Hatim
         prediction_map = None
         if 'prediction_grid' in kwargs:
             prediction_map = self._generate_prediction_map(
@@ -387,12 +387,12 @@ class SpatialAnalyzer:
         from sklearn.model_selection import train_test_split
         from sklearn.metrics import accuracy_score, r2_score
         
-        # Split data
+# Copyright (c) 2025 Mohamed Z. Hatim
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.3, random_state=42
         )
         
-        # Fit model
+# Copyright (c) 2025 Mohamed Z. Hatim
         if np.all(np.isin(y, [0, 1])):  # Binary classification
             from sklearn.ensemble import RandomForestClassifier
             from sklearn.metrics import roc_auc_score
@@ -432,7 +432,7 @@ class SpatialAnalyzer:
         from sklearn.preprocessing import StandardScaler
         from sklearn.pipeline import Pipeline
         
-        # Create preprocessing pipeline
+# Copyright (c) 2025 Mohamed Z. Hatim
         if np.all(np.isin(y, [0, 1])):  # Binary
             pipeline = Pipeline([
                 ('scaler', StandardScaler()),
@@ -468,7 +468,7 @@ class SpatialAnalyzer:
     
     def _fit_maxent_hsm(self, X: pd.DataFrame, y: pd.Series, **kwargs) -> Dict[str, Any]:
         """Simplified MaxEnt-like model using logistic regression."""
-        # This is a simplified version - true MaxEnt would require specialized implementation
+# Copyright (c) 2025 Mohamed Z. Hatim
         warnings.warn("Using simplified MaxEnt (logistic regression)")
         return self._fit_glm_hsm(X, y, **kwargs)
     
@@ -481,7 +481,7 @@ class SpatialAnalyzer:
             else:
                 importance = np.zeros(len(X.columns))
         else:
-            # Permutation importance for other methods
+# Copyright (c) 2025 Mohamed Z. Hatim
             importance = np.zeros(len(X.columns))
             baseline_score = model.score(X, y)
             
@@ -505,9 +505,9 @@ class SpatialAnalyzer:
         
         return predictions
     
-    # =============================================================================
-    # FRAGMENTATION ANALYSIS AND LANDSCAPE METRICS
-    # =============================================================================
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def fragmentation_analysis(self, landscape_data: np.ndarray,
                              patch_types: Optional[List] = None,
@@ -536,10 +536,10 @@ class SpatialAnalyzer:
         results = {}
         
         for patch_type in patch_types:
-            # Create binary mask for this patch type
+# Copyright (c) 2025 Mohamed Z. Hatim
             binary_mask = (landscape_data == patch_type).astype(int)
             
-            # Calculate landscape metrics
+# Copyright (c) 2025 Mohamed Z. Hatim
             metrics = {}
             for metric_name, metric_func in self.landscape_metrics.items():
                 try:
@@ -548,7 +548,7 @@ class SpatialAnalyzer:
                     warnings.warn(f"Error calculating {metric_name}: {e}")
                     metrics[metric_name] = np.nan
             
-            # Additional fragmentation-specific metrics
+# Copyright (c) 2025 Mohamed Z. Hatim
             fragmentation_metrics = self._calculate_fragmentation_metrics(
                 binary_mask, cell_size
             )
@@ -556,7 +556,7 @@ class SpatialAnalyzer:
             
             results[f'patch_type_{patch_type}'] = metrics
         
-        # Calculate landscape-level metrics
+# Copyright (c) 2025 Mohamed Z. Hatim
         landscape_metrics = self._calculate_landscape_level_metrics(
             landscape_data, patch_types, cell_size
         )
@@ -574,7 +574,7 @@ class SpatialAnalyzer:
     def _edge_density(self, binary_mask: np.ndarray, landscape: np.ndarray,
                      cell_size: float) -> float:
         """Calculate edge density (edge length per area)."""
-        # Calculate edge using gradient
+# Copyright (c) 2025 Mohamed Z. Hatim
         edges = np.gradient(binary_mask.astype(float))
         edge_magnitude = np.sqrt(edges[0]**2 + edges[1]**2)
         total_edge = np.sum(edge_magnitude > 0) * cell_size
@@ -633,28 +633,28 @@ class SpatialAnalyzer:
     def _landscape_shape_index(self, binary_mask: np.ndarray, landscape: np.ndarray,
                               cell_size: float) -> float:
         """Calculate landscape shape index."""
-        # Simplified LSI calculation
+# Copyright (c) 2025 Mohamed Z. Hatim
         total_edge = self._edge_density(binary_mask, landscape, cell_size)
         total_area = np.sum(binary_mask) * (cell_size ** 2)
         
         if total_area == 0:
             return 0
         
-        # LSI = edge length / (minimum edge length for same area)
+# Copyright (c) 2025 Mohamed Z. Hatim
         min_edge = 4 * np.sqrt(total_area)  # Square perimeter
         return total_edge / min_edge if min_edge > 0 else 0
     
     def _contagion_index(self, binary_mask: np.ndarray, landscape: np.ndarray,
                         cell_size: float) -> float:
         """Calculate contagion index."""
-        # Simplified contagion calculation
+# Copyright (c) 2025 Mohamed Z. Hatim
         patch_types = np.unique(landscape)
         n_types = len(patch_types)
         
         if n_types <= 1:
             return 100
         
-        # Calculate adjacencies
+# Copyright (c) 2025 Mohamed Z. Hatim
         adjacencies = np.zeros((n_types, n_types))
         
         for i in range(landscape.shape[0] - 1):
@@ -670,7 +670,7 @@ class SpatialAnalyzer:
                 adjacencies[idx1, idx2] += 1
                 adjacencies[idx1, idx3] += 1
         
-        # Calculate contagion
+# Copyright (c) 2025 Mohamed Z. Hatim
         total_adjacencies = np.sum(adjacencies)
         if total_adjacencies == 0:
             return 0
@@ -719,20 +719,20 @@ class SpatialAnalyzer:
         }
         
         if n_patches > 0:
-            # Calculate patch compactness
+# Copyright (c) 2025 Mohamed Z. Hatim
             compactness_values = []
             
             for patch_id in range(1, n_patches + 1):
                 patch = (labeled_patches == patch_id)
                 patch_area = np.sum(patch)
                 
-                # Calculate perimeter
+# Copyright (c) 2025 Mohamed Z. Hatim
                 patch_float = patch.astype(float)
                 edges = np.gradient(patch_float)
                 perimeter = np.sum(np.sqrt(edges[0]**2 + edges[1]**2) > 0)
                 
                 if perimeter > 0:
-                    # Compactness = 4π * area / perimeter²
+# Copyright (c) 2025 Mohamed Z. Hatim
                     compactness = (4 * np.pi * patch_area) / (perimeter ** 2)
                     compactness_values.append(compactness)
             
@@ -753,9 +753,9 @@ class SpatialAnalyzer:
         
         return metrics
     
-    # =============================================================================
-    # SPATIAL AUTOCORRELATION
-    # =============================================================================
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def spatial_autocorrelation(self, data: pd.DataFrame,
                               x_col: str = 'longitude',
@@ -803,22 +803,22 @@ class SpatialAnalyzer:
         """Calculate Moran's I spatial autocorrelation."""
         n = len(points)
         
-        # Create spatial weights matrix
+# Copyright (c) 2025 Mohamed Z. Hatim
         distances = distance_matrix(points, points)
         
         if distance_threshold is None:
-            # Use mean of all pairwise distances
+# Copyright (c) 2025 Mohamed Z. Hatim
             distance_threshold = np.mean(distances[distances > 0])
         
-        # Binary weights: 1 if within threshold, 0 otherwise
+# Copyright (c) 2025 Mohamed Z. Hatim
         W = (distances <= distance_threshold) & (distances > 0)
         W = W.astype(float)
         
-        # Normalize weights
+# Copyright (c) 2025 Mohamed Z. Hatim
         row_sums = np.sum(W, axis=1)
         W[row_sums > 0] = W[row_sums > 0] / row_sums[row_sums > 0][:, np.newaxis]
         
-        # Calculate Moran's I
+# Copyright (c) 2025 Mohamed Z. Hatim
         mean_val = np.mean(values)
         deviations = values - mean_val
         
@@ -830,11 +830,11 @@ class SpatialAnalyzer:
         else:
             morans_i = numerator / denominator
         
-        # Expected value under null hypothesis
+# Copyright (c) 2025 Mohamed Z. Hatim
         expected_i = -1 / (n - 1)
         
-        # Calculate significance (simplified)
-        # This is a simplified version - full calculation would require more complex statistics
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
         z_score = (morans_i - expected_i) / np.sqrt(1 / n)  # Simplified standard error
         p_value = 2 * (1 - stats.norm.cdf(abs(z_score)))
         
@@ -852,7 +852,7 @@ class SpatialAnalyzer:
         """Calculate Geary's C spatial autocorrelation."""
         n = len(points)
         
-        # Create spatial weights matrix (same as Moran's I)
+# Copyright (c) 2025 Mohamed Z. Hatim
         distances = distance_matrix(points, points)
         
         if distance_threshold is None:
@@ -861,7 +861,7 @@ class SpatialAnalyzer:
         W = (distances <= distance_threshold) & (distances > 0)
         W = W.astype(float)
         
-        # Calculate Geary's C
+# Copyright (c) 2025 Mohamed Z. Hatim
         numerator = 0
         denominator = 0
         mean_val = np.mean(values)
@@ -890,19 +890,19 @@ class SpatialAnalyzer:
         """Calculate empirical variogram."""
         distances = distance_matrix(points, points)
         
-        # Get upper triangular distances and value differences
+# Copyright (c) 2025 Mohamed Z. Hatim
         triu_indices = np.triu_indices(len(points), k=1)
         dist_pairs = distances[triu_indices]
         value_pairs = np.array([(values[i], values[j]) for i, j in zip(triu_indices[0], triu_indices[1])])
         
-        # Calculate squared differences
+# Copyright (c) 2025 Mohamed Z. Hatim
         squared_diffs = (value_pairs[:, 0] - value_pairs[:, 1]) ** 2
         
-        # Create lag bins
+# Copyright (c) 2025 Mohamed Z. Hatim
         max_dist = np.max(dist_pairs)
         lag_bins = np.linspace(0, max_dist, n_lags + 1)
         
-        # Calculate variogram values for each lag
+# Copyright (c) 2025 Mohamed Z. Hatim
         lag_centers = []
         variogram_values = []
         n_pairs = []

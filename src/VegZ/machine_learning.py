@@ -98,30 +98,30 @@ class MachineLearningAnalyzer:
         Tuple[np.ndarray, np.ndarray, List[str]]
             Features, target, and feature names
         """
-        # Select features
+# Copyright (c) 2025 Mohamed Z. Hatim
         if feature_columns is None:
             feature_columns = [col for col in data.columns if col != target_column]
         
         X = data[feature_columns].copy()
         y = data[target_column].copy()
         
-        # Handle missing data
+# Copyright (c) 2025 Mohamed Z. Hatim
         if handle_missing == 'drop':
             complete_cases = ~(X.isnull().any(axis=1) | y.isnull())
             X = X[complete_cases]
             y = y[complete_cases]
         elif handle_missing == 'impute':
-            # Impute features
+# Copyright (c) 2025 Mohamed Z. Hatim
             if ITERATIVE_IMPUTER_AVAILABLE:
                 imputer = IterativeImputer(random_state=self.random_state)
                 X = pd.DataFrame(imputer.fit_transform(X), columns=X.columns, index=X.index)
             else:
                 X = X.fillna(X.mean())
             
-            # Handle target missing values
+# Copyright (c) 2025 Mohamed Z. Hatim
             y = y.fillna(y.mean() if y.dtype.kind in 'biufc' else y.mode()[0])
         
-        # Scale features if requested
+# Copyright (c) 2025 Mohamed Z. Hatim
         if scale_features:
             scaler = StandardScaler()
             X_scaled = scaler.fit_transform(X)
@@ -161,15 +161,15 @@ class MachineLearningAnalyzer:
         if model_types is None:
             model_types = ['rf', 'svm', 'mlp']
         
-        # Prepare data
+# Copyright (c) 2025 Mohamed Z. Hatim
         X, y, feature_names = self.prepare_data(data, species_column, morphological_features)
         
-        # Encode species labels
+# Copyright (c) 2025 Mohamed Z. Hatim
         le = LabelEncoder()
         y_encoded = le.fit_transform(y)
         self.encoders['species'] = le
         
-        # Split data
+# Copyright (c) 2025 Mohamed Z. Hatim
         X_train, X_test, y_train, y_test = train_test_split(
             X, y_encoded, test_size=test_size, random_state=self.random_state, stratify=y_encoded
         )
@@ -183,7 +183,7 @@ class MachineLearningAnalyzer:
             'species_names': le.classes_
         }
         
-        # Try different models
+# Copyright (c) 2025 Mohamed Z. Hatim
         models = {
             'rf': RandomForestClassifier(n_estimators=100, random_state=self.random_state),
             'svm': SVC(kernel='rbf', random_state=self.random_state),
@@ -196,18 +196,18 @@ class MachineLearningAnalyzer:
                 
             model = models[model_name]
             
-            # Train model
+# Copyright (c) 2025 Mohamed Z. Hatim
             model.fit(X_train, y_train)
             
-            # Make predictions
+# Copyright (c) 2025 Mohamed Z. Hatim
             y_pred = model.predict(X_test)
             y_pred_proba = model.predict_proba(X_test) if hasattr(model, 'predict_proba') else None
             
-            # Calculate performance
+# Copyright (c) 2025 Mohamed Z. Hatim
             accuracy = accuracy_score(y_test, y_pred)
             report = classification_report(y_test, y_pred, target_names=le.classes_, output_dict=True)
             
-            # Feature importance
+# Copyright (c) 2025 Mohamed Z. Hatim
             if hasattr(model, 'feature_importances_'):
                 importance = dict(zip(feature_names, model.feature_importances_))
             elif hasattr(model, 'coef_'):
@@ -228,7 +228,7 @@ class MachineLearningAnalyzer:
                 'probabilities': y_pred_proba
             }
         
-        # Store best model
+# Copyright (c) 2025 Mohamed Z. Hatim
         best_model = max(results['performance'].items(), key=lambda x: x[1]['accuracy'])
         results['best_model'] = best_model[0]
         self.models['species_identification'] = results
@@ -262,10 +262,10 @@ class MachineLearningAnalyzer:
         Dict[str, Any]
             Habitat suitability modeling results
         """
-        # Prepare data
+# Copyright (c) 2025 Mohamed Z. Hatim
         X, y, feature_names = self.prepare_data(data, species_column, environmental_features)
         
-        # Select model
+# Copyright (c) 2025 Mohamed Z. Hatim
         if model_type == 'rf':
             model = RandomForestClassifier(n_estimators=100, random_state=self.random_state)
         elif model_type == 'gbm':
@@ -275,22 +275,22 @@ class MachineLearningAnalyzer:
         else:
             raise ValueError(f"Unknown model type: {model_type}")
         
-        # Split data
+# Copyright (c) 2025 Mohamed Z. Hatim
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.3, random_state=self.random_state
         )
         
-        # Train model
+# Copyright (c) 2025 Mohamed Z. Hatim
         model.fit(X_train, y_train)
         
-        # Make predictions
+# Copyright (c) 2025 Mohamed Z. Hatim
         y_pred = model.predict(X_test)
         if hasattr(model, 'predict_proba'):
             suitability_proba = model.predict_proba(X_test)[:, 1]
         else:
             suitability_proba = model.predict(X_test)
         
-        # Performance metrics
+# Copyright (c) 2025 Mohamed Z. Hatim
         if model_type in ['rf', 'logistic']:
             accuracy = accuracy_score(y_test, y_pred)
             performance = {'accuracy': accuracy}
@@ -299,12 +299,12 @@ class MachineLearningAnalyzer:
             r2 = r2_score(y_test, y_pred)
             performance = {'mse': mse, 'r2': r2}
         
-        # Cross-validation
+# Copyright (c) 2025 Mohamed Z. Hatim
         cv_scores = None
         if cross_validation:
             cv_scores = cross_val_score(model, X, y, cv=5, random_state=self.random_state)
         
-        # Feature importance
+# Copyright (c) 2025 Mohamed Z. Hatim
         if hasattr(model, 'feature_importances_'):
             importance = dict(zip(feature_names, model.feature_importances_))
         else:
@@ -353,15 +353,15 @@ class MachineLearningAnalyzer:
         Dict[str, Any]
             Biomass prediction results
         """
-        # Prepare data
+# Copyright (c) 2025 Mohamed Z. Hatim
         X, y, feature_names = self.prepare_data(data, biomass_column, predictor_features)
         
-        # Split data
+# Copyright (c) 2025 Mohamed Z. Hatim
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.3, random_state=self.random_state
         )
         
-        # Select and configure model
+# Copyright (c) 2025 Mohamed Z. Hatim
         if model_type == 'rf':
             model = RandomForestRegressor(random_state=self.random_state)
             param_grid = {
@@ -390,7 +390,7 @@ class MachineLearningAnalyzer:
         else:
             raise ValueError(f"Unknown model type: {model_type}")
         
-        # Hyperparameter optimization
+# Copyright (c) 2025 Mohamed Z. Hatim
         if optimize_hyperparameters:
             grid_search = GridSearchCV(model, param_grid, cv=5, scoring='r2', n_jobs=-1)
             grid_search.fit(X_train, y_train)
@@ -401,16 +401,16 @@ class MachineLearningAnalyzer:
             best_model = model
             best_params = {}
         
-        # Make predictions
+# Copyright (c) 2025 Mohamed Z. Hatim
         y_pred = best_model.predict(X_test)
         
-        # Performance metrics
+# Copyright (c) 2025 Mohamed Z. Hatim
         mse = mean_squared_error(y_test, y_pred)
         rmse = np.sqrt(mse)
         r2 = r2_score(y_test, y_pred)
         mae = np.mean(np.abs(y_test - y_pred))
         
-        # Feature importance
+# Copyright (c) 2025 Mohamed Z. Hatim
         if hasattr(best_model, 'feature_importances_'):
             importance = dict(zip(feature_names, best_model.feature_importances_))
         elif hasattr(best_model, 'coef_'):
@@ -462,11 +462,11 @@ class MachineLearningAnalyzer:
         Dict[str, Any]
             Anomaly detection results
         """
-        # Prepare data
+# Copyright (c) 2025 Mohamed Z. Hatim
         X = data[feature_columns].copy()
         X = X.fillna(X.mean())  # Simple imputation for anomaly detection
         
-        # Scale features
+# Copyright (c) 2025 Mohamed Z. Hatim
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
         
@@ -477,13 +477,13 @@ class MachineLearningAnalyzer:
         elif method == 'dbscan':
             detector = DBSCAN(eps=0.5, min_samples=5)
             cluster_labels = detector.fit_predict(X_scaled)
-            # Consider noise points (-1) as anomalies
+# Copyright (c) 2025 Mohamed Z. Hatim
             anomaly_labels = np.where(cluster_labels == -1, -1, 1)
             anomaly_scores = np.zeros(len(X_scaled))  # DBSCAN doesn't provide scores
         else:
             raise ValueError(f"Unknown or unavailable method: {method}")
         
-        # Convert labels (-1: anomaly, 1: normal)
+# Copyright (c) 2025 Mohamed Z. Hatim
         is_anomaly = anomaly_labels == -1
         
         results = {
@@ -496,7 +496,7 @@ class MachineLearningAnalyzer:
             'feature_names': feature_columns
         }
         
-        # Add anomaly information to original data
+# Copyright (c) 2025 Mohamed Z. Hatim
         results['data_with_anomalies'] = data.copy()
         results['data_with_anomalies']['is_anomaly'] = is_anomaly
         results['data_with_anomalies']['anomaly_score'] = anomaly_scores
@@ -527,18 +527,18 @@ class MachineLearningAnalyzer:
         Dict[str, Any]
             Community classification results
         """
-        # Prepare data
+# Copyright (c) 2025 Mohamed Z. Hatim
         X = data[species_columns].copy()
         X = X.fillna(0)  # Fill missing with 0 for species data
         
-        # Apply appropriate transformation for community data
+# Copyright (c) 2025 Mohamed Z. Hatim
         X_transformed = np.log1p(X)  # Log transformation for abundance data
         
-        # Scale features
+# Copyright (c) 2025 Mohamed Z. Hatim
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X_transformed)
         
-        # Estimate optimal number of clusters if not provided
+# Copyright (c) 2025 Mohamed Z. Hatim
         if n_communities is None and method == 'kmeans':
             inertias = []
             K_range = range(2, min(11, len(X) // 2))
@@ -547,12 +547,12 @@ class MachineLearningAnalyzer:
                 kmeans.fit(X_scaled)
                 inertias.append(kmeans.inertia_)
             
-            # Use elbow method to estimate optimal k
+# Copyright (c) 2025 Mohamed Z. Hatim
             deltas = np.diff(inertias)
             delta_deltas = np.diff(deltas)
             n_communities = K_range[np.argmax(delta_deltas) + 2] if len(delta_deltas) > 0 else 3
         
-        # Perform clustering
+# Copyright (c) 2025 Mohamed Z. Hatim
         if method == 'kmeans':
             clusterer = KMeans(n_clusters=n_communities, random_state=self.random_state)
             cluster_labels = clusterer.fit_predict(X_scaled)
@@ -566,7 +566,7 @@ class MachineLearningAnalyzer:
         else:
             raise ValueError(f"Unknown method: {method}")
         
-        # Calculate community characteristics
+# Copyright (c) 2025 Mohamed Z. Hatim
         communities = {}
         for i in range(n_communities):
             if method == 'dbscan':
@@ -595,7 +595,7 @@ class MachineLearningAnalyzer:
             'species_names': species_columns
         }
         
-        # Add cluster labels to original data
+# Copyright (c) 2025 Mohamed Z. Hatim
         results['data_with_clusters'] = data.copy()
         results['data_with_clusters']['community'] = cluster_labels
         
@@ -625,15 +625,15 @@ class MachineLearningAnalyzer:
         Dict[str, Any]
             Dimensionality reduction results
         """
-        # Prepare data
+# Copyright (c) 2025 Mohamed Z. Hatim
         X = data[feature_columns].copy()
         X = X.fillna(X.mean())
         
-        # Scale features
+# Copyright (c) 2025 Mohamed Z. Hatim
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
         
-        # Apply dimensionality reduction
+# Copyright (c) 2025 Mohamed Z. Hatim
         if method == 'pca':
             reducer = PCA(n_components=n_components, random_state=self.random_state)
             X_reduced = reducer.fit_transform(X_scaled)
@@ -661,7 +661,7 @@ class MachineLearningAnalyzer:
             'n_components': n_components
         }
         
-        # Create DataFrame with reduced data
+# Copyright (c) 2025 Mohamed Z. Hatim
         component_names = [f'{method.upper()}{i+1}' for i in range(n_components)]
         results['reduced_df'] = pd.DataFrame(
             X_reduced,
@@ -698,11 +698,11 @@ class MachineLearningAnalyzer:
         """Plot classification model performance."""
         fig, axes = plt.subplots(2, 2, figsize=(12, 10))
         
-        # Feature importance
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'feature_importance' in results:
             importance = results['feature_importance']
             if isinstance(importance, dict) and importance:
-                # If multiple models, use the best one
+# Copyright (c) 2025 Mohamed Z. Hatim
                 if isinstance(list(importance.values())[0], dict):
                     best_model = results.get('best_model', list(importance.keys())[0])
                     importance = importance[best_model]
@@ -714,7 +714,7 @@ class MachineLearningAnalyzer:
                 axes[0, 0].set_title('Feature Importance')
                 axes[0, 0].set_xlabel('Importance')
         
-        # Confusion matrix (if available)
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'predictions' in results:
             pred_data = results['predictions']
             if isinstance(pred_data, dict) and 'y_true' in pred_data:
@@ -725,7 +725,7 @@ class MachineLearningAnalyzer:
                 sns.heatmap(confusion_df, annot=True, fmt='d', ax=axes[0, 1])
                 axes[0, 1].set_title('Confusion Matrix')
         
-        # Performance metrics
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'performance' in results:
             perf = results['performance']
             if isinstance(perf, dict) and 'accuracy' in perf:
@@ -736,7 +736,7 @@ class MachineLearningAnalyzer:
                 axes[1, 0].set_title('Performance Metrics')
                 axes[1, 0].set_ylim(0, 1)
         
-        # Remove empty subplot
+# Copyright (c) 2025 Mohamed Z. Hatim
         axes[1, 1].remove()
         
         plt.tight_layout()
@@ -746,7 +746,7 @@ class MachineLearningAnalyzer:
         """Plot regression model performance."""
         fig, axes = plt.subplots(2, 2, figsize=(12, 10))
         
-        # Feature importance
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'feature_importance' in results:
             importance = results['feature_importance']
             if importance:
@@ -757,7 +757,7 @@ class MachineLearningAnalyzer:
                 axes[0, 0].set_title('Feature Importance')
                 axes[0, 0].set_xlabel('Importance')
         
-        # Actual vs Predicted
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'predictions' in results:
             y_true = results['predictions']['y_true']
             y_pred = results['predictions']['y_pred']
@@ -768,7 +768,7 @@ class MachineLearningAnalyzer:
             axes[0, 1].set_ylabel('Predicted')
             axes[0, 1].set_title('Actual vs Predicted')
         
-        # Residuals
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'predictions' in results:
             residuals = y_true - y_pred
             axes[1, 0].scatter(y_pred, residuals, alpha=0.6)
@@ -777,7 +777,7 @@ class MachineLearningAnalyzer:
             axes[1, 0].set_ylabel('Residuals')
             axes[1, 0].set_title('Residual Plot')
         
-        # Performance metrics
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'performance' in results:
             perf = results['performance']
             metrics = list(perf.keys())
@@ -829,30 +829,30 @@ class PredictiveModeling:
         Dict[str, Any]
             Species distribution modeling results
         """
-        # Merge presence and environmental data based on coordinates
+# Copyright (c) 2025 Mohamed Z. Hatim
         merged_data = presence_data.merge(
             environmental_data,
             on=coordinate_columns,
             how='inner'
         )
         
-        # Prepare features
+# Copyright (c) 2025 Mohamed Z. Hatim
         X = merged_data[environmental_columns + coordinate_columns]
         y = merged_data[species_column]
         
-        # Handle missing data
+# Copyright (c) 2025 Mohamed Z. Hatim
         X = X.fillna(X.mean())
         
-        # Scale features
+# Copyright (c) 2025 Mohamed Z. Hatim
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
         
-        # Split data
+# Copyright (c) 2025 Mohamed Z. Hatim
         X_train, X_test, y_train, y_test = train_test_split(
             X_scaled, y, test_size=0.3, random_state=self.random_state, stratify=y
         )
         
-        # Train multiple models
+# Copyright (c) 2025 Mohamed Z. Hatim
         models = {
             'logistic': LogisticRegression(random_state=self.random_state),
             'random_forest': RandomForestClassifier(n_estimators=100, random_state=self.random_state),
@@ -873,7 +873,7 @@ class PredictiveModeling:
                 'y_test': y_test
             }
         
-        # Select best model
+# Copyright (c) 2025 Mohamed Z. Hatim
         best_model_name = max(results.keys(), key=lambda x: results[x]['accuracy'])
         
         return {
@@ -908,22 +908,22 @@ class PredictiveModeling:
         Dict[str, Any]
             Climate change projection results
         """
-        # Train model on current data
+# Copyright (c) 2025 Mohamed Z. Hatim
         X_current = current_data[climate_variables]
         y_current = current_data[species_column]
         
-        # Handle missing data
+# Copyright (c) 2025 Mohamed Z. Hatim
         X_current = X_current.fillna(X_current.mean())
         
-        # Scale features
+# Copyright (c) 2025 Mohamed Z. Hatim
         scaler = StandardScaler()
         X_current_scaled = scaler.fit_transform(X_current)
         
-        # Train model
+# Copyright (c) 2025 Mohamed Z. Hatim
         model = RandomForestClassifier(n_estimators=200, random_state=self.random_state)
         model.fit(X_current_scaled, y_current)
         
-        # Make future projections
+# Copyright (c) 2025 Mohamed Z. Hatim
         X_future = future_climate[climate_variables]
         X_future = X_future.fillna(X_future.mean())
         X_future_scaled = scaler.transform(X_future)
@@ -931,7 +931,7 @@ class PredictiveModeling:
         future_predictions = model.predict(X_future_scaled)
         future_probabilities = model.predict_proba(X_future_scaled)[:, 1]
         
-        # Calculate changes
+# Copyright (c) 2025 Mohamed Z. Hatim
         current_suitability = model.predict_proba(X_current_scaled)[:, 1].mean()
         future_suitability = future_probabilities.mean()
         suitability_change = future_suitability - current_suitability
@@ -948,7 +948,7 @@ class PredictiveModeling:
         }
 
 
-# Example usage and integration
+# Copyright (c) 2025 Mohamed Z. Hatim
 def quick_ml_analysis(data: pd.DataFrame, 
                      target_column: str, 
                      feature_columns: List[str] = None,

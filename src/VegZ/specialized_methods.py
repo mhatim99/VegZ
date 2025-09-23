@@ -67,7 +67,7 @@ class PhylogeneticDiversityAnalyzer:
             else:
                 raise ValueError("Distance matrix must be a DataFrame")
         elif format == 'newick':
-            # Simplified newick parsing - in practice would use specialized libraries
+# Copyright (c) 2025 Mohamed Z. Hatim
             warnings.warn("Newick format support is simplified. Use specialized phylogenetic libraries for full support.")
             self.phylo_tree = phylo_data
         else:
@@ -97,7 +97,7 @@ class PhylogeneticDiversityAnalyzer:
         if self.distance_matrix is None:
             raise ValueError("Phylogenetic data not loaded. Use load_phylogeny() first.")
         
-        # Ensure species match between community data and phylogeny
+# Copyright (c) 2025 Mohamed Z. Hatim
         common_species = list(set(community_data.columns) & set(self.distance_matrix.index))
         if len(common_species) == 0:
             raise ValueError("No common species between community data and phylogeny")
@@ -111,14 +111,14 @@ class PhylogeneticDiversityAnalyzer:
             'n_species': len(common_species)
         }
         
-        # Calculate metrics for each site
+# Copyright (c) 2025 Mohamed Z. Hatim
         site_results = {}
         for site in community_subset.index:
             site_composition = community_subset.loc[site]
             present_species = site_composition[site_composition > 0].index.tolist()
             
             if len(present_species) < 2:
-                # Skip sites with < 2 species
+# Copyright (c) 2025 Mohamed Z. Hatim
                 continue
             
             site_phylo = phylo_subset.loc[present_species, present_species]
@@ -126,20 +126,20 @@ class PhylogeneticDiversityAnalyzer:
             
             site_metrics = {}
             
-            # Faith's Phylogenetic Diversity (PD)
+# Copyright (c) 2025 Mohamed Z. Hatim
             if 'pd' in metrics:
                 site_metrics['pd'] = self._calculate_faith_pd(site_phylo, abundances)
             
-            # Mean Pairwise Distance (MPD)
+# Copyright (c) 2025 Mohamed Z. Hatim
             if 'mpd' in metrics:
                 site_metrics['mpd'] = self._calculate_mpd(site_phylo, abundances)
             
-            # Mean Nearest Taxon Distance (MNTD)
+# Copyright (c) 2025 Mohamed Z. Hatim
             if 'mntd' in metrics:
                 site_metrics['mntd'] = self._calculate_mntd(site_phylo, abundances)
             
-            # Net Relatedness Index (NRI) and Nearest Taxon Index (NTI)
-            # These require null model comparisons - simplified implementation
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
             if 'nri' in metrics or 'nti' in metrics:
                 null_mpd, null_mntd = self._calculate_null_phylo_metrics(
                     phylo_subset, len(present_species), n_iterations=99
@@ -152,7 +152,7 @@ class PhylogeneticDiversityAnalyzer:
             
             site_results[site] = site_metrics
         
-        # Convert to DataFrame
+# Copyright (c) 2025 Mohamed Z. Hatim
         if site_results:
             results['metrics'] = pd.DataFrame(site_results).T
         
@@ -164,14 +164,14 @@ class PhylogeneticDiversityAnalyzer:
         if len(phylo_distances) < 2:
             return 0
         
-        # Simplified PD calculation using minimum spanning tree
+# Copyright (c) 2025 Mohamed Z. Hatim
         if GRAPH_METHODS_AVAILABLE:
-            # Convert to sparse matrix and find MST
+# Copyright (c) 2025 Mohamed Z. Hatim
             distance_matrix = phylo_distances.values
             mst = minimum_spanning_tree(distance_matrix).toarray()
             pd_value = np.sum(mst)
         else:
-            # Fallback: sum of unique pairwise distances
+# Copyright (c) 2025 Mohamed Z. Hatim
             distances = phylo_distances.values
             unique_distances = distances[np.triu_indices(len(distances), k=1)]
             pd_value = np.sum(unique_distances) / len(unique_distances)
@@ -184,7 +184,7 @@ class PhylogeneticDiversityAnalyzer:
         distances = phylo_distances.values
         weights = abundances.values
         
-        # Weight distances by abundances
+# Copyright (c) 2025 Mohamed Z. Hatim
         total_weight = 0
         weighted_distance = 0
         
@@ -202,7 +202,7 @@ class PhylogeneticDiversityAnalyzer:
         distances = phylo_distances.values
         np.fill_diagonal(distances, np.inf)  # Exclude self-distances
         
-        # Find nearest neighbor for each species
+# Copyright (c) 2025 Mohamed Z. Hatim
         nearest_distances = []
         for i in range(len(distances)):
             min_dist = np.min(distances[i, :])
@@ -219,7 +219,7 @@ class PhylogeneticDiversityAnalyzer:
         null_mntd_values = []
         
         for _ in range(n_iterations):
-            # Random sample of species
+# Copyright (c) 2025 Mohamed Z. Hatim
             sampled_species = np.random.choice(
                 phylo_matrix.index, size=n_species, replace=False
             )
@@ -265,19 +265,19 @@ class MetacommunityAnalyzer:
         Dict[str, Any]
             EMS analysis results
         """
-        # Convert to presence-absence
+# Copyright (c) 2025 Mohamed Z. Hatim
         pa_data = (community_data > 0).astype(int)
         
-        # Calculate coherence
+# Copyright (c) 2025 Mohamed Z. Hatim
         coherence = self._calculate_coherence(pa_data)
         
-        # Calculate species turnover
+# Copyright (c) 2025 Mohamed Z. Hatim
         turnover = self._calculate_turnover(pa_data)
         
-        # Calculate boundary clumping
+# Copyright (c) 2025 Mohamed Z. Hatim
         boundary_clumping = self._calculate_boundary_clumping(pa_data)
         
-        # Classify metacommunity structure
+# Copyright (c) 2025 Mohamed Z. Hatim
         structure_type = self._classify_metacommunity_structure(
             coherence, turnover, boundary_clumping
         )
@@ -294,7 +294,7 @@ class MetacommunityAnalyzer:
         """Calculate species coherence."""
         n_sites, n_species = pa_data.shape
         
-        # Count embedded absences for each species
+# Copyright (c) 2025 Mohamed Z. Hatim
         embedded_absences = 0
         total_possible = 0
         
@@ -303,11 +303,11 @@ class MetacommunityAnalyzer:
             if len(presence_sites) < 2:
                 continue
             
-            # Sort sites by ordination axis (simplified: by species richness)
+# Copyright (c) 2025 Mohamed Z. Hatim
             site_richness = pa_data.sum(axis=1)
             sorted_sites = site_richness.sort_values(ascending=False).index
             
-            # Find first and last occurrence
+# Copyright (c) 2025 Mohamed Z. Hatim
             presence_positions = [i for i, site in enumerate(sorted_sites) if site in presence_sites]
             if len(presence_positions) < 2:
                 continue
@@ -315,7 +315,7 @@ class MetacommunityAnalyzer:
             first_pos = min(presence_positions)
             last_pos = max(presence_positions)
             
-            # Count absences between first and last occurrence
+# Copyright (c) 2025 Mohamed Z. Hatim
             for pos in range(first_pos + 1, last_pos):
                 site = sorted_sites[pos]
                 if pa_data.loc[site, species] == 0:
@@ -333,14 +333,14 @@ class MetacommunityAnalyzer:
     
     def _calculate_turnover(self, pa_data: pd.DataFrame) -> Dict[str, Any]:
         """Calculate species turnover."""
-        # Calculate Whittaker's beta diversity
+# Copyright (c) 2025 Mohamed Z. Hatim
         site_richness = pa_data.sum(axis=1)
         total_richness = (pa_data.sum(axis=0) > 0).sum()
         mean_alpha = site_richness.mean()
         
         beta_w = (total_richness / mean_alpha) - 1
         
-        # Calculate replacement and richness difference components
+# Copyright (c) 2025 Mohamed Z. Hatim
         pairwise_turnover = []
         for i, site1 in enumerate(pa_data.index):
             for site2 in pa_data.index[i+1:]:
@@ -348,7 +348,7 @@ class MetacommunityAnalyzer:
                 unique1 = (pa_data.loc[site1] & ~pa_data.loc[site2]).sum()
                 unique2 = (~pa_data.loc[site1] & pa_data.loc[site2]).sum()
                 
-                # Sorensen turnover
+# Copyright (c) 2025 Mohamed Z. Hatim
                 turnover = (unique1 + unique2) / (2 * shared + unique1 + unique2) if (shared + unique1 + unique2) > 0 else 0
                 pairwise_turnover.append(turnover)
         
@@ -360,8 +360,8 @@ class MetacommunityAnalyzer:
     
     def _calculate_boundary_clumping(self, pa_data: pd.DataFrame) -> Dict[str, Any]:
         """Calculate boundary clumping."""
-        # Simplified boundary clumping calculation
-        # In practice, this requires more sophisticated ordination and boundary detection
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
         
         site_richness = pa_data.sum(axis=1).sort_values(ascending=False)
         species_ranges = {}
@@ -371,7 +371,7 @@ class MetacommunityAnalyzer:
             if len(presence_sites) == 0:
                 continue
             
-            # Find positions of presence sites in richness ranking
+# Copyright (c) 2025 Mohamed Z. Hatim
             positions = [list(site_richness.index).index(site) for site in presence_sites]
             range_size = max(positions) - min(positions) + 1
             species_ranges[species] = range_size / len(presence_sites)
@@ -443,7 +443,7 @@ class NetworkAnalyzer:
         Dict[str, Any]
             Network analysis results
         """
-        # Calculate species associations
+# Copyright (c) 2025 Mohamed Z. Hatim
         if method == 'correlation':
             associations = community_data.corr()
         elif method == 'jaccard':
@@ -451,16 +451,16 @@ class NetworkAnalyzer:
         else:
             raise ValueError(f"Unknown method: {method}")
         
-        # Remove self-correlations
+# Copyright (c) 2025 Mohamed Z. Hatim
         np.fill_diagonal(associations.values, 0)
         
-        # Create adjacency matrix based on threshold
+# Copyright (c) 2025 Mohamed Z. Hatim
         adjacency = (np.abs(associations) >= threshold).astype(int)
         
-        # Calculate network properties
+# Copyright (c) 2025 Mohamed Z. Hatim
         network_props = self._calculate_network_properties(adjacency, associations)
         
-        # Create network object if NetworkX is available
+# Copyright (c) 2025 Mohamed Z. Hatim
         network_obj = None
         if NETWORKX_AVAILABLE:
             network_obj = self._create_networkx_graph(associations, threshold)
@@ -504,7 +504,7 @@ class NetworkAnalyzer:
     def _calculate_network_properties(self, adjacency: Union[np.ndarray, pd.DataFrame], 
                                     associations: pd.DataFrame) -> Dict[str, Any]:
         """Calculate basic network properties."""
-        # Ensure adjacency is numpy array
+# Copyright (c) 2025 Mohamed Z. Hatim
         if isinstance(adjacency, pd.DataFrame):
             adjacency_values = adjacency.values
         else:
@@ -513,20 +513,20 @@ class NetworkAnalyzer:
         n_nodes = adjacency_values.shape[0]
         n_edges = np.sum(adjacency_values) // 2  # Undirected network
         
-        # Degree distribution
+# Copyright (c) 2025 Mohamed Z. Hatim
         degrees = np.sum(adjacency_values, axis=1)
         
-        # Density
+# Copyright (c) 2025 Mohamed Z. Hatim
         max_edges = n_nodes * (n_nodes - 1) // 2
         density = n_edges / max_edges if max_edges > 0 else 0
         
-        # Average path length (simplified calculation)
+# Copyright (c) 2025 Mohamed Z. Hatim
         if GRAPH_METHODS_AVAILABLE:
-            # Convert to distance matrix (inverse of associations)
+# Copyright (c) 2025 Mohamed Z. Hatim
             distance_matrix = 1 / (np.abs(associations.values) + 1e-10)
             np.fill_diagonal(distance_matrix, 0)
             
-            # Calculate shortest paths
+# Copyright (c) 2025 Mohamed Z. Hatim
             dist_matrix = dijkstra(distance_matrix, directed=False)
             finite_distances = dist_matrix[np.isfinite(dist_matrix) & (dist_matrix > 0)]
             avg_path_length = np.mean(finite_distances) if len(finite_distances) > 0 else np.inf
@@ -550,11 +550,11 @@ class NetworkAnalyzer:
         
         G = nx.Graph()
         
-        # Add nodes
+# Copyright (c) 2025 Mohamed Z. Hatim
         for species in associations.index:
             G.add_node(species)
         
-        # Add edges
+# Copyright (c) 2025 Mohamed Z. Hatim
         for i, species1 in enumerate(associations.index):
             for species2 in associations.index[i+1:]:
                 association_strength = abs(associations.loc[species1, species2])
@@ -571,27 +571,27 @@ class NetworkAnalyzer:
         props = {}
         
         try:
-            # Clustering coefficient
+# Copyright (c) 2025 Mohamed Z. Hatim
             props['clustering_coefficient'] = nx.average_clustering(G)
             
-            # Betweenness centrality
+# Copyright (c) 2025 Mohamed Z. Hatim
             props['betweenness_centrality'] = nx.betweenness_centrality(G)
             
-            # Eigenvector centrality
+# Copyright (c) 2025 Mohamed Z. Hatim
             try:
                 props['eigenvector_centrality'] = nx.eigenvector_centrality(G, max_iter=1000)
             except:
                 props['eigenvector_centrality'] = {}
             
-            # Connected components
+# Copyright (c) 2025 Mohamed Z. Hatim
             props['n_components'] = nx.number_connected_components(G)
             props['largest_component_size'] = len(max(nx.connected_components(G), key=len))
             
-            # Small-world properties
+# Copyright (c) 2025 Mohamed Z. Hatim
             if nx.is_connected(G):
                 props['average_shortest_path'] = nx.average_shortest_path_length(G)
                 
-                # Compare to random network
+# Copyright (c) 2025 Mohamed Z. Hatim
                 random_G = nx.erdos_renyi_graph(G.number_of_nodes(), 
                                               G.number_of_edges() / (G.number_of_nodes() * (G.number_of_nodes() - 1) / 2))
                 if nx.is_connected(random_G):
@@ -636,37 +636,37 @@ class CommunityAssemblyAnalyzer:
         """
         results = {}
         
-        # Taxonomic patterns
+# Copyright (c) 2025 Mohamed Z. Hatim
         taxonomic_patterns = self._analyze_taxonomic_patterns(community_data)
         results['taxonomic'] = taxonomic_patterns
         
-        # Trait-based patterns
+# Copyright (c) 2025 Mohamed Z. Hatim
         if trait_data is not None:
             trait_patterns = self._analyze_trait_patterns(community_data, trait_data)
             results['trait_based'] = trait_patterns
         
-        # Phylogenetic patterns
+# Copyright (c) 2025 Mohamed Z. Hatim
         if phylo_data is not None:
             phylo_patterns = self._analyze_phylogenetic_patterns(community_data, phylo_data)
             results['phylogenetic'] = phylo_patterns
         
-        # Overall assembly interpretation
+# Copyright (c) 2025 Mohamed Z. Hatim
         results['interpretation'] = self._interpret_assembly_processes(results)
         
         return results
     
     def _analyze_taxonomic_patterns(self, community_data: pd.DataFrame) -> Dict[str, Any]:
         """Analyze taxonomic diversity patterns."""
-        # Species richness patterns
+# Copyright (c) 2025 Mohamed Z. Hatim
         richness = community_data.sum(axis=1)
         
-        # Evenness patterns
+# Copyright (c) 2025 Mohamed Z. Hatim
         evenness = []
         for site in community_data.index:
             site_data = community_data.loc[site]
             present_species = site_data[site_data > 0]
             if len(present_species) > 1:
-                # Shannon evenness
+# Copyright (c) 2025 Mohamed Z. Hatim
                 proportions = present_species / present_species.sum()
                 shannon = -np.sum(proportions * np.log(proportions))
                 max_shannon = np.log(len(present_species))
@@ -685,7 +685,7 @@ class CommunityAssemblyAnalyzer:
     def _analyze_trait_patterns(self, community_data: pd.DataFrame, 
                                trait_data: pd.DataFrame) -> Dict[str, Any]:
         """Analyze trait-based assembly patterns."""
-        # Get common species
+# Copyright (c) 2025 Mohamed Z. Hatim
         common_species = list(set(community_data.columns) & set(trait_data.index))
         if len(common_species) == 0:
             return {'error': 'No common species between community and trait data'}
@@ -693,7 +693,7 @@ class CommunityAssemblyAnalyzer:
         community_subset = community_data[common_species]
         trait_subset = trait_data.loc[common_species]
         
-        # Calculate community-weighted means
+# Copyright (c) 2025 Mohamed Z. Hatim
         cwm_traits = []
         trait_variance = []
         
@@ -709,7 +709,7 @@ class CommunityAssemblyAnalyzer:
             
             site_traits = trait_subset.loc[present_species]
             
-            # Calculate CWM for numeric traits
+# Copyright (c) 2025 Mohamed Z. Hatim
             cwm_site = {}
             variance_site = {}
             
@@ -717,7 +717,7 @@ class CommunityAssemblyAnalyzer:
                 trait_values = site_traits[trait].fillna(site_traits[trait].mean())
                 cwm_site[trait] = (trait_values * weights).sum()
                 
-                # Trait variance (weighted)
+# Copyright (c) 2025 Mohamed Z. Hatim
                 variance_site[trait] = ((trait_values - cwm_site[trait])**2 * weights).sum()
             
             cwm_traits.append(cwm_site)
@@ -735,7 +735,7 @@ class CommunityAssemblyAnalyzer:
     def _analyze_phylogenetic_patterns(self, community_data: pd.DataFrame,
                                      phylo_data: pd.DataFrame) -> Dict[str, Any]:
         """Analyze phylogenetic assembly patterns."""
-        # Use simplified phylogenetic diversity calculation
+# Copyright (c) 2025 Mohamed Z. Hatim
         phylo_analyzer = PhylogeneticDiversityAnalyzer()
         phylo_analyzer.load_phylogeny(phylo_data)
         
@@ -749,7 +749,7 @@ class CommunityAssemblyAnalyzer:
         """Interpret assembly processes based on patterns."""
         interpretation = {}
         
-        # Taxonomic interpretation
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'taxonomic' in results:
             richness_cv = results['taxonomic']['richness_std'] / results['taxonomic']['mean_richness']
             if richness_cv > 0.5:
@@ -757,7 +757,7 @@ class CommunityAssemblyAnalyzer:
             else:
                 interpretation['richness_pattern'] = "Low variation in species richness suggests neutral assembly"
         
-        # Trait-based interpretation
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'trait_based' in results and 'error' not in results['trait_based']:
             cwm_traits = results['trait_based']['cwm_traits']
             if not cwm_traits.empty:
@@ -768,7 +768,7 @@ class CommunityAssemblyAnalyzer:
                 else:
                     interpretation['trait_pattern'] = "Low trait variation suggests weak environmental filtering"
         
-        # Phylogenetic interpretation
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'phylogenetic' in results and 'metrics' in results['phylogenetic']:
             phylo_metrics = results['phylogenetic']['metrics']
             if not phylo_metrics.empty and 'nri' in phylo_metrics.columns:
@@ -783,7 +783,7 @@ class CommunityAssemblyAnalyzer:
         return interpretation
 
 
-# Quick analysis functions
+# Copyright (c) 2025 Mohamed Z. Hatim
 def quick_phylogenetic_diversity(community_data: pd.DataFrame,
                                 phylo_distances: pd.DataFrame) -> Dict[str, Any]:
     """

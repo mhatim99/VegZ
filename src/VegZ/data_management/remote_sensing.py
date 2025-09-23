@@ -37,7 +37,7 @@ class RemoteSensingAPI:
                 self.ee_initialized = True
             except Exception as e:
                 self.ee_initialized = False
-                # Only warn if authentication specifically fails, not for missing credentials
+# Copyright (c) 2025 Mohamed Z. Hatim
                 if "authentication" in str(e).lower() or "credentials" in str(e).lower():
                     warnings.warn(f"Earth Engine authentication required. Run 'earthengine authenticate' in your terminal.")
                 else:
@@ -94,7 +94,7 @@ class LandsatAPI:
         for i, (lat, lon) in enumerate(coordinates):
             point = ee.Geometry.Point([lon, lat])
             
-            # Get Landsat collection
+# Copyright (c) 2025 Mohamed Z. Hatim
             collection = (ee.ImageCollection(self.collection_id)
                          .filterBounds(point)
                          .filterDate(date_range[0], date_range[1])
@@ -103,10 +103,10 @@ class LandsatAPI:
             if collection.size().getInfo() == 0:
                 continue
             
-            # Calculate median composite
+# Copyright (c) 2025 Mohamed Z. Hatim
             image = collection.median()
             
-            # Calculate indices
+# Copyright (c) 2025 Mohamed Z. Hatim
             for index in indices:
                 if index in self.available_indices:
                     index_image = self._calculate_index(image, index)
@@ -187,7 +187,7 @@ class MODISAPI:
         for i, (lat, lon) in enumerate(coordinates):
             point = ee.Geometry.Point([lon, lat])
             
-            # Get MODIS collection
+# Copyright (c) 2025 Mohamed Z. Hatim
             collection = (ee.ImageCollection(self.collection_id)
                          .filterBounds(point)
                          .filterDate(date_range[0], date_range[1]))
@@ -195,7 +195,7 @@ class MODISAPI:
             if collection.size().getInfo() == 0:
                 continue
             
-            # Get time series
+# Copyright (c) 2025 Mohamed Z. Hatim
             def extract_values(image):
                 date = ee.Date(image.get('system:time_start')).format('YYYY-MM-dd')
                 values = image.select(['NDVI', 'EVI']).reduceRegion(
@@ -247,7 +247,7 @@ class SentinelAPI:
         for i, (lat, lon) in enumerate(coordinates):
             point = ee.Geometry.Point([lon, lat])
             
-            # Get Sentinel-2 collection
+# Copyright (c) 2025 Mohamed Z. Hatim
             collection = (ee.ImageCollection(self.collection_id)
                          .filterBounds(point)
                          .filterDate(date_range[0], date_range[1])
@@ -256,10 +256,10 @@ class SentinelAPI:
             if collection.size().getInfo() == 0:
                 continue
             
-            # Calculate median composite
+# Copyright (c) 2025 Mohamed Z. Hatim
             image = collection.median()
             
-            # Calculate indices
+# Copyright (c) 2025 Mohamed Z. Hatim
             for index in indices:
                 if index in self.available_indices:
                     index_image = self._calculate_index(image, index)

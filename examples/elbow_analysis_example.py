@@ -17,18 +17,18 @@ def demonstrate_elbow_analysis():
     
     print("=== VegZ Comprehensive Elbow Analysis Demonstration ===\n")
     
-    # Load example vegetation data
+    # Copyright (c) 2025 Mohamed Z. Hatim
     try:
         data = pd.read_csv('species_abundance.csv', index_col=0)
         print(f"Loaded vegetation data: {data.shape[0]} sites, {data.shape[1]} species")
     except FileNotFoundError:
         print("Creating synthetic vegetation data for demonstration...")
-        # Create synthetic vegetation data
+        # Copyright (c) 2025 Mohamed Z. Hatim
         np.random.seed(42)
         n_sites = 50
         n_species = 20
         
-        # Create 4 distinct vegetation types
+        # Copyright (c) 2025 Mohamed Z. Hatim
         group1 = np.random.poisson(5, (12, n_species)) * np.random.binomial(1, 0.3, (12, n_species))
         group2 = np.random.poisson(3, (13, n_species)) * np.random.binomial(1, 0.4, (13, n_species))
         group3 = np.random.poisson(8, (12, n_species)) * np.random.binomial(1, 0.2, (12, n_species))
@@ -46,11 +46,11 @@ def demonstrate_elbow_analysis():
     print("METHOD 1: Using VegZ Main Class")
     print("="*60)
     
-    # Initialize VegZ
+    # Copyright (c) 2025 Mohamed Z. Hatim
     veg = VegZ()
     veg.species_matrix = data
     
-    # Comprehensive elbow analysis
+    # Copyright (c) 2025 Mohamed Z. Hatim
     print("\n1. Running comprehensive elbow analysis...")
     elbow_results = veg.elbow_analysis(
         k_range=range(1, 12),
@@ -59,7 +59,7 @@ def demonstrate_elbow_analysis():
         plot_results=True
     )
     
-    # Display results
+    # Copyright (c) 2025 Mohamed Z. Hatim
     print("\nElbow Analysis Results:")
     print("-" * 40)
     for method, k_value in elbow_results['elbow_points'].items():
@@ -68,12 +68,12 @@ def demonstrate_elbow_analysis():
     print(f"\nConsensus recommendation: k = {elbow_results['recommendations']['consensus']}")
     print(f"Confidence score: {elbow_results['recommendations']['confidence']:.2f}")
     
-    # Additional recommendations
+    # Copyright (c) 2025 Mohamed Z. Hatim
     print("\nAdditional recommendations:")
     print(f"Best Silhouette score: k = {elbow_results['recommendations'].get('silhouette_optimal', 'N/A')}")
     print(f"Best Calinski-Harabasz: k = {elbow_results['recommendations'].get('calinski_optimal', 'N/A')}")
     
-    # Quick elbow analysis
+    # Copyright (c) 2025 Mohamed Z. Hatim
     print("\n2. Quick elbow analysis for rapid results...")
     optimal_k = veg.quick_elbow_analysis(max_k=10)
     print(f"Quick recommendation: k = {optimal_k}")
@@ -82,7 +82,7 @@ def demonstrate_elbow_analysis():
     print("METHOD 2: Using VegetationClustering Class Directly")
     print("="*60)
     
-    # Direct clustering approach
+    # Copyright (c) 2025 Mohamed Z. Hatim
     clustering = VegetationClustering()
     
     print("\n3. Using specialized clustering class...")
@@ -91,7 +91,7 @@ def demonstrate_elbow_analysis():
         k_range=range(1, 10),
         methods=['knee_locator', 'derivative', 'l_method'],
         transform='hellinger',
-        plot_results=False  # Skip plots for this example
+        plot_results=False  # Copyright (c) 2025 Mohamed Z. Hatim
     )
     
     print("\nDetailed method information:")
@@ -120,22 +120,22 @@ def demonstrate_elbow_analysis():
     
     print("\n5. Complete clustering workflow with elbow analysis...")
     
-    # Step 1: Determine optimal k
+    # Copyright (c) 2025 Mohamed Z. Hatim
     optimal_k = veg.quick_elbow_analysis(max_k=10)
     print(f"Optimal k determined: {optimal_k}")
     
-    # Step 2: Perform clustering with optimal k
+    # Copyright (c) 2025 Mohamed Z. Hatim
     print(f"\nPerforming k-means clustering with k={optimal_k}...")
     kmeans_results = veg.kmeans_clustering(n_clusters=optimal_k)
     
-    # Step 3: Analyze clustering quality
+    # Copyright (c) 2025 Mohamed Z. Hatim
     print(f"Clustering inertia: {kmeans_results['inertia']:.2f}")
     
-    # Step 4: Find indicator species
+    # Copyright (c) 2025 Mohamed Z. Hatim
     print("\nFinding indicator species for each cluster...")
     indicators = veg.indicator_species_analysis(kmeans_results['cluster_labels'])
     
-    # Display top indicators for each cluster
+    # Copyright (c) 2025 Mohamed Z. Hatim
     for cluster in sorted(indicators['cluster'].unique()):
         cluster_indicators = indicators[indicators['cluster'] == cluster].nlargest(3, 'indicator_value')
         print(f"\nCluster {cluster} top indicators:")

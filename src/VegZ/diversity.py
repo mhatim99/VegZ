@@ -149,7 +149,7 @@ class DiversityAnalyzer:
             if S <= 1 or N <= 0:
                 return 0
             
-            # Iterative solution for alpha
+# Copyright (c) 2025 Mohamed Z. Hatim
             alpha = S  # Initial guess
             for _ in range(100):  # Max iterations
                 alpha_new = S / np.log(1 + N/alpha)
@@ -197,7 +197,7 @@ class DiversityAnalyzer:
             
             N = abundances.sum()
             
-            # Calculate log factorial sum
+# Copyright (c) 2025 Mohamed Z. Hatim
             log_factorial_sum = np.sum([self._log_factorial(n) for n in abundances])
             log_N_factorial = self._log_factorial(N)
             
@@ -242,7 +242,7 @@ class DiversityAnalyzer:
             if len(abundances) == 0:
                 return 0
             
-            # Separate rare and abundant species
+# Copyright (c) 2025 Mohamed Z. Hatim
             rare = abundances[abundances <= rare_threshold]
             abundant = abundances[abundances > rare_threshold]
             
@@ -255,13 +255,13 @@ class DiversityAnalyzer:
             N_rare = rare.sum()
             f1 = np.sum(rare == 1)
             
-            # Coverage estimate
+# Copyright (c) 2025 Mohamed Z. Hatim
             C_ace = 1 - (f1 / N_rare) if N_rare > 0 else 1
             
             if C_ace == 0:
                 return S_abund + S_rare
             
-            # Coefficient of variation
+# Copyright (c) 2025 Mohamed Z. Hatim
             sum_i_fi = np.sum([i * np.sum(rare == i) for i in range(1, rare_threshold + 1)])
             gamma_ace = (S_rare / C_ace) * (sum_i_fi / (N_rare * (N_rare - 1))) - 1
             gamma_ace = max(gamma_ace, 0)

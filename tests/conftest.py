@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import warnings
 
-# Suppress warnings during testing
+# Copyright (c) 2025 Mohamed Z. Hatim
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -20,10 +20,10 @@ def large_sample_data():
     n_sites = 100
     n_species = 50
     
-    # Create 5 distinct vegetation types
+# Copyright (c) 2025 Mohamed Z. Hatim
     groups = []
     for i in range(5):
-        # Each group has different abundance patterns
+# Copyright (c) 2025 Mohamed Z. Hatim
         group_size = 20
         lambda_param = [3, 5, 2, 7, 4][i]
         prob_param = [0.3, 0.4, 0.2, 0.5, 0.35][i]
@@ -92,7 +92,7 @@ def temporal_data():
     data = []
     for date in dates:
         for site in sites:
-            # Seasonal variation in species abundances
+# Copyright (c) 2025 Mohamed Z. Hatim
             seasonal_factor = 0.5 + 0.5 * np.cos((date.month - 6) * 2 * np.pi / 12)
             
             abundances = np.random.poisson(5 * seasonal_factor, len(species))

@@ -45,9 +45,9 @@ class EnvironmentalModeler:
             'unimodal': self._unimodal_response
         }
     
-    # =============================================================================
-    # GENERALIZED ADDITIVE MODELS (GAMs)
-    # =============================================================================
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def fit_gam(self, data: pd.DataFrame,
                 response_col: str,
@@ -78,7 +78,7 @@ class EnvironmentalModeler:
         dict
             GAM results including model, smoothers, and diagnostics
         """
-        # Clean data
+# Copyright (c) 2025 Mohamed Z. Hatim
         use_cols = [response_col] + predictor_cols
         clean_data = data[use_cols].dropna()
         
@@ -88,11 +88,11 @@ class EnvironmentalModeler:
         y = clean_data[response_col].values
         X = clean_data[predictor_cols]
         
-        # Set default smoother types
+# Copyright (c) 2025 Mohamed Z. Hatim
         if smoother_types is None:
             smoother_types = {col: 'spline' for col in predictor_cols}
         
-        # Fit GAM components
+# Copyright (c) 2025 Mohamed Z. Hatim
         gam_results = {
             'smoothers': {},
             'linear_terms': {},
@@ -102,10 +102,10 @@ class EnvironmentalModeler:
             'n_observations': len(clean_data)
         }
         
-        # Initialize predicted values
+# Copyright (c) 2025 Mohamed Z. Hatim
         y_pred = np.mean(y) * np.ones_like(y)  # Start with intercept
         
-        # Fit each smoother
+# Copyright (c) 2025 Mohamed Z. Hatim
         for predictor in predictor_cols:
             smoother_type = smoother_types.get(predictor, 'spline')
             
@@ -115,7 +115,7 @@ class EnvironmentalModeler:
             
             smoother_func = self.gam_smoothers[smoother_type]
             
-            # Fit smoother
+# Copyright (c) 2025 Mohamed Z. Hatim
             smoother_result = smoother_func(
                 X[predictor].values, y, **kwargs
             )
@@ -129,26 +129,26 @@ class EnvironmentalModeler:
                 'r_squared': smoother_result.get('r_squared', 0)
             }
             
-            # Add to prediction (additive model)
+# Copyright (c) 2025 Mohamed Z. Hatim
             y_pred += smoother_result['fitted_values'] - np.mean(smoother_result['fitted_values'])
         
-        # Apply link function based on family
+# Copyright (c) 2025 Mohamed Z. Hatim
         if family == 'binomial':
-            # Logistic link
+# Copyright (c) 2025 Mohamed Z. Hatim
             y_pred_prob = 1 / (1 + np.exp(-y_pred))
             gam_results['fitted_probabilities'] = y_pred_prob
             y_pred = y_pred_prob
         elif family == 'poisson':
-            # Log link
+# Copyright (c) 2025 Mohamed Z. Hatim
             y_pred = np.exp(y_pred)
         
         gam_results['fitted_values'] = y_pred
         
-        # Calculate model diagnostics
+# Copyright (c) 2025 Mohamed Z. Hatim
         diagnostics = self._calculate_gam_diagnostics(y, y_pred, gam_results, family)
         gam_results['diagnostics'] = diagnostics
         
-        # Calculate ANOVA-like decomposition
+# Copyright (c) 2025 Mohamed Z. Hatim
         anova_results = self._gam_anova(y, gam_results)
         gam_results['anova'] = anova_results
         
@@ -158,18 +158,18 @@ class EnvironmentalModeler:
                         smoothing_factor: Optional[float] = None,
                         **kwargs) -> Dict[str, Any]:
         """Fit spline smoother."""
-        # Remove any NaN values
+# Copyright (c) 2025 Mohamed Z. Hatim
         valid_mask = ~(np.isnan(x) | np.isnan(y))
         x_clean = x[valid_mask]
         y_clean = y[valid_mask]
         
         if len(x_clean) < 3:
-            # Not enough points for spline, use linear fit
+# Copyright (c) 2025 Mohamed Z. Hatim
             return self._linear_smoother(x, y)
         
-        # Automatic smoothing factor selection if not provided
+# Copyright (c) 2025 Mohamed Z. Hatim
         if smoothing_factor is None:
-            # Use cross-validation to select optimal smoothing
+# Copyright (c) 2025 Mohamed Z. Hatim
             smoothing_candidates = np.logspace(-3, 1, 20)
             best_score = -np.inf
             best_s = smoothing_candidates[0]
@@ -188,15 +188,15 @@ class EnvironmentalModeler:
             
             smoothing_factor = best_s
         
-        # Fit final spline
+# Copyright (c) 2025 Mohamed Z. Hatim
         try:
             spline = UnivariateSpline(x_clean, y_clean, s=smoothing_factor)
             
-            # Calculate fitted values for all x
+# Copyright (c) 2025 Mohamed Z. Hatim
             fitted_values = np.full_like(x, np.mean(y_clean))
             fitted_values[valid_mask] = spline(x_clean)
             
-            # Calculate effective degrees of freedom (approximation)
+# Copyright (c) 2025 Mohamed Z. Hatim
             edf = min(len(x_clean), max(2, len(x_clean) / (1 + smoothing_factor)))
             
             return {
@@ -224,10 +224,10 @@ class EnvironmentalModeler:
             if len(x_clean) < 3:
                 return self._linear_smoother(x, y)
             
-            # Fit LOWESS
+# Copyright (c) 2025 Mohamed Z. Hatim
             smoothed = lowess(y_clean, x_clean, frac=frac, return_sorted=True)
             
-            # Interpolate to all x values
+# Copyright (c) 2025 Mohamed Z. Hatim
             from scipy.interpolate import interp1d
             interp_func = interp1d(smoothed[:, 0], smoothed[:, 1], 
                                  bounds_error=False, fill_value='extrapolate')
@@ -257,14 +257,14 @@ class EnvironmentalModeler:
         if len(x_clean) < degree + 1:
             degree = max(1, len(x_clean) - 1)
         
-        # Fit polynomial
+# Copyright (c) 2025 Mohamed Z. Hatim
         poly_features = PolynomialFeatures(degree=degree)
         X_poly = poly_features.fit_transform(x_clean.reshape(-1, 1))
         
         reg = LinearRegression()
         reg.fit(X_poly, y_clean)
         
-        # Predict for all x values
+# Copyright (c) 2025 Mohamed Z. Hatim
         fitted_values = np.full_like(x, np.mean(y_clean))
         X_all_poly = poly_features.transform(x[valid_mask].reshape(-1, 1))
         fitted_values[valid_mask] = reg.predict(X_all_poly)
@@ -280,7 +280,7 @@ class EnvironmentalModeler:
     def _gaussian_process_smoother(self, x: np.ndarray, y: np.ndarray,
                                  **kwargs) -> Dict[str, Any]:
         """Gaussian Process smoother (simplified implementation)."""
-        # This is a simplified GP - full implementation would use specialized libraries
+# Copyright (c) 2025 Mohamed Z. Hatim
         try:
             from sklearn.gaussian_process import GaussianProcessRegressor
             from sklearn.gaussian_process.kernels import RBF, ConstantKernel
@@ -292,13 +292,13 @@ class EnvironmentalModeler:
             if len(x_clean) < 3:
                 return self._linear_smoother(x, y)
             
-            # Set up GP with RBF kernel
+# Copyright (c) 2025 Mohamed Z. Hatim
             kernel = ConstantKernel(1.0) * RBF(1.0)
             gp = GaussianProcessRegressor(kernel=kernel, random_state=42)
             
             gp.fit(x_clean, y_clean)
             
-            # Predict for all x values
+# Copyright (c) 2025 Mohamed Z. Hatim
             fitted_values = np.full_like(x, np.mean(y_clean))
             fitted_values[valid_mask], _ = gp.predict(x_clean, return_std=True)
             
@@ -328,7 +328,7 @@ class EnvironmentalModeler:
                 'r_squared': 0
             }
         
-        # Fit linear regression
+# Copyright (c) 2025 Mohamed Z. Hatim
         reg = LinearRegression()
         reg.fit(x_clean.reshape(-1, 1), y_clean)
         
@@ -347,35 +347,35 @@ class EnvironmentalModeler:
         """Calculate GAM diagnostic statistics."""
         n = len(y)
         
-        # Basic fit statistics
+# Copyright (c) 2025 Mohamed Z. Hatim
         if family == 'gaussian':
             deviance = np.sum((y - y_pred) ** 2)
             null_deviance = np.sum((y - np.mean(y)) ** 2)
         elif family == 'binomial':
-            # Deviance for logistic regression
+# Copyright (c) 2025 Mohamed Z. Hatim
             y_pred_clipped = np.clip(y_pred, 1e-15, 1 - 1e-15)
             deviance = -2 * np.sum(y * np.log(y_pred_clipped) + (1 - y) * np.log(1 - y_pred_clipped))
             null_deviance = -2 * np.sum(y * np.log(np.mean(y)) + (1 - y) * np.log(1 - np.mean(y)))
         elif family == 'poisson':
-            # Poisson deviance
+# Copyright (c) 2025 Mohamed Z. Hatim
             y_pred_clipped = np.clip(y_pred, 1e-15, np.inf)
             deviance = 2 * np.sum(y * np.log(y / y_pred_clipped) - (y - y_pred_clipped))
             null_deviance = 2 * np.sum(y * np.log(y / np.mean(y)) - (y - np.mean(y)))
         
-        # Calculate total effective degrees of freedom
+# Copyright (c) 2025 Mohamed Z. Hatim
         total_edf = sum(smoother['edf'] for smoother in gam_results['smoothers'].values())
         
-        # AIC and BIC approximations
+# Copyright (c) 2025 Mohamed Z. Hatim
         aic = deviance + 2 * total_edf
         bic = deviance + np.log(n) * total_edf
         
-        # Explained deviance
+# Copyright (c) 2025 Mohamed Z. Hatim
         explained_deviance = 1 - (deviance / null_deviance) if null_deviance > 0 else 0
         
-        # Residuals
+# Copyright (c) 2025 Mohamed Z. Hatim
         residuals = y - y_pred
         
-        # Cook's distance (simplified)
+# Copyright (c) 2025 Mohamed Z. Hatim
         leverage = total_edf / n  # Rough approximation
         cooks_d = (residuals ** 2) * leverage / (1 - leverage)
         
@@ -399,11 +399,11 @@ class EnvironmentalModeler:
         total_ss = np.sum((y - np.mean(y)) ** 2)
         
         for predictor, smoother_info in gam_results['smoothers'].items():
-            # Component sum of squares
+# Copyright (c) 2025 Mohamed Z. Hatim
             fitted_component = smoother_info['fitted_values'] - np.mean(smoother_info['fitted_values'])
             component_ss = np.sum(fitted_component ** 2)
             
-            # F-statistic approximation
+# Copyright (c) 2025 Mohamed Z. Hatim
             edf = smoother_info['edf']
             residual_df = len(y) - gam_results['diagnostics']['total_edf']
             residual_ms = gam_results['diagnostics']['deviance'] / residual_df if residual_df > 0 else 1
@@ -422,9 +422,9 @@ class EnvironmentalModeler:
         
         return anova_results
     
-    # =============================================================================
-    # ENVIRONMENTAL GRADIENT ANALYSIS
-    # =============================================================================
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def environmental_gradient_analysis(self, species_data: pd.DataFrame,
                                       env_data: pd.DataFrame,
@@ -458,13 +458,13 @@ class EnvironmentalModeler:
     def _cca_gradient_analysis(self, species_data: pd.DataFrame,
                               env_data: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """CCA-based gradient analysis."""
-        # Use the CCA implementation from multivariate module
+# Copyright (c) 2025 Mohamed Z. Hatim
         from .multivariate import MultivariateAnalyzer
         
         mv_analyzer = MultivariateAnalyzer()
         cca_results = mv_analyzer.canonical_correspondence_analysis(species_data, env_data)
         
-        # Extract gradient information
+# Copyright (c) 2025 Mohamed Z. Hatim
         gradient_results = {
             'method': 'CCA',
             'axis_scores': cca_results['site_scores'],
@@ -474,7 +474,7 @@ class EnvironmentalModeler:
             'explained_variance': cca_results['explained_variance_ratio']
         }
         
-        # Calculate species optima along gradients
+# Copyright (c) 2025 Mohamed Z. Hatim
         optima = self._calculate_species_optima(
             species_data, cca_results['site_scores']
         )
@@ -490,7 +490,7 @@ class EnvironmentalModeler:
         mv_analyzer = MultivariateAnalyzer()
         dca_results = mv_analyzer.detrended_correspondence_analysis(species_data)
         
-        # Correlate DCA axes with environmental variables
+# Copyright (c) 2025 Mohamed Z. Hatim
         axis_env_correlations = {}
         for axis in dca_results['site_scores'].columns:
             axis_values = dca_results['site_scores'][axis]
@@ -498,7 +498,7 @@ class EnvironmentalModeler:
             
             for env_var in env_data.columns:
                 if env_data[env_var].dtype in ['float64', 'int64']:
-                    # Align data
+# Copyright (c) 2025 Mohamed Z. Hatim
                     common_idx = axis_values.index.intersection(env_data.index)
                     if len(common_idx) > 3:
                         corr = np.corrcoef(
@@ -545,11 +545,11 @@ class EnvironmentalModeler:
         from sklearn.decomposition import PCA
         from sklearn.preprocessing import StandardScaler
         
-        # Standardize environmental data
+# Copyright (c) 2025 Mohamed Z. Hatim
         scaler = StandardScaler()
         env_scaled = scaler.fit_transform(env_data.select_dtypes(include=[np.number]))
         
-        # Fit PCA
+# Copyright (c) 2025 Mohamed Z. Hatim
         pca = PCA()
         env_scores = pca.fit_transform(env_scaled)
         
@@ -579,18 +579,18 @@ class EnvironmentalModeler:
         
         for axis in gradient_scores.columns:
             for species in species_data.columns:
-                # Calculate weighted mean (optimum)
+# Copyright (c) 2025 Mohamed Z. Hatim
                 abundances = species_data[species]
                 gradient_vals = gradient_scores[axis]
                 
-                # Align data
+# Copyright (c) 2025 Mohamed Z. Hatim
                 common_idx = abundances.index.intersection(gradient_vals.index)
                 
                 if len(common_idx) > 0:
                     abund_aligned = abundances.loc[common_idx]
                     grad_aligned = gradient_vals.loc[common_idx]
                     
-                    # Remove zeros for optimum calculation
+# Copyright (c) 2025 Mohamed Z. Hatim
                     nonzero_mask = abund_aligned > 0
                     
                     if nonzero_mask.any():
@@ -602,9 +602,9 @@ class EnvironmentalModeler:
         
         return optima
     
-    # =============================================================================
-    # SPECIES RESPONSE CURVES
-    # =============================================================================
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def species_response_curves(self, species_data: pd.Series,
                                environmental_var: pd.Series,
@@ -629,12 +629,12 @@ class EnvironmentalModeler:
         dict
             Response curve fitting results
         """
-        # Align data
+# Copyright (c) 2025 Mohamed Z. Hatim
         common_idx = species_data.index.intersection(environmental_var.index)
         species_aligned = species_data.loc[common_idx]
         env_aligned = environmental_var.loc[common_idx]
         
-        # Remove missing values
+# Copyright (c) 2025 Mohamed Z. Hatim
         valid_mask = ~(species_aligned.isna() | env_aligned.isna())
         species_clean = species_aligned[valid_mask].values
         env_clean = env_aligned[valid_mask].values
@@ -648,25 +648,25 @@ class EnvironmentalModeler:
         curve_func = self.response_curves[curve_type]
         
         try:
-            # Fit response curve
+# Copyright (c) 2025 Mohamed Z. Hatim
             popt, pcov = optimize.curve_fit(
                 curve_func, env_clean, species_clean,
                 maxfev=5000
             )
             
-            # Calculate fitted values
+# Copyright (c) 2025 Mohamed Z. Hatim
             fitted_values = curve_func(env_clean, *popt)
             
-            # Calculate goodness of fit
+# Copyright (c) 2025 Mohamed Z. Hatim
             r_squared = r2_score(species_clean, fitted_values)
             rmse = np.sqrt(mean_squared_error(species_clean, fitted_values))
             
-            # Extract ecological parameters
+# Copyright (c) 2025 Mohamed Z. Hatim
             ecological_params = self._extract_response_parameters(
                 curve_type, popt, env_clean
             )
             
-            # Generate prediction curve
+# Copyright (c) 2025 Mohamed Z. Hatim
             env_range = np.linspace(env_clean.min(), env_clean.max(), 100)
             predicted_curve = curve_func(env_range, *popt)
             
@@ -712,14 +712,14 @@ class EnvironmentalModeler:
                       alpha: float, beta: float,
                       x_min: float, x_max: float) -> np.ndarray:
         """Beta function response curve."""
-        # Normalize x to [0, 1]
+# Copyright (c) 2025 Mohamed Z. Hatim
         x_norm = (x - x_min) / (x_max - x_min)
         x_norm = np.clip(x_norm, 1e-10, 1 - 1e-10)
         
-        # Beta function
+# Copyright (c) 2025 Mohamed Z. Hatim
         beta_func = (x_norm ** (alpha - 1)) * ((1 - x_norm) ** (beta - 1))
         
-        # Normalize to amplitude
+# Copyright (c) 2025 Mohamed Z. Hatim
         max_beta = ((alpha - 1) / (alpha + beta - 2)) ** (alpha - 1) * \
                    ((beta - 1) / (alpha + beta - 2)) ** (beta - 1)
         
@@ -765,7 +765,7 @@ class EnvironmentalModeler:
             
         elif curve_type == 'beta':
             amplitude, alpha, beta_param, x_min, x_max = params
-            # Calculate mode of beta distribution
+# Copyright (c) 2025 Mohamed Z. Hatim
             if alpha > 1 and beta_param > 1:
                 mode = x_min + (alpha - 1) / (alpha + beta_param - 2) * (x_max - x_min)
                 ecological_params['optimum'] = mode
@@ -789,9 +789,9 @@ class EnvironmentalModeler:
         
         return ecological_params
     
-    # =============================================================================
-    # CLIMATE-VEGETATION RESPONSE MODELING
-    # =============================================================================
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def climate_vegetation_response_modeling(self, vegetation_data: pd.DataFrame,
                                            climate_data: pd.DataFrame,
@@ -819,19 +819,19 @@ class EnvironmentalModeler:
         dict
             Climate-vegetation response model results
         """
-        # Merge datasets
+# Copyright (c) 2025 Mohamed Z. Hatim
         merged_data = pd.merge(vegetation_data, climate_data, 
                               left_index=True, right_index=True, how='inner')
         
         if model_type == 'gam':
-            # Fit GAM
+# Copyright (c) 2025 Mohamed Z. Hatim
             results = self.fit_gam(
                 merged_data, response_col, climate_vars,
                 family='gaussian'
             )
             
         elif model_type == 'response_curves':
-            # Fit individual response curves for each climate variable
+# Copyright (c) 2025 Mohamed Z. Hatim
             results = {'individual_responses': {}}
             
             for climate_var in climate_vars:
@@ -847,7 +847,7 @@ class EnvironmentalModeler:
                         warnings.warn(f"Failed to fit curve for {climate_var}: {e}")
         
         elif model_type == 'multiple_regression':
-            # Multiple regression with polynomial terms
+# Copyright (c) 2025 Mohamed Z. Hatim
             from sklearn.preprocessing import PolynomialFeatures
             from sklearn.linear_model import LinearRegression
             from sklearn.pipeline import Pipeline
@@ -855,7 +855,7 @@ class EnvironmentalModeler:
             X = merged_data[climate_vars]
             y = merged_data[response_col]
             
-            # Create polynomial features
+# Copyright (c) 2025 Mohamed Z. Hatim
             poly_reg = Pipeline([
                 ('poly', PolynomialFeatures(degree=2, interaction_only=True)),
                 ('reg', LinearRegression())

@@ -68,7 +68,7 @@ class VegetationDataParser:
         encoding = kwargs.get('encoding', 'utf-8')
         separator = kwargs.get('sep', None)
         
-        # Auto-detect separator if not provided
+# Copyright (c) 2025 Mohamed Z. Hatim
         if separator is None:
             with open(filepath, 'r', encoding=encoding) as f:
                 first_line = f.readline()
@@ -84,7 +84,7 @@ class VegetationDataParser:
         try:
             df = pd.read_csv(filepath, sep=separator, encoding=encoding, **kwargs)
         except UnicodeDecodeError:
-            # Try different encodings
+# Copyright (c) 2025 Mohamed Z. Hatim
             for enc in ['latin-1', 'iso-8859-1', 'cp1252']:
                 try:
                     df = pd.read_csv(filepath, sep=separator, encoding=enc, **kwargs)
@@ -115,12 +115,12 @@ class VegetationDataParser:
     
     def _standardize_columns(self, df: pd.DataFrame) -> pd.DataFrame:
         """Standardize column names and common data issues."""
-        # Clean column names
+# Copyright (c) 2025 Mohamed Z. Hatim
         df.columns = df.columns.str.strip().str.lower()
         df.columns = df.columns.str.replace(' ', '_')
         df.columns = df.columns.str.replace('[^a-zA-Z0-9_]', '', regex=True)
         
-        # Handle common column name variations
+# Copyright (c) 2025 Mohamed Z. Hatim
         column_mappings = {
             'species': ['species_name', 'taxon', 'scientific_name'],
             'abundance': ['cover', 'coverage', 'abundance_value', 'percent_cover'],
@@ -171,7 +171,7 @@ class TurbovegParser(VegetationDataParser):
         
         results = {}
         
-        # Look for standard Turboveg files
+# Copyright (c) 2025 Mohamed Z. Hatim
         file_patterns = {
             'species_list': ['species.txt', 'taxa.txt', 'florlist.txt'],
             'releves': ['releves.txt', 'vegetation.txt', 'plots.txt'],
@@ -187,7 +187,7 @@ class TurbovegParser(VegetationDataParser):
                     break
         
         if not results:
-            # Fallback: try to parse any CSV/TXT files
+# Copyright (c) 2025 Mohamed Z. Hatim
             for filepath in export_dir.glob('*.txt'):
                 try:
                     results[filepath.stem] = self.parse(filepath)
@@ -200,7 +200,7 @@ class TurbovegParser(VegetationDataParser):
         """Parse Turboveg species list file."""
         df = self._parse_text(filepath, sep='\t')
         
-        # Common Turboveg species list columns
+# Copyright (c) 2025 Mohamed Z. Hatim
         expected_cols = ['species_nr', 'species_name', 'author', 'family']
         for i, col in enumerate(expected_cols):
             if i < len(df.columns):
@@ -212,7 +212,7 @@ class TurbovegParser(VegetationDataParser):
         """Parse Turboveg releves/vegetation data."""
         df = self._parse_text(filepath, sep='\t')
         
-        # Common Turboveg releve columns
+# Copyright (c) 2025 Mohamed Z. Hatim
         expected_cols = ['releve_nr', 'species_nr', 'layer', 'cover_code', 'abundance']
         for i, col in enumerate(expected_cols):
             if i < len(df.columns):
@@ -224,7 +224,7 @@ class TurbovegParser(VegetationDataParser):
         """Parse Turboveg header/site data."""
         df = self._parse_text(filepath, sep='\t')
         
-        # Common Turboveg header columns
+# Copyright (c) 2025 Mohamed Z. Hatim
         expected_cols = ['releve_nr', 'date', 'author', 'latitude', 'longitude', 'altitude']
         for i, col in enumerate(expected_cols):
             if i < len(df.columns):
@@ -276,7 +276,7 @@ class AgencyDataParser(VegetationDataParser):
         """Parse USFS Forest Inventory data."""
         df = self.parse(filepath, **kwargs)
         
-        # USFS-specific standardization
+# Copyright (c) 2025 Mohamed Z. Hatim
         usfs_mappings = {
             'plot': 'plot_id',
             'spcd': 'species_code',
@@ -294,7 +294,7 @@ class AgencyDataParser(VegetationDataParser):
         """Parse National Park Service data."""
         df = self.parse(filepath, **kwargs)
         
-        # NPS-specific standardization
+# Copyright (c) 2025 Mohamed Z. Hatim
         nps_mappings = {
             'plot_code': 'plot_id',
             'taxa_code': 'species_code',
@@ -311,7 +311,7 @@ class AgencyDataParser(VegetationDataParser):
         """Parse EPA environmental data."""
         df = self.parse(filepath, **kwargs)
         
-        # EPA-specific standardization
+# Copyright (c) 2025 Mohamed Z. Hatim
         epa_mappings = {
             'site_id': 'plot_id',
             'taxon': 'species',
@@ -328,7 +328,7 @@ class AgencyDataParser(VegetationDataParser):
         """Parse Forest Inventory and Analysis data."""
         df = self.parse(filepath, **kwargs)
         
-        # FIA-specific standardization
+# Copyright (c) 2025 Mohamed Z. Hatim
         fia_mappings = {
             'plt_cn': 'plot_id',
             'spcd': 'species_code',

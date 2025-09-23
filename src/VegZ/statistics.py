@@ -51,18 +51,18 @@ class EcologicalStatistics:
         if metric in self.distance_metrics:
             distances = self.distance_metrics[metric](data.values)
         else:
-            # Fallback to scipy pdist
+# Copyright (c) 2025 Mohamed Z. Hatim
             try:
-                # Convert underscore to scipy format
+# Copyright (c) 2025 Mohamed Z. Hatim
                 scipy_metric = metric.replace('_', '')
                 if scipy_metric == 'braycurtis':
                     scipy_metric = 'braycurtis'
                 distances = pdist(data.values, metric=scipy_metric)
             except ValueError:
-                # Default to Bray-Curtis if metric not recognized
+# Copyright (c) 2025 Mohamed Z. Hatim
                 distances = self._bray_curtis_distance(data.values)
         
-        # Convert to square form
+# Copyright (c) 2025 Mohamed Z. Hatim
         distance_matrix = squareform(distances)
         
         return pd.DataFrame(
@@ -71,9 +71,9 @@ class EcologicalStatistics:
             columns=data.index
         )
     
-    # =============================================================================
-    # PERMANOVA (Permutational Multivariate Analysis of Variance)
-    # =============================================================================
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def permanova(self, distance_matrix: Union[pd.DataFrame, np.ndarray],
                   groups: Union[pd.Series, List],
@@ -95,13 +95,13 @@ class EcologicalStatistics:
         dict
             PERMANOVA results including F-statistic and p-value
         """
-        # Convert to numpy arrays
+# Copyright (c) 2025 Mohamed Z. Hatim
         if isinstance(distance_matrix, pd.DataFrame):
             if distance_matrix.shape[0] == distance_matrix.shape[1]:
-                # Assume it's a distance matrix
+# Copyright (c) 2025 Mohamed Z. Hatim
                 dist_matrix = distance_matrix.values
             else:
-                # Calculate distance matrix
+# Copyright (c) 2025 Mohamed Z. Hatim
                 dist_matrix = squareform(pdist(distance_matrix.values))
         else:
             if distance_matrix.shape[0] == distance_matrix.shape[1]:
@@ -114,31 +114,31 @@ class EcologicalStatistics:
         else:
             group_labels = np.array(groups)
         
-        # Calculate observed F-statistic
+# Copyright (c) 2025 Mohamed Z. Hatim
         observed_f = self._calculate_permanova_f(dist_matrix, group_labels)
         
-        # Permutation test
+# Copyright (c) 2025 Mohamed Z. Hatim
         permuted_f_stats = []
         n_samples = len(group_labels)
         
         for _ in range(permutations):
-            # Shuffle group labels
+# Copyright (c) 2025 Mohamed Z. Hatim
             permuted_groups = np.random.permutation(group_labels)
             
-            # Calculate F-statistic for permuted data
+# Copyright (c) 2025 Mohamed Z. Hatim
             f_stat = self._calculate_permanova_f(dist_matrix, permuted_groups)
             permuted_f_stats.append(f_stat)
         
-        # Calculate p-value
+# Copyright (c) 2025 Mohamed Z. Hatim
         p_value = (np.sum(np.array(permuted_f_stats) >= observed_f) + 1) / (permutations + 1)
         
-        # Degrees of freedom
+# Copyright (c) 2025 Mohamed Z. Hatim
         unique_groups = np.unique(group_labels)
         df_between = len(unique_groups) - 1
         df_within = n_samples - len(unique_groups)
         df_total = n_samples - 1
         
-        # Calculate R-squared
+# Copyright (c) 2025 Mohamed Z. Hatim
         ss_total = self._calculate_total_sum_squares(dist_matrix)
         ss_between = self._calculate_between_sum_squares(dist_matrix, group_labels)
         ss_within = ss_total - ss_between
@@ -171,19 +171,19 @@ class EcologicalStatistics:
         if n_groups < 2:
             return 0.0
         
-        # Calculate sum of squares
+# Copyright (c) 2025 Mohamed Z. Hatim
         ss_total = self._calculate_total_sum_squares(dist_matrix)
         ss_between = self._calculate_between_sum_squares(dist_matrix, group_labels)
         ss_within = ss_total - ss_between
         
-        # Degrees of freedom
+# Copyright (c) 2025 Mohamed Z. Hatim
         df_between = n_groups - 1
         df_within = n_samples - n_groups
         
         if df_within <= 0 or ss_within <= 0:
             return 0.0
         
-        # F-statistic
+# Copyright (c) 2025 Mohamed Z. Hatim
         ms_between = ss_between / df_between
         ms_within = ss_within / df_within
         
@@ -211,7 +211,7 @@ class EcologicalStatistics:
             if n_group <= 1:
                 continue
             
-            # Within-group distances
+# Copyright (c) 2025 Mohamed Z. Hatim
             group_distances = dist_matrix[np.ix_(group_mask, group_mask)]
             ss_group = np.sum(group_distances**2) / (2 * n_group)
             
@@ -221,9 +221,9 @@ class EcologicalStatistics:
         
         return ss_total - ss_between
     
-    # =============================================================================
-    # ANOSIM (Analysis of Similarities)
-    # =============================================================================
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def anosim(self, distance_matrix: Union[pd.DataFrame, np.ndarray],
                groups: Union[pd.Series, List],
@@ -245,7 +245,7 @@ class EcologicalStatistics:
         dict
             ANOSIM results including R-statistic and p-value
         """
-        # Prepare data
+# Copyright (c) 2025 Mohamed Z. Hatim
         if isinstance(distance_matrix, pd.DataFrame):
             dist_matrix = distance_matrix.values
         else:
@@ -256,10 +256,10 @@ class EcologicalStatistics:
         else:
             group_labels = np.array(groups)
         
-        # Calculate observed R-statistic
+# Copyright (c) 2025 Mohamed Z. Hatim
         observed_r = self._calculate_anosim_r(dist_matrix, group_labels)
         
-        # Permutation test
+# Copyright (c) 2025 Mohamed Z. Hatim
         permuted_r_stats = []
         
         for _ in range(permutations):
@@ -267,7 +267,7 @@ class EcologicalStatistics:
             r_stat = self._calculate_anosim_r(dist_matrix, permuted_groups)
             permuted_r_stats.append(r_stat)
         
-        # Calculate p-value
+# Copyright (c) 2025 Mohamed Z. Hatim
         p_value = (np.sum(np.array(permuted_r_stats) >= observed_r) + 1) / (permutations + 1)
         
         results = {
@@ -287,23 +287,23 @@ class EcologicalStatistics:
         if len(unique_groups) < 2:
             return 0.0
         
-        # Calculate rank matrix
+# Copyright (c) 2025 Mohamed Z. Hatim
         n = len(dist_matrix)
         ranks = np.zeros_like(dist_matrix)
         
-        # Get upper triangular distances and rank them
+# Copyright (c) 2025 Mohamed Z. Hatim
         triu_indices = np.triu_indices(n, k=1)
         distances = dist_matrix[triu_indices]
         distance_ranks = stats.rankdata(distances)
         
-        # Fill rank matrix
+# Copyright (c) 2025 Mohamed Z. Hatim
         rank_idx = 0
         for i in range(n):
             for j in range(i + 1, n):
                 ranks[i, j] = ranks[j, i] = distance_ranks[rank_idx]
                 rank_idx += 1
         
-        # Calculate within and between group rank means
+# Copyright (c) 2025 Mohamed Z. Hatim
         within_ranks = []
         between_ranks = []
         
@@ -320,7 +320,7 @@ class EcologicalStatistics:
         mean_within = np.mean(within_ranks)
         mean_between = np.mean(between_ranks)
         
-        # R-statistic
+# Copyright (c) 2025 Mohamed Z. Hatim
         n_comparisons = len(distances)
         mean_all_ranks = (n_comparisons + 1) / 2
         
@@ -328,9 +328,9 @@ class EcologicalStatistics:
         
         return r_stat
     
-    # =============================================================================
-    # MRPP (Multi-Response Permutation Procedures)
-    # =============================================================================
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def mrpp(self, distance_matrix: Union[pd.DataFrame, np.ndarray],
              groups: Union[pd.Series, List],
@@ -352,7 +352,7 @@ class EcologicalStatistics:
         dict
             MRPP results including delta and A statistics
         """
-        # Prepare data
+# Copyright (c) 2025 Mohamed Z. Hatim
         if isinstance(distance_matrix, pd.DataFrame):
             dist_matrix = distance_matrix.values
         else:
@@ -363,10 +363,10 @@ class EcologicalStatistics:
         else:
             group_labels = np.array(groups)
         
-        # Calculate observed delta
+# Copyright (c) 2025 Mohamed Z. Hatim
         observed_delta = self._calculate_mrpp_delta(dist_matrix, group_labels)
         
-        # Calculate expected delta (mean of all pairwise distances)
+# Copyright (c) 2025 Mohamed Z. Hatim
         n = len(group_labels)
         all_distances = []
         for i in range(n):
@@ -375,7 +375,7 @@ class EcologicalStatistics:
         
         expected_delta = np.mean(all_distances)
         
-        # Permutation test
+# Copyright (c) 2025 Mohamed Z. Hatim
         permuted_deltas = []
         
         for _ in range(permutations):
@@ -383,10 +383,10 @@ class EcologicalStatistics:
             delta = self._calculate_mrpp_delta(dist_matrix, permuted_groups)
             permuted_deltas.append(delta)
         
-        # Calculate p-value
+# Copyright (c) 2025 Mohamed Z. Hatim
         p_value = (np.sum(np.array(permuted_deltas) <= observed_delta) + 1) / (permutations + 1)
         
-        # Calculate A statistic (effect size)
+# Copyright (c) 2025 Mohamed Z. Hatim
         a_statistic = (expected_delta - observed_delta) / expected_delta
         
         results = {
@@ -415,7 +415,7 @@ class EcologicalStatistics:
             group_mask = group_labels == group
             group_indices = np.where(group_mask)[0]
             
-            # Calculate within-group mean distance
+# Copyright (c) 2025 Mohamed Z. Hatim
             within_distances = []
             for i in range(len(group_indices)):
                 for j in range(i + 1, len(group_indices)):
@@ -428,9 +428,9 @@ class EcologicalStatistics:
         
         return weighted_within_sum
     
-    # =============================================================================
-    # MANTEL TEST
-    # =============================================================================
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def mantel_test(self, matrix1: Union[pd.DataFrame, np.ndarray],
                     matrix2: Union[pd.DataFrame, np.ndarray],
@@ -455,7 +455,7 @@ class EcologicalStatistics:
         dict
             Mantel test results
         """
-        # Convert to numpy arrays
+# Copyright (c) 2025 Mohamed Z. Hatim
         if isinstance(matrix1, pd.DataFrame):
             mat1 = matrix1.values
         else:
@@ -466,18 +466,18 @@ class EcologicalStatistics:
         else:
             mat2 = matrix2
         
-        # Ensure matrices are same size
+# Copyright (c) 2025 Mohamed Z. Hatim
         if mat1.shape != mat2.shape:
             raise ValueError("Matrices must have the same dimensions")
         
-        # Extract upper triangular elements (excluding diagonal)
+# Copyright (c) 2025 Mohamed Z. Hatim
         n = mat1.shape[0]
         triu_indices = np.triu_indices(n, k=1)
         
         vec1 = mat1[triu_indices]
         vec2 = mat2[triu_indices]
         
-        # Calculate observed correlation
+# Copyright (c) 2025 Mohamed Z. Hatim
         if method == 'pearson':
             observed_r = np.corrcoef(vec1, vec2)[0, 1]
         elif method == 'spearman':
@@ -487,22 +487,22 @@ class EcologicalStatistics:
         else:
             raise ValueError(f"Unknown correlation method: {method}")
         
-        # Handle NaN correlation
+# Copyright (c) 2025 Mohamed Z. Hatim
         if np.isnan(observed_r):
             observed_r = 0.0
         
-        # Permutation test
+# Copyright (c) 2025 Mohamed Z. Hatim
         permuted_correlations = []
         
         for _ in range(permutations):
-            # Randomly permute rows and columns of matrix2
+# Copyright (c) 2025 Mohamed Z. Hatim
             perm_indices = np.random.permutation(n)
             mat2_permuted = mat2[np.ix_(perm_indices, perm_indices)]
             
-            # Extract upper triangular elements
+# Copyright (c) 2025 Mohamed Z. Hatim
             vec2_permuted = mat2_permuted[triu_indices]
             
-            # Calculate correlation
+# Copyright (c) 2025 Mohamed Z. Hatim
             if method == 'pearson':
                 r = np.corrcoef(vec1, vec2_permuted)[0, 1]
             elif method == 'spearman':
@@ -515,7 +515,7 @@ class EcologicalStatistics:
             
             permuted_correlations.append(r)
         
-        # Calculate p-value (two-tailed)
+# Copyright (c) 2025 Mohamed Z. Hatim
         permuted_correlations = np.array(permuted_correlations)
         p_value = (np.sum(np.abs(permuted_correlations) >= np.abs(observed_r)) + 1) / (permutations + 1)
         
@@ -555,7 +555,7 @@ class EcologicalStatistics:
         dict
             Partial Mantel test results
         """
-        # Convert to numpy arrays and extract upper triangular elements
+# Copyright (c) 2025 Mohamed Z. Hatim
         def extract_upper_tri(matrix):
             if isinstance(matrix, pd.DataFrame):
                 mat = matrix.values
@@ -570,20 +570,20 @@ class EcologicalStatistics:
         vec2 = extract_upper_tri(matrix2)
         vec3 = extract_upper_tri(matrix3)
         
-        # Calculate partial correlation
+# Copyright (c) 2025 Mohamed Z. Hatim
         def partial_correlation(x, y, z):
             """Calculate partial correlation between x and y controlling for z."""
-            # Correlations
+# Copyright (c) 2025 Mohamed Z. Hatim
             rxy = np.corrcoef(x, y)[0, 1]
             rxz = np.corrcoef(x, z)[0, 1]
             ryz = np.corrcoef(y, z)[0, 1]
             
-            # Handle NaN correlations
+# Copyright (c) 2025 Mohamed Z. Hatim
             rxy = 0.0 if np.isnan(rxy) else rxy
             rxz = 0.0 if np.isnan(rxz) else rxz
             ryz = 0.0 if np.isnan(ryz) else ryz
             
-            # Partial correlation formula
+# Copyright (c) 2025 Mohamed Z. Hatim
             denominator = np.sqrt((1 - rxz**2) * (1 - ryz**2))
             
             if denominator == 0:
@@ -593,15 +593,15 @@ class EcologicalStatistics:
             
             return partial_r
         
-        # Observed partial correlation
+# Copyright (c) 2025 Mohamed Z. Hatim
         observed_partial_r = partial_correlation(vec1, vec2, vec3)
         
-        # Permutation test
+# Copyright (c) 2025 Mohamed Z. Hatim
         permuted_partial_correlations = []
         n = matrix1.shape[0] if isinstance(matrix1, np.ndarray) else matrix1.shape[0]
         
         for _ in range(permutations):
-            # Permute matrix2
+# Copyright (c) 2025 Mohamed Z. Hatim
             perm_indices = np.random.permutation(n)
             
             if isinstance(matrix2, pd.DataFrame):
@@ -614,7 +614,7 @@ class EcologicalStatistics:
             partial_r = partial_correlation(vec1, vec2_permuted, vec3)
             permuted_partial_correlations.append(partial_r)
         
-        # Calculate p-value (two-tailed)
+# Copyright (c) 2025 Mohamed Z. Hatim
         permuted_partial_correlations = np.array(permuted_partial_correlations)
         p_value = (np.sum(np.abs(permuted_partial_correlations) >= np.abs(observed_partial_r)) + 1) / (permutations + 1)
         
@@ -628,9 +628,9 @@ class EcologicalStatistics:
         
         return results
     
-    # =============================================================================
-    # INDICATOR SPECIES ANALYSIS (IndVal)
-    # =============================================================================
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def indicator_species_analysis(self, species_data: pd.DataFrame,
                                  groups: Union[pd.Series, List],
@@ -663,13 +663,13 @@ class EcologicalStatistics:
         for species in species_data.columns:
             species_abundances = species_data[species].values
             
-            # Calculate IndVal for each group
+# Copyright (c) 2025 Mohamed Z. Hatim
             group_indvals = {}
             
             for group in unique_groups:
                 group_mask = group_labels == group
                 
-                # Relative abundance in group
+# Copyright (c) 2025 Mohamed Z. Hatim
                 group_abundance = species_abundances[group_mask]
                 total_abundance = species_abundances.sum()
                 
@@ -678,7 +678,7 @@ class EcologicalStatistics:
                 else:
                     relative_abundance = group_abundance.sum() / total_abundance
                 
-                # Relative frequency in group
+# Copyright (c) 2025 Mohamed Z. Hatim
                 group_presence = (group_abundance > 0).sum()
                 group_size = group_mask.sum()
                 
@@ -687,7 +687,7 @@ class EcologicalStatistics:
                 else:
                     relative_frequency = group_presence / group_size
                 
-                # IndVal = Relative Abundance × Relative Frequency × 100
+# Copyright (c) 2025 Mohamed Z. Hatim
                 indval = relative_abundance * relative_frequency * 100
                 
                 group_indvals[group] = {
@@ -696,17 +696,17 @@ class EcologicalStatistics:
                     'relative_frequency': relative_frequency
                 }
             
-            # Find group with maximum IndVal
+# Copyright (c) 2025 Mohamed Z. Hatim
             max_group = max(group_indvals.keys(), key=lambda g: group_indvals[g]['indval'])
             max_indval = group_indvals[max_group]['indval']
             
-            # Permutation test for significance
+# Copyright (c) 2025 Mohamed Z. Hatim
             permuted_indvals = []
             
             for _ in range(permutations):
                 permuted_groups = np.random.permutation(group_labels)
                 
-                # Calculate IndVal for permuted data
+# Copyright (c) 2025 Mohamed Z. Hatim
                 perm_group_mask = permuted_groups == max_group
                 perm_group_abundance = species_abundances[perm_group_mask]
                 
@@ -726,7 +726,7 @@ class EcologicalStatistics:
                 perm_indval = perm_rel_abundance * perm_rel_frequency * 100
                 permuted_indvals.append(perm_indval)
             
-            # Calculate p-value
+# Copyright (c) 2025 Mohamed Z. Hatim
             p_value = (np.sum(np.array(permuted_indvals) >= max_indval) + 1) / (permutations + 1)
             
             results[species] = {
@@ -738,9 +738,9 @@ class EcologicalStatistics:
         
         return results
     
-    # =============================================================================
-    # SIMILARITY PERCENTAGES (SIMPER)
-    # =============================================================================
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def simper_analysis(self, species_data: pd.DataFrame,
                        groups: Union[pd.Series, List],
@@ -770,7 +770,7 @@ class EcologicalStatistics:
         unique_groups = np.unique(group_labels)
         results = {}
         
-        # Within-group similarities
+# Copyright (c) 2025 Mohamed Z. Hatim
         for group in unique_groups:
             group_mask = group_labels == group
             group_data = species_data[group_mask]
@@ -778,13 +778,13 @@ class EcologicalStatistics:
             if len(group_data) < 2:
                 continue
             
-            # Calculate pairwise similarities within group
+# Copyright (c) 2025 Mohamed Z. Hatim
             similarities = []
             species_contributions = {species: [] for species in species_data.columns}
             
             for i in range(len(group_data)):
                 for j in range(i + 1, len(group_data)):
-                    # Calculate similarity (1 - distance)
+# Copyright (c) 2025 Mohamed Z. Hatim
                     sample1 = group_data.iloc[i].values
                     sample2 = group_data.iloc[j].values
                     
@@ -796,14 +796,14 @@ class EcologicalStatistics:
                     similarity = 1 - distance
                     similarities.append(similarity)
                     
-                    # Species contributions to similarity
+# Copyright (c) 2025 Mohamed Z. Hatim
                     for k, species in enumerate(species_data.columns):
-                        # Simplified contribution calculation
+# Copyright (c) 2025 Mohamed Z. Hatim
                         avg_abundance = (sample1[k] + sample2[k]) / 2
                         species_contribution = avg_abundance / (sample1.sum() + sample2.sum()) * similarity
                         species_contributions[species].append(species_contribution)
             
-            # Average similarity and species contributions
+# Copyright (c) 2025 Mohamed Z. Hatim
             avg_similarity = np.mean(similarities) if similarities else 0
             
             species_avg_contrib = {}
@@ -818,7 +818,7 @@ class EcologicalStatistics:
                 'species_contributions': species_avg_contrib
             }
         
-        # Between-group dissimilarities
+# Copyright (c) 2025 Mohamed Z. Hatim
         for i, group1 in enumerate(unique_groups):
             for group2 in unique_groups[i + 1:]:
                 group1_mask = group_labels == group1
@@ -827,7 +827,7 @@ class EcologicalStatistics:
                 group1_data = species_data[group1_mask]
                 group2_data = species_data[group2_mask]
                 
-                # Calculate pairwise dissimilarities between groups
+# Copyright (c) 2025 Mohamed Z. Hatim
                 dissimilarities = []
                 species_contributions = {species: [] for species in species_data.columns}
                 
@@ -843,12 +843,12 @@ class EcologicalStatistics:
                         
                         dissimilarities.append(dissimilarity)
                         
-                        # Species contributions to dissimilarity
+# Copyright (c) 2025 Mohamed Z. Hatim
                         for k, species in enumerate(species_data.columns):
                             contrib = abs(s1_values[k] - s2_values[k]) / (s1_values.sum() + s2_values.sum()) * dissimilarity
                             species_contributions[species].append(contrib)
                 
-                # Average dissimilarity and species contributions
+# Copyright (c) 2025 Mohamed Z. Hatim
                 avg_dissimilarity = np.mean(dissimilarities) if dissimilarities else 0
                 
                 species_avg_contrib = {}
@@ -865,9 +865,9 @@ class EcologicalStatistics:
         
         return results
     
-    # =============================================================================
-    # UTILITY FUNCTIONS
-    # =============================================================================
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def _bray_curtis_single(self, x: np.ndarray, y: np.ndarray) -> float:
         """Calculate Bray-Curtis distance between two samples."""

@@ -83,11 +83,11 @@ class InteractiveVisualizer:
             warnings.warn("Plotly not available, creating static plots instead")
             return self._create_static_diversity_plots(diversity_results, data)
         
-        # Diversity indices comparison
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'diversity_indices' in diversity_results:
             diversity_df = pd.DataFrame(diversity_results['diversity_indices']).T
             
-            # Interactive bar plot of diversity indices
+# Copyright (c) 2025 Mohamed Z. Hatim
             fig = px.bar(
                 diversity_df.reset_index(), 
                 x='index', 
@@ -99,7 +99,7 @@ class InteractiveVisualizer:
             fig.update_layout(height=500)
             dashboard['diversity_comparison'] = fig
         
-        # Species accumulation curve
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'species_accumulation' in diversity_results:
             accum_data = diversity_results['species_accumulation']
             
@@ -139,7 +139,7 @@ class InteractiveVisualizer:
             )
             dashboard['accumulation_curve'] = fig
         
-        # Rank-abundance plot
+# Copyright (c) 2025 Mohamed Z. Hatim
         if data is not None:
             species_totals = data.sum(axis=0).sort_values(ascending=False)
             relative_abundance = species_totals / species_totals.sum()
@@ -193,16 +193,16 @@ class InteractiveVisualizer:
             warnings.warn("Plotly not available, creating static plots instead")
             return self._create_static_ordination_plots(ordination_results)
         
-        # Ordination biplot
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'site_scores' in ordination_results:
             site_scores = ordination_results['site_scores']
             
-            # Basic scatter plot
+# Copyright (c) 2025 Mohamed Z. Hatim
             fig = go.Figure()
             
-            # Add site points
+# Copyright (c) 2025 Mohamed Z. Hatim
             if group_column and environmental_data is not None and group_column in environmental_data.columns:
-                # Color by groups
+# Copyright (c) 2025 Mohamed Z. Hatim
                 groups = environmental_data[group_column]
                 unique_groups = groups.unique()
                 colors = px.colors.qualitative.Set1[:len(unique_groups)]
@@ -221,7 +221,7 @@ class InteractiveVisualizer:
                         hovertemplate='<b>%{text}</b><br>Axis 1: %{x:.3f}<br>Axis 2: %{y:.3f}<extra></extra>'
                     ))
             else:
-                # Single color
+# Copyright (c) 2025 Mohamed Z. Hatim
                 fig.add_trace(go.Scatter(
                     x=site_scores.iloc[:, 0],
                     y=site_scores.iloc[:, 1],
@@ -232,11 +232,11 @@ class InteractiveVisualizer:
                     name='Sites'
                 ))
             
-            # Add species arrows if available
+# Copyright (c) 2025 Mohamed Z. Hatim
             if 'species_scores' in ordination_results:
                 species_scores = ordination_results['species_scores']
                 
-                # Scale species scores for visibility
+# Copyright (c) 2025 Mohamed Z. Hatim
                 scale_factor = 0.8 * max(
                     site_scores.iloc[:, 0].max() - site_scores.iloc[:, 0].min(),
                     site_scores.iloc[:, 1].max() - site_scores.iloc[:, 1].min()
@@ -247,7 +247,7 @@ class InteractiveVisualizer:
                 
                 scaled_species = species_scores * scale_factor
                 
-                # Add arrows
+# Copyright (c) 2025 Mohamed Z. Hatim
                 for species in scaled_species.index:
                     fig.add_annotation(
                         ax=0, ay=0,
@@ -264,7 +264,7 @@ class InteractiveVisualizer:
                         borderwidth=1
                     )
             
-            # Get axis labels with variance explained
+# Copyright (c) 2025 Mohamed Z. Hatim
             axis1_var = ordination_results.get('explained_variance', [0, 0])[0] if len(ordination_results.get('explained_variance', [])) > 0 else 0
             axis2_var = ordination_results.get('explained_variance', [0, 0])[1] if len(ordination_results.get('explained_variance', [])) > 1 else 0
             
@@ -278,7 +278,7 @@ class InteractiveVisualizer:
             
             dashboard['ordination_biplot'] = fig
         
-        # Scree plot
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'explained_variance' in ordination_results:
             explained_var = ordination_results['explained_variance']
             
@@ -324,9 +324,9 @@ class InteractiveVisualizer:
         if not PLOTLY_AVAILABLE:
             return self._create_static_clustering_plots(clustering_results)
         
-        # Dendrogram (if hierarchical clustering)
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'dendrogram_data' in clustering_results:
-            # Note: Plotly dendrogram creation is complex, using simplified version
+# Copyright (c) 2025 Mohamed Z. Hatim
             fig = go.Figure()
             fig.add_annotation(
                 text="Dendrogram visualization requires specialized implementation",
@@ -338,18 +338,18 @@ class InteractiveVisualizer:
             fig.update_layout(title='Hierarchical Clustering Dendrogram', height=400)
             dashboard['dendrogram'] = fig
         
-        # Cluster validation metrics
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'validation_metrics' in clustering_results:
             metrics = clustering_results['validation_metrics']
             
-            # Silhouette plot
+# Copyright (c) 2025 Mohamed Z. Hatim
             if 'silhouette_scores' in metrics:
                 silhouette_data = metrics['silhouette_scores']
                 cluster_labels = clustering_results.get('cluster_labels', [])
                 
                 fig = go.Figure()
                 
-                # Plot silhouette scores by cluster
+# Copyright (c) 2025 Mohamed Z. Hatim
                 y_lower = 10
                 for cluster in sorted(set(cluster_labels)):
                     cluster_silhouette = silhouette_data[np.array(cluster_labels) == cluster]
@@ -369,7 +369,7 @@ class InteractiveVisualizer:
                     
                     y_lower = y_upper + 10
                 
-                # Add average line
+# Copyright (c) 2025 Mohamed Z. Hatim
                 avg_silhouette = np.mean(silhouette_data)
                 fig.add_vline(
                     x=avg_silhouette,
@@ -385,14 +385,14 @@ class InteractiveVisualizer:
                 )
                 dashboard['silhouette_plot'] = fig
         
-        # Cluster overlay on ordination
+# Copyright (c) 2025 Mohamed Z. Hatim
         if ordination_results and 'site_scores' in ordination_results and 'cluster_labels' in clustering_results:
             site_scores = ordination_results['site_scores']
             cluster_labels = clustering_results['cluster_labels']
             
             fig = go.Figure()
             
-            # Plot points colored by cluster
+# Copyright (c) 2025 Mohamed Z. Hatim
             unique_clusters = sorted(set(cluster_labels))
             colors = px.colors.qualitative.Set1[:len(unique_clusters)]
             
@@ -443,11 +443,11 @@ class InteractiveVisualizer:
         if not PLOTLY_AVAILABLE:
             return {}
         
-        # Functional diversity by sites
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'site_diversity' in trait_results:
             site_fd = trait_results['site_diversity']
             
-            # Create subplots for different FD indices
+# Copyright (c) 2025 Mohamed Z. Hatim
             fig = make_subplots(
                 rows=2, cols=2,
                 subplot_titles=['FRic', 'FEve', 'FDiv', 'FDis'],
@@ -473,7 +473,7 @@ class InteractiveVisualizer:
             fig.update_layout(title='Functional Diversity Indices by Site', height=600)
             dashboard['functional_diversity'] = fig
         
-        # Trait space visualization
+# Copyright (c) 2025 Mohamed Z. Hatim
         if trait_data is not None and 'functional_groups' in trait_results:
             functional_groups = trait_results['functional_groups']['functional_groups']
             numeric_traits = trait_data.select_dtypes(include=[np.number]).columns[:3]  # Use first 3 traits
@@ -482,7 +482,7 @@ class InteractiveVisualizer:
                 trait_subset = trait_data[numeric_traits[:3]].fillna(trait_data[numeric_traits[:3]].mean())
                 
                 if len(numeric_traits) >= 3:
-                    # 3D scatter
+# Copyright (c) 2025 Mohamed Z. Hatim
                     fig = go.Figure(data=go.Scatter3d(
                         x=trait_subset.iloc[:, 0],
                         y=trait_subset.iloc[:, 1],
@@ -512,7 +512,7 @@ class InteractiveVisualizer:
                         height=600
                     )
                 else:
-                    # 2D scatter
+# Copyright (c) 2025 Mohamed Z. Hatim
                     fig = px.scatter(
                         x=trait_subset.iloc[:, 0],
                         y=trait_subset.iloc[:, 1],
@@ -559,7 +559,7 @@ class InteractiveVisualizer:
             fig, ax = plt.subplots(figsize=(10, 8))
             ax.scatter(site_scores.iloc[:, 0], site_scores.iloc[:, 1])
             
-            # Add site labels
+# Copyright (c) 2025 Mohamed Z. Hatim
             for i, site in enumerate(site_scores.index):
                 ax.annotate(site, (site_scores.iloc[i, 0], site_scores.iloc[i, 1]))
             
@@ -611,7 +611,7 @@ class InteractiveVisualizer:
             return None
         
         if format == 'html':
-            # Create HTML with all plots
+# Copyright (c) 2025 Mohamed Z. Hatim
             html_parts = []
             html_parts.append('<html><head><title>VegZ Dashboard</title></head><body>')
             html_parts.append('<h1>VegZ Analysis Dashboard</h1>')
@@ -667,14 +667,14 @@ class ReportGenerator:
         template_content = self._get_report_template(output_format)
         template = Template(template_content)
         
-        # Prepare context for template
+# Copyright (c) 2025 Mohamed Z. Hatim
         context = {
             'results': results,
             'data_summary': data_summary or {},
             'timestamp': pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')
         }
         
-        # Add summary statistics
+# Copyright (c) 2025 Mohamed Z. Hatim
         context['summary_stats'] = self._calculate_summary_stats(results)
         
         return template.render(**context)
@@ -752,7 +752,7 @@ class ReportGenerator:
         
         elif format == 'markdown':
             return """
-# VegZ Vegetation Analysis Report
+# Copyright (c) 2025 Mohamed Z. Hatim
 
 **Generated:** {{ timestamp }}
 
@@ -867,7 +867,7 @@ class ReportGenerator:
         return filename
 
 
-# Quick functions for common visualizations
+# Copyright (c) 2025 Mohamed Z. Hatim
 def quick_diversity_dashboard(diversity_results: Dict[str, Any], 
                             data: pd.DataFrame = None) -> Dict[str, Any]:
     """

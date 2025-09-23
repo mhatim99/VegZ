@@ -17,14 +17,14 @@ class TestVegetationClustering:
         """Create sample data with clear cluster structure."""
         np.random.seed(42)
         
-        # Create 3 distinct clusters
+# Copyright (c) 2025 Mohamed Z. Hatim
         cluster1 = np.random.multivariate_normal([2, 2], [[1, 0], [0, 1]], 10)
         cluster2 = np.random.multivariate_normal([8, 8], [[1, 0], [0, 1]], 10)
         cluster3 = np.random.multivariate_normal([2, 8], [[1, 0], [0, 1]], 10)
         
         data = np.vstack([cluster1, cluster2, cluster3])
         
-        # Add more dimensions to simulate species data
+# Copyright (c) 2025 Mohamed Z. Hatim
         extra_dims = np.random.poisson(2, (30, 8))
         data = np.hstack([data, extra_dims])
         
@@ -54,7 +54,7 @@ class TestVegetationClustering:
             plot_results=False
         )
         
-        # Check structure
+# Copyright (c) 2025 Mohamed Z. Hatim
         assert isinstance(results, dict)
         assert 'k_values' in results
         assert 'metrics' in results
@@ -62,27 +62,27 @@ class TestVegetationClustering:
         assert 'method_details' in results
         assert 'recommendations' in results
         
-        # Check k_values
+# Copyright (c) 2025 Mohamed Z. Hatim
         assert results['k_values'] == list(range(1, 8))
         
-        # Check metrics
+# Copyright (c) 2025 Mohamed Z. Hatim
         metrics = results['metrics']
         assert 'inertia' in metrics
         assert 'silhouette_scores' in metrics
         assert 'calinski_harabasz_scores' in metrics
         assert len(metrics['inertia']) == 7
         
-        # Check elbow points detected
+# Copyright (c) 2025 Mohamed Z. Hatim
         assert 'knee_locator' in results['elbow_points']
         assert 'derivative' in results['elbow_points']
         assert 'variance_explained' in results['elbow_points']
         
-        # Check method details
+# Copyright (c) 2025 Mohamed Z. Hatim
         for method in ['knee_locator', 'derivative', 'variance_explained']:
             assert method in results['method_details']
             assert 'description' in results['method_details'][method]
         
-        # Check recommendations
+# Copyright (c) 2025 Mohamed Z. Hatim
         assert 'consensus' in results['recommendations']
         assert 'confidence' in results['recommendations']
     
@@ -90,9 +90,9 @@ class TestVegetationClustering:
         """Test knee locator elbow detection."""
         clustering = VegetationClustering()
         
-        # Create a clear elbow curve
+# Copyright (c) 2025 Mohamed Z. Hatim
         k_values = list(range(1, 8))
-        # Manually create inertia curve with elbow at k=3
+# Copyright (c) 2025 Mohamed Z. Hatim
         inertias = [100, 60, 35, 30, 28, 26, 25]
         
         elbow_k = clustering._knee_locator_method(k_values, inertias)
@@ -104,7 +104,7 @@ class TestVegetationClustering:
         """Test derivative-based elbow detection."""
         clustering = VegetationClustering()
         
-        # Create a curve with clear elbow
+# Copyright (c) 2025 Mohamed Z. Hatim
         k_values = list(range(1, 6))
         inertias = [100, 50, 25, 22, 21]  # Clear elbow at k=3
         
@@ -134,7 +134,7 @@ class TestVegetationClustering:
         
         elbow_k = clustering._distortion_jump_method(k_values, inertias)
         
-        # Method should return a valid k or None
+# Copyright (c) 2025 Mohamed Z. Hatim
         assert elbow_k is None or elbow_k in k_values
     
     def test_l_method_elbow(self, sample_data):
@@ -142,7 +142,7 @@ class TestVegetationClustering:
         clustering = VegetationClustering()
         
         k_values = list(range(1, 8))
-        # Create data that fits well with 2 linear segments
+# Copyright (c) 2025 Mohamed Z. Hatim
         inertias = [100, 80, 60, 45, 42, 40, 39]
         
         elbow_k = clustering._l_method_elbow(k_values, inertias)
@@ -166,13 +166,13 @@ class TestVegetationClustering:
             
             assert isinstance(results, dict)
             assert 'recommendations' in results
-            # Should not crash with any transformation
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def test_elbow_analysis_consensus(self, sample_data):
         """Test consensus mechanism in elbow analysis."""
         clustering = VegetationClustering()
         
-        # Mock elbow points for testing consensus
+# Copyright (c) 2025 Mohamed Z. Hatim
         results = {
             'elbow_points': {
                 'method1': 3,
@@ -182,7 +182,7 @@ class TestVegetationClustering:
             'recommendations': {}
         }
         
-        # Test the consensus logic
+# Copyright (c) 2025 Mohamed Z. Hatim
         elbow_points = [v for v in results['elbow_points'].values() if v is not None]
         if elbow_points:
             from collections import Counter
@@ -246,7 +246,7 @@ class TestVegetationClustering:
         assert 'metrics' in results
         assert 'recommendations' in results
         
-        # Check that methods were applied
+# Copyright (c) 2025 Mohamed Z. Hatim
         assert 'elbow' in results['optimal_k']
         assert 'silhouette' in results['optimal_k']
 
@@ -289,11 +289,11 @@ class TestElbowPlotting:
         assert 'axes' in plots
         assert 'description' in plots
         
-        # Check that matplotlib figure was created
+# Copyright (c) 2025 Mohamed Z. Hatim
         import matplotlib.pyplot as plt
         assert isinstance(plots['figure'], plt.Figure)
         
-        # Clean up
+# Copyright (c) 2025 Mohamed Z. Hatim
         plt.close(plots['figure'])
 
 

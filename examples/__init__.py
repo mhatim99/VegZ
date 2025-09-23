@@ -1,1 +1,1 @@
-# VegZ Examples
+# Copyright (c) 2025 Mohamed Z. Hatim

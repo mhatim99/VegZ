@@ -37,13 +37,13 @@ class SpatialValidator:
         self.urban_areas = None
         self.institutions = None
         
-        # Common coordinate validation ranges
+# Copyright (c) 2025 Mohamed Z. Hatim
         self.coord_ranges = {
             'latitude': (-90, 90),
             'longitude': (-180, 180)
         }
         
-        # Known geographic centroids (lat, lon)
+# Copyright (c) 2025 Mohamed Z. Hatim
         self.known_centroids = {
             'country_centroids': {
                 'Brazil': (-14.2350, -51.9253),
@@ -55,7 +55,7 @@ class SpatialValidator:
                 'Russia': (61.5240, 105.3188)
             },
             'institution_coordinates': {
-                # Museums and herbaria coordinates
+# Copyright (c) 2025 Mohamed Z. Hatim
                 'Smithsonian': (38.8912, -77.0253),
                 'Harvard_Herbaria': (42.3826, -71.1162),
                 'Kew_Gardens': (51.4829, -0.2945),
@@ -95,59 +95,59 @@ class SpatialValidator:
             results['issues_found'].append(f"Missing coordinate columns: {lat_col}, {lon_col}")
             return results
         
-        # Create flags DataFrame
+# Copyright (c) 2025 Mohamed Z. Hatim
         flags_df = pd.DataFrame(index=df.index)
         
-        # Flag missing coordinates
+# Copyright (c) 2025 Mohamed Z. Hatim
         missing_coords = df[lat_col].isna() | df[lon_col].isna()
         flags_df['missing_coordinates'] = missing_coords
         results['flags']['missing_coordinates'] = missing_coords.sum()
         
-        # Flag invalid ranges
+# Copyright (c) 2025 Mohamed Z. Hatim
         invalid_lat = (df[lat_col] < -90) | (df[lat_col] > 90)
         invalid_lon = (df[lon_col] < -180) | (df[lon_col] > 180)
         flags_df['invalid_ranges'] = invalid_lat | invalid_lon
         results['flags']['invalid_ranges'] = (invalid_lat | invalid_lon).sum()
         
-        # Flag zero coordinates (0,0)
+# Copyright (c) 2025 Mohamed Z. Hatim
         zero_coords = (df[lat_col] == 0) & (df[lon_col] == 0)
         flags_df['zero_coordinates'] = zero_coords
         results['flags']['zero_coordinates'] = zero_coords.sum()
         
-        # Flag transposed coordinates (common error)
+# Copyright (c) 2025 Mohamed Z. Hatim
         transposed = self._detect_transposed_coordinates(df, lat_col, lon_col)
         flags_df['potentially_transposed'] = transposed
         results['flags']['potentially_transposed'] = transposed.sum()
         
-        # Flag low precision coordinates
+# Copyright (c) 2025 Mohamed Z. Hatim
         low_precision = self._detect_low_precision(df, lat_col, lon_col)
         flags_df['low_precision'] = low_precision
         results['flags']['low_precision'] = low_precision.sum()
         
-        # Flag potential centroids
+# Copyright (c) 2025 Mohamed Z. Hatim
         centroids = self._detect_centroids(df, lat_col, lon_col)
         flags_df['potential_centroids'] = centroids
         results['flags']['potential_centroids'] = centroids.sum()
         
-        # Flag coordinates in urban areas (if data available)
+# Copyright (c) 2025 Mohamed Z. Hatim
         urban = self._detect_urban_coordinates(df, lat_col, lon_col)
         flags_df['urban_areas'] = urban
         results['flags']['urban_areas'] = urban.sum()
         
-        # Flag institution coordinates
+# Copyright (c) 2025 Mohamed Z. Hatim
         institutions = self._detect_institution_coordinates(df, lat_col, lon_col)
         flags_df['near_institutions'] = institutions
         results['flags']['near_institutions'] = institutions.sum()
         
-        # Calculate valid coordinates
+# Copyright (c) 2025 Mohamed Z. Hatim
         all_flags = flags_df.any(axis=1)
         results['valid_coordinates'] = (~all_flags).sum()
         
-        # Add coordinate precision assessment
+# Copyright (c) 2025 Mohamed Z. Hatim
         precision_assessment = self._assess_coordinate_precision(df, lat_col, lon_col)
         results['precision_assessment'] = precision_assessment
         
-        # Add flags DataFrame to results
+# Copyright (c) 2025 Mohamed Z. Hatim
         results['flags_dataframe'] = flags_df
         
         return results
@@ -155,13 +155,13 @@ class SpatialValidator:
     def _detect_transposed_coordinates(self, df: pd.DataFrame,
                                      lat_col: str, lon_col: str) -> pd.Series:
         """Detect potentially transposed coordinates."""
-        # Look for patterns indicating transposition
-        # Latitude values in longitude range and vice versa
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
         
-        # Extreme longitude values in latitude column
+# Copyright (c) 2025 Mohamed Z. Hatim
         extreme_lat = (df[lat_col].abs() > 90) & (df[lat_col].abs() <= 180)
         
-        # Values that would be valid if swapped
+# Copyright (c) 2025 Mohamed Z. Hatim
         would_be_valid_if_swapped = (
             (df[lat_col].abs() > 90) & (df[lat_col].abs() <= 180) &
             (df[lon_col].abs() <= 90)
@@ -194,7 +194,7 @@ class SpatialValidator:
         
         for category, centroids in self.known_centroids.items():
             for name, (cent_lat, cent_lon) in centroids.items():
-                # Calculate distance to centroid
+# Copyright (c) 2025 Mohamed Z. Hatim
                 distance = np.sqrt(
                     (df[lat_col] - cent_lat)**2 + (df[lon_col] - cent_lon)**2
                 )
@@ -206,10 +206,10 @@ class SpatialValidator:
     def _detect_urban_coordinates(self, df: pd.DataFrame,
                                 lat_col: str, lon_col: str) -> pd.Series:
         """Detect coordinates in major urban areas."""
-        # Simple implementation - could be enhanced with actual urban boundary data
+# Copyright (c) 2025 Mohamed Z. Hatim
         urban_flags = pd.Series(False, index=df.index)
         
-        # Major cities coordinates (rough areas)
+# Copyright (c) 2025 Mohamed Z. Hatim
         major_cities = {
             'New_York': (40.7128, -74.0060, 0.5),
             'London': (51.5074, -0.1278, 0.3),
@@ -251,7 +251,7 @@ class SpatialValidator:
         """Assess coordinate precision levels."""
         def precision_to_uncertainty(decimals):
             """Convert decimal places to approximate uncertainty in meters."""
-            # Rough conversion: 1 degree ≈ 111 km
+# Copyright (c) 2025 Mohamed Z. Hatim
             if decimals == 0:
                 return 111000  # ~111 km
             elif decimals == 1:
@@ -277,7 +277,7 @@ class SpatialValidator:
         lat_decimals = df[lat_col].apply(count_decimals)
         lon_decimals = df[lon_col].apply(count_decimals)
         
-        # Use minimum precision of lat/lon pair
+# Copyright (c) 2025 Mohamed Z. Hatim
         min_precision = np.minimum(lat_decimals, lon_decimals)
         uncertainty = min_precision.apply(precision_to_uncertainty)
         
@@ -320,16 +320,16 @@ class SpatialValidator:
             warnings.warn("GeoPandas not available. Cannot derive countries from coordinates.")
             return result_df
         
-        # Try to use a simple country boundary check
-        # This is a simplified implementation - in practice, you'd use actual country boundary data
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
         
         try:
-            # Create points
+# Copyright (c) 2025 Mohamed Z. Hatim
             valid_coords = (~df[lat_col].isna()) & (~df[lon_col].isna())
             
             if valid_coords.any():
-                # Use a simple approach based on coordinate ranges
-                # This is a very rough approximation - real implementation would use proper boundaries
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
                 countries = self._approximate_country_from_coordinates(
                     df.loc[valid_coords, lat_col].values,
                     df.loc[valid_coords, lon_col].values
@@ -350,7 +350,7 @@ class SpatialValidator:
         for lat, lon in zip(latitudes, longitudes):
             country = "Unknown"
             
-            # Very rough approximations - replace with actual boundary data
+# Copyright (c) 2025 Mohamed Z. Hatim
             if 25 <= lat <= 49 and -125 <= lon <= -66:
                 country = "United States"
             elif 42 <= lat <= 70 and -141 <= lon <= -52:
@@ -406,7 +406,7 @@ class SpatialValidator:
             return outlier_flags
         
         if method == 'iqr':
-            # IQR method for each coordinate
+# Copyright (c) 2025 Mohamed Z. Hatim
             for col in [lat_col, lon_col]:
                 Q1 = df[col].quantile(0.25)
                 Q3 = df[col].quantile(0.75)
@@ -418,7 +418,7 @@ class SpatialValidator:
                 outlier_flags |= outliers
         
         elif method == 'zscore':
-            # Z-score method
+# Copyright (c) 2025 Mohamed Z. Hatim
             for col in [lat_col, lon_col]:
                 z_scores = np.abs(stats.zscore(df[col].dropna()))
                 outliers = pd.Series(False, index=df.index)
@@ -473,10 +473,10 @@ class SpatialValidator:
         }
         
         if country_col and country_col in df.columns:
-            # Derive countries from coordinates
+# Copyright (c) 2025 Mohamed Z. Hatim
             df_with_derived = self.derive_country_from_coordinates(df, lat_col, lon_col)
             
-            # Compare stated vs derived countries
+# Copyright (c) 2025 Mohamed Z. Hatim
             stated_countries = df[country_col].fillna('Unknown')
             derived_countries = df_with_derived['derived_country'].fillna('Unknown')
             
@@ -524,23 +524,23 @@ class SpatialValidator:
             }
         }
         
-        # Coordinate validation
+# Copyright (c) 2025 Mohamed Z. Hatim
         coord_validation = self.validate_coordinates(df, lat_col, lon_col)
         report['coordinate_validation'] = coord_validation
         
-        # Geographic outliers
+# Copyright (c) 2025 Mohamed Z. Hatim
         outliers = self.detect_geographic_outliers(df, lat_col, lon_col)
         report['geographic_outliers'] = {
             'count': outliers.sum(),
             'percentage': (outliers.sum() / len(df)) * 100
         }
         
-        # Coordinate consistency
+# Copyright (c) 2025 Mohamed Z. Hatim
         if country_col:
             consistency = self.validate_coordinate_consistency(df, lat_col, lon_col, country_col)
             report['coordinate_consistency'] = consistency
         
-        # Summary recommendations
+# Copyright (c) 2025 Mohamed Z. Hatim
         recommendations = []
         
         if coord_validation['flags']['missing_coordinates'] > 0:

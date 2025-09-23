@@ -1,1 +1,1 @@
-# VegZ Test Suite
+# Copyright (c) 2025 Mohamed Z. Hatim

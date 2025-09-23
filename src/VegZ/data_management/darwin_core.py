@@ -25,7 +25,7 @@ class DarwinCoreHandler:
     def _load_dwc_terms(self) -> Dict[str, Dict[str, Any]]:
         """Load Darwin Core term definitions."""
         return {
-            # Record-level terms
+# Copyright (c) 2025 Mohamed Z. Hatim
             'type': {'category': 'record', 'datatype': 'string'},
             'modified': {'category': 'record', 'datatype': 'datetime'},
             'language': {'category': 'record', 'datatype': 'string'},
@@ -46,7 +46,7 @@ class DarwinCoreHandler:
             'dataGeneralizations': {'category': 'record', 'datatype': 'string'},
             'dynamicProperties': {'category': 'record', 'datatype': 'string'},
             
-            # Occurrence terms
+# Copyright (c) 2025 Mohamed Z. Hatim
             'occurrenceID': {'category': 'occurrence', 'datatype': 'string'},
             'catalogNumber': {'category': 'occurrence', 'datatype': 'string'},
             'recordNumber': {'category': 'occurrence', 'datatype': 'string'},
@@ -68,7 +68,7 @@ class DarwinCoreHandler:
             'otherCatalogNumbers': {'category': 'occurrence', 'datatype': 'string'},
             'occurrenceRemarks': {'category': 'occurrence', 'datatype': 'string'},
             
-            # Event terms
+# Copyright (c) 2025 Mohamed Z. Hatim
             'eventID': {'category': 'event', 'datatype': 'string'},
             'parentEventID': {'category': 'event', 'datatype': 'string'},
             'fieldNumber': {'category': 'event', 'datatype': 'string'},
@@ -88,7 +88,7 @@ class DarwinCoreHandler:
             'fieldNotes': {'category': 'event', 'datatype': 'string'},
             'eventRemarks': {'category': 'event', 'datatype': 'string'},
             
-            # Location terms
+# Copyright (c) 2025 Mohamed Z. Hatim
             'locationID': {'category': 'location', 'datatype': 'string'},
             'higherGeographyID': {'category': 'location', 'datatype': 'string'},
             'higherGeography': {'category': 'location', 'datatype': 'string'},
@@ -134,7 +134,7 @@ class DarwinCoreHandler:
             'georeferenceVerificationStatus': {'category': 'location', 'datatype': 'string'},
             'georeferenceRemarks': {'category': 'location', 'datatype': 'string'},
             
-            # Taxonomic terms
+# Copyright (c) 2025 Mohamed Z. Hatim
             'taxonID': {'category': 'taxon', 'datatype': 'string'},
             'scientificNameID': {'category': 'taxon', 'datatype': 'string'},
             'acceptedNameUsageID': {'category': 'taxon', 'datatype': 'string'},
@@ -189,21 +189,21 @@ class DarwinCoreHandler:
         """
         dwc_df = df.copy()
         
-        # Apply field mapping if provided
+# Copyright (c) 2025 Mohamed Z. Hatim
         if field_mapping:
             dwc_df = dwc_df.rename(columns=field_mapping)
         
-        # Auto-map common fields
+# Copyright (c) 2025 Mohamed Z. Hatim
         auto_mapping = self._get_auto_field_mapping(dwc_df.columns)
         dwc_df = dwc_df.rename(columns=auto_mapping)
         
-        # Add required fields if missing
+# Copyright (c) 2025 Mohamed Z. Hatim
         dwc_df = self._add_required_fields(dwc_df)
         
-        # Validate and convert data types
+# Copyright (c) 2025 Mohamed Z. Hatim
         dwc_df = self._validate_dwc_types(dwc_df)
         
-        # Add metadata
+# Copyright (c) 2025 Mohamed Z. Hatim
         dwc_df = self._add_metadata(dwc_df)
         
         return dwc_df
@@ -228,29 +228,29 @@ class DarwinCoreHandler:
             'info': []
         }
         
-        # Check required terms
+# Copyright (c) 2025 Mohamed Z. Hatim
         missing_required = [term for term in self.required_terms if term not in df.columns]
         if missing_required:
             validation_results['errors'].extend([f"Missing required term: {term}" for term in missing_required])
         
-        # Check for invalid terms
+# Copyright (c) 2025 Mohamed Z. Hatim
         invalid_terms = [col for col in df.columns if col not in self.dwc_terms and not col.startswith('_')]
         if invalid_terms:
             validation_results['warnings'].extend([f"Non-standard term: {term}" for term in invalid_terms])
         
-        # Validate data types and values
+# Copyright (c) 2025 Mohamed Z. Hatim
         for column in df.columns:
             if column in self.dwc_terms:
                 expected_type = self.dwc_terms[column]['datatype']
                 validation_results.update(self._validate_column(df, column, expected_type))
         
-        # Check for coordinate validity
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'decimalLatitude' in df.columns and 'decimalLongitude' in df.columns:
             invalid_coords = self._validate_coordinates(df)
             if invalid_coords:
                 validation_results['warnings'].append(f"Found {invalid_coords} invalid coordinate pairs")
         
-        # Check for date validity
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'eventDate' in df.columns:
             invalid_dates = self._validate_dates(df)
             if invalid_dates:
@@ -262,7 +262,7 @@ class DarwinCoreHandler:
         """Generate automatic field mapping to DwC terms."""
         mapping = {}
         
-        # Common field mappings
+# Copyright (c) 2025 Mohamed Z. Hatim
         field_mappings = {
             'species': 'scientificName',
             'species_name': 'scientificName',
@@ -298,19 +298,19 @@ class DarwinCoreHandler:
         """Add missing required fields with default values."""
         dwc_df = df.copy()
         
-        # Add occurrenceID if missing
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'occurrenceID' not in dwc_df.columns:
             dwc_df['occurrenceID'] = [str(uuid.uuid4()) for _ in range(len(dwc_df))]
         
-        # Add catalogNumber if missing
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'catalogNumber' not in dwc_df.columns:
             dwc_df['catalogNumber'] = dwc_df.index.astype(str)
         
-        # Add basisOfRecord if missing
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'basisOfRecord' not in dwc_df.columns:
             dwc_df['basisOfRecord'] = 'HumanObservation'
         
-        # Add kingdom if missing but scientificName present
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'kingdom' not in dwc_df.columns and 'scientificName' in dwc_df.columns:
             dwc_df['kingdom'] = 'Plantae'  # Default for vegetation data
         
@@ -342,13 +342,13 @@ class DarwinCoreHandler:
         if column not in df.columns:
             return results
         
-        # Check for null values in required fields
+# Copyright (c) 2025 Mohamed Z. Hatim
         if column in self.required_terms:
             null_count = df[column].isnull().sum()
             if null_count > 0:
                 results['warnings'].append(f"Required field '{column}' has {null_count} null values")
         
-        # Type-specific validation
+# Copyright (c) 2025 Mohamed Z. Hatim
         if expected_type == 'float':
             try:
                 numeric_series = pd.to_numeric(df[column], errors='coerce')
@@ -368,7 +368,7 @@ class DarwinCoreHandler:
         if lat_col not in df.columns or lon_col not in df.columns:
             return 0
         
-        # Check coordinate ranges
+# Copyright (c) 2025 Mohamed Z. Hatim
         invalid_lat = (df[lat_col] < -90) | (df[lat_col] > 90)
         invalid_lon = (df[lon_col] < -180) | (df[lon_col] > 180)
         
@@ -392,11 +392,11 @@ class DarwinCoreHandler:
         """Add metadata fields."""
         dwc_df = df.copy()
         
-        # Add modification date
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'modified' not in dwc_df.columns:
             dwc_df['modified'] = datetime.now().isoformat()
         
-        # Add language
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 'language' not in dwc_df.columns:
             dwc_df['language'] = 'en'
         
@@ -413,11 +413,11 @@ class DarwinCoreHandler:
         output_path : str
             Output file path (without extension)
         """
-        # Save occurrence data
+# Copyright (c) 2025 Mohamed Z. Hatim
         occurrence_file = f"{output_path}_occurrence.csv"
         df.to_csv(occurrence_file, index=False)
         
-        # Create meta.xml
+# Copyright (c) 2025 Mohamed Z. Hatim
         meta_content = self._generate_meta_xml(df.columns)
         with open(f"{output_path}_meta.xml", 'w') as f:
             f.write(meta_content)

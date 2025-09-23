@@ -15,7 +15,7 @@ class TestDiversityAnalyzer:
     @pytest.fixture
     def sample_data(self):
         """Create sample species abundance data."""
-        # Create data with known diversity properties
+# Copyright (c) 2025 Mohamed Z. Hatim
         data = pd.DataFrame({
             'Species_A': [10, 5, 0, 8, 0],
             'Species_B': [5, 10, 15, 2, 0],
@@ -28,7 +28,7 @@ class TestDiversityAnalyzer:
     @pytest.fixture
     def even_community(self):
         """Create perfectly even community for testing."""
-        # All species have equal abundance - maximum evenness
+# Copyright (c) 2025 Mohamed Z. Hatim
         data = pd.DataFrame({
             'Species_A': [10, 10, 10],
             'Species_B': [10, 10, 10],
@@ -40,7 +40,7 @@ class TestDiversityAnalyzer:
     @pytest.fixture
     def uneven_community(self):
         """Create uneven community for testing."""
-        # One species dominates - low evenness
+# Copyright (c) 2025 Mohamed Z. Hatim
         data = pd.DataFrame({
             'Species_A': [90, 90, 90],
             'Species_B': [5, 5, 5],
@@ -68,7 +68,7 @@ class TestDiversityAnalyzer:
         assert len(shannon) == len(sample_data)
         assert all(shannon >= 0)  # Shannon is always non-negative
         
-        # Site with no species should have Shannon = 0
+# Copyright (c) 2025 Mohamed Z. Hatim
         zero_site = sample_data.iloc[0:1] * 0
         shannon_zero = analyzer.shannon_diversity(zero_site)
         assert shannon_zero.iloc[0] == 0
@@ -93,7 +93,7 @@ class TestDiversityAnalyzer:
         assert all(richness >= 0)
         assert all(richness <= len(sample_data.columns))
         
-        # Check that richness counts non-zero species correctly
+# Copyright (c) 2025 Mohamed Z. Hatim
         expected_richness = (sample_data > 0).sum(axis=1)
         pd.testing.assert_series_equal(richness, expected_richness)
     
@@ -101,16 +101,16 @@ class TestDiversityAnalyzer:
         """Test Pielou's evenness calculation."""
         analyzer = DiversityAnalyzer()
         
-        # Even community should have higher evenness
+# Copyright (c) 2025 Mohamed Z. Hatim
         evenness_even = analyzer.pielou_evenness(even_community)
         evenness_uneven = analyzer.pielou_evenness(uneven_community)
         
         assert isinstance(evenness_even, pd.Series)
         assert isinstance(evenness_uneven, pd.Series)
         
-        # Even community should have evenness close to 1
+# Copyright (c) 2025 Mohamed Z. Hatim
         assert all(evenness_even > 0.9)
-        # Uneven community should have lower evenness
+# Copyright (c) 2025 Mohamed Z. Hatim
         assert all(evenness_uneven < evenness_even.min())
     
     def test_fisher_alpha(self, sample_data):
@@ -131,7 +131,7 @@ class TestDiversityAnalyzer:
         assert len(chao1) == len(sample_data)
         assert all(chao1 >= 0)
         
-        # Chao1 should be >= observed richness
+# Copyright (c) 2025 Mohamed Z. Hatim
         observed_richness = analyzer.species_richness(sample_data)
         assert all(chao1 >= observed_richness)
     
@@ -143,12 +143,12 @@ class TestDiversityAnalyzer:
         assert isinstance(all_diversity, pd.DataFrame)
         assert len(all_diversity) == len(sample_data)
         
-        # Check that major indices are present
+# Copyright (c) 2025 Mohamed Z. Hatim
         expected_indices = ['shannon', 'simpson', 'richness', 'evenness']
         for index in expected_indices:
             assert index in all_diversity.columns
         
-        # Check that no values are missing for basic indices
+# Copyright (c) 2025 Mohamed Z. Hatim
         assert not all_diversity[expected_indices].isnull().any().any()
     
     def test_hill_numbers(self, sample_data):
@@ -161,18 +161,18 @@ class TestDiversityAnalyzer:
         assert len(hill_numbers) == len(sample_data)
         assert len(hill_numbers.columns) == len(q_values)
         
-        # Check column names
+# Copyright (c) 2025 Mohamed Z. Hatim
         expected_cols = [f'Hill_q{q}' for q in q_values]
         assert list(hill_numbers.columns) == expected_cols
         
-        # Hill numbers should be positive
+# Copyright (c) 2025 Mohamed Z. Hatim
         assert all(hill_numbers.min() >= 0)
         
-        # For each site, Hill numbers should generally decrease as q increases
-        # (this is a mathematical property of Hill numbers)
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
         for idx in hill_numbers.index:
             row = hill_numbers.loc[idx]
-            # Allow some tolerance for numerical precision
+# Copyright (c) 2025 Mohamed Z. Hatim
             decreasing = all(row.iloc[i] >= row.iloc[i+1] - 1e-10 for i in range(len(row)-1))
             assert decreasing, f"Hill numbers should be decreasing for site {idx}"
     
@@ -188,20 +188,20 @@ class TestDiversityAnalyzer:
             assert beta.shape[0] == len(sample_data)
             assert beta.shape[1] == len(sample_data)
             
-            # Beta diversity matrix should be symmetric
+# Copyright (c) 2025 Mohamed Z. Hatim
             np.testing.assert_array_almost_equal(beta.values, beta.values.T, decimal=10)
             
-            # Diagonal should be 0 (sites compared to themselves)
+# Copyright (c) 2025 Mohamed Z. Hatim
             assert all(np.diag(beta) == 0)
             
-            # All values should be non-negative
+# Copyright (c) 2025 Mohamed Z. Hatim
             assert all(beta.min() >= 0)
     
     def test_rarefaction_curve(self, sample_data):
         """Test rarefaction curve calculation."""
         analyzer = DiversityAnalyzer()
         
-        # Use a subset of sites with sufficient individuals
+# Copyright (c) 2025 Mohamed Z. Hatim
         subset_data = sample_data.iloc[:3]  # First 3 sites
         
         rarefaction = analyzer.rarefaction_curve(
@@ -214,16 +214,16 @@ class TestDiversityAnalyzer:
         assert 'sample_size' in rarefaction.columns
         assert 'expected_species' in rarefaction.columns
         
-        # Check that expected species increases with sample size (generally)
+# Copyright (c) 2025 Mohamed Z. Hatim
         for sample_id in rarefaction['sample_id'].unique():
             site_data = rarefaction[rarefaction['sample_id'] == sample_id]
             if len(site_data) > 1:
-                # Should generally be increasing (allow for some plateauing)
+# Copyright (c) 2025 Mohamed Z. Hatim
                 assert site_data['expected_species'].iloc[-1] >= site_data['expected_species'].iloc[0]
     
     def test_diversity_with_empty_sites(self):
         """Test diversity calculation with sites containing no species."""
-        # Create data with some empty sites
+# Copyright (c) 2025 Mohamed Z. Hatim
         data = pd.DataFrame({
             'Species_A': [0, 0, 5, 10],
             'Species_B': [0, 0, 10, 5],
@@ -232,12 +232,12 @@ class TestDiversityAnalyzer:
         
         analyzer = DiversityAnalyzer()
         
-        # Should handle empty sites gracefully
+# Copyright (c) 2025 Mohamed Z. Hatim
         shannon = analyzer.shannon_diversity(data)
         simpson = analyzer.simpson_diversity(data)
         richness = analyzer.species_richness(data)
         
-        # Empty sites should have diversity = 0 and richness = 0
+# Copyright (c) 2025 Mohamed Z. Hatim
         assert shannon.iloc[0] == 0
         assert shannon.iloc[1] == 0
         assert simpson.iloc[0] == 0
@@ -249,7 +249,7 @@ class TestDiversityAnalyzer:
         """Test the generic calculate_index method."""
         analyzer = DiversityAnalyzer()
         
-        # Test with different index names
+# Copyright (c) 2025 Mohamed Z. Hatim
         indices_to_test = ['shannon', 'simpson', 'richness', 'evenness', 'chao1']
         
         for index_name in indices_to_test:
@@ -259,7 +259,7 @@ class TestDiversityAnalyzer:
             assert len(result) == len(sample_data)
             assert not result.isnull().any(), f"Index {index_name} should not have null values"
         
-        # Test with invalid index name
+# Copyright (c) 2025 Mohamed Z. Hatim
         with pytest.raises(ValueError, match="Unknown diversity index"):
             analyzer.calculate_index(sample_data, 'invalid_index')
 

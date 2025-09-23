@@ -44,9 +44,9 @@ class TemporalAnalyzer:
             'x11': self._x11_decomposition
         }
     
-    # =============================================================================
-    # PHENOLOGY MODELING
-    # =============================================================================
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def phenology_modeling(self, data: pd.DataFrame,
                           time_col: str = 'date',
@@ -77,7 +77,7 @@ class TemporalAnalyzer:
         if time_col not in data.columns or response_col not in data.columns:
             raise ValueError(f"Required columns {time_col} and {response_col} not found")
         
-        # Convert dates to day of year
+# Copyright (c) 2025 Mohamed Z. Hatim
         data_clean = data.copy()
         if not pd.api.types.is_numeric_dtype(data_clean[time_col]):
             dates = pd.to_datetime(data_clean[time_col])
@@ -89,7 +89,7 @@ class TemporalAnalyzer:
         results = {}
         
         if species_col and species_col in data.columns:
-            # Model each species separately
+# Copyright (c) 2025 Mohamed Z. Hatim
             for species in data_clean[species_col].unique():
                 species_data = data_clean[data_clean[species_col] == species]
                 species_results = self._fit_phenology_model(
@@ -99,7 +99,7 @@ class TemporalAnalyzer:
                 )
                 results[species] = species_results
         else:
-            # Model entire dataset
+# Copyright (c) 2025 Mohamed Z. Hatim
             results['combined'] = self._fit_phenology_model(
                 data_clean[time_var].values,
                 data_clean[response_col].values,
@@ -125,22 +125,22 @@ class TemporalAnalyzer:
         model_func = self.phenology_models[model_type]
         
         try:
-            # Fit the model
+# Copyright (c) 2025 Mohamed Z. Hatim
             popt, pcov = optimize.curve_fit(
                 model_func, x, y,
                 maxfev=5000,
                 bounds=self._get_model_bounds(model_type, x, y)
             )
             
-            # Calculate goodness of fit
+# Copyright (c) 2025 Mohamed Z. Hatim
             y_pred = model_func(x, *popt)
             r_squared = r2_score(y, y_pred)
             rmse = np.sqrt(mean_squared_error(y, y_pred))
             
-            # Calculate parameter uncertainties
+# Copyright (c) 2025 Mohamed Z. Hatim
             param_errors = np.sqrt(np.diag(pcov))
             
-            # Extract phenological parameters
+# Copyright (c) 2025 Mohamed Z. Hatim
             pheno_params = self._extract_phenology_parameters(model_type, popt, x)
             
             results = {
@@ -185,11 +185,11 @@ class TemporalAnalyzer:
     def _beta_model(self, x: np.ndarray, a: float, alpha: float, 
                    beta: float, t1: float, t2: float) -> np.ndarray:
         """Beta function phenology model."""
-        # Normalize x to [0, 1] range
+# Copyright (c) 2025 Mohamed Z. Hatim
         x_norm = (x - t1) / (t2 - t1)
         x_norm = np.clip(x_norm, 0, 1)
         
-        # Beta function
+# Copyright (c) 2025 Mohamed Z. Hatim
         return a * (x_norm**(alpha-1)) * ((1-x_norm)**(beta-1))
     
     def _weibull_model(self, x: np.ndarray, a: float, k: float, 
@@ -220,7 +220,7 @@ class TemporalAnalyzer:
             lower = [0, 0.1, 1, y_min]
             upper = [y_range * 2, 10, (x_max - x_min), y_max]
         else:
-            # Default bounds
+# Copyright (c) 2025 Mohamed Z. Hatim
             lower = [-np.inf] * 4
             upper = [np.inf] * 4
         
@@ -254,7 +254,7 @@ class TemporalAnalyzer:
             
         elif model_type == 'beta':
             a, alpha, beta_param, t1, t2 = params
-            # Peak time for beta distribution
+# Copyright (c) 2025 Mohamed Z. Hatim
             if alpha > 1 and beta_param > 1:
                 peak_norm = (alpha - 1) / (alpha + beta_param - 2)
                 pheno_params['peak_time'] = t1 + peak_norm * (t2 - t1)
@@ -264,9 +264,9 @@ class TemporalAnalyzer:
             
         return pheno_params
     
-    # =============================================================================
-    # TREND DETECTION
-    # =============================================================================
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def trend_detection(self, data: pd.DataFrame,
                        time_col: str = 'date',
@@ -297,10 +297,10 @@ class TemporalAnalyzer:
         if method not in self.trend_methods:
             raise ValueError(f"Unknown trend method: {method}")
         
-        # Prepare data
+# Copyright (c) 2025 Mohamed Z. Hatim
         data_clean = data.dropna(subset=[time_col, response_col])
         
-        # Convert time to numeric if needed
+# Copyright (c) 2025 Mohamed Z. Hatim
         if not pd.api.types.is_numeric_dtype(data_clean[time_col]):
             time_numeric = pd.to_datetime(data_clean[time_col]).map(pd.Timestamp.toordinal)
         else:
@@ -309,7 +309,7 @@ class TemporalAnalyzer:
         x = time_numeric.values
         y = data_clean[response_col].values
         
-        # Apply trend method
+# Copyright (c) 2025 Mohamed Z. Hatim
         trend_func = self.trend_methods[method]
         results = trend_func(x, y, **kwargs)
         
@@ -326,7 +326,7 @@ class TemporalAnalyzer:
     
     def _linear_trend(self, x: np.ndarray, y: np.ndarray, **kwargs) -> Dict[str, Any]:
         """Linear trend analysis."""
-        # Fit linear regression
+# Copyright (c) 2025 Mohamed Z. Hatim
         reg = LinearRegression()
         X = x.reshape(-1, 1)
         reg.fit(X, y)
@@ -335,11 +335,11 @@ class TemporalAnalyzer:
         slope = reg.coef_[0]
         intercept = reg.intercept_
         
-        # Statistical tests
+# Copyright (c) 2025 Mohamed Z. Hatim
         r_squared = reg.score(X, y)
         n = len(y)
         
-        # t-test for slope significance
+# Copyright (c) 2025 Mohamed Z. Hatim
         residuals = y - y_pred
         mse = np.sum(residuals**2) / (n - 2)
         se_slope = np.sqrt(mse / np.sum((x - x.mean())**2))
@@ -361,7 +361,7 @@ class TemporalAnalyzer:
     def _polynomial_trend(self, x: np.ndarray, y: np.ndarray, 
                          degree: int = 2, **kwargs) -> Dict[str, Any]:
         """Polynomial trend analysis."""
-        # Fit polynomial regression
+# Copyright (c) 2025 Mohamed Z. Hatim
         poly_features = PolynomialFeatures(degree=degree)
         X_poly = poly_features.fit_transform(x.reshape(-1, 1))
         
@@ -383,14 +383,14 @@ class TemporalAnalyzer:
     def _spline_trend(self, x: np.ndarray, y: np.ndarray, 
                      smoothing: float = None, **kwargs) -> Dict[str, Any]:
         """Spline trend analysis."""
-        # Fit smoothing spline
+# Copyright (c) 2025 Mohamed Z. Hatim
         if smoothing is None:
             smoothing = len(x)
         
         spline = UnivariateSpline(x, y, s=smoothing)
         y_pred = spline(x)
         
-        # Calculate derivatives for trend analysis
+# Copyright (c) 2025 Mohamed Z. Hatim
         x_fine = np.linspace(x.min(), x.max(), len(x) * 10)
         y_fine = spline(x_fine)
         derivatives = spline.derivative()(x_fine)
@@ -412,12 +412,12 @@ class TemporalAnalyzer:
         try:
             from statsmodels.nonparametric.smoothers_lowess import lowess
             
-            # Fit LOWESS
+# Copyright (c) 2025 Mohamed Z. Hatim
             smoothed = lowess(y, x, frac=frac, return_sorted=True)
             x_smooth = smoothed[:, 0]
             y_smooth = smoothed[:, 1]
             
-            # Interpolate to original x values
+# Copyright (c) 2025 Mohamed Z. Hatim
             interp_func = interp1d(x_smooth, y_smooth, 
                                  bounds_error=False, fill_value='extrapolate')
             y_pred = interp_func(x)
@@ -431,7 +431,7 @@ class TemporalAnalyzer:
             
         except ImportError:
             warnings.warn("statsmodels not available, using simple moving average")
-            # Fallback to simple moving average
+# Copyright (c) 2025 Mohamed Z. Hatim
             window = max(3, int(len(x) * frac))
             y_pred = pd.Series(y).rolling(window, center=True).mean().fillna(method='bfill').fillna(method='ffill').values
             
@@ -446,7 +446,7 @@ class TemporalAnalyzer:
         """Mann-Kendall trend test."""
         n = len(y)
         
-        # Calculate S statistic
+# Copyright (c) 2025 Mohamed Z. Hatim
         s = 0
         for i in range(n - 1):
             for j in range(i + 1, n):
@@ -455,14 +455,14 @@ class TemporalAnalyzer:
                 elif y[j] < y[i]:
                     s -= 1
         
-        # Calculate variance
-        # Handle ties
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
         unique_vals, counts = np.unique(y, return_counts=True)
         tie_adjustment = np.sum(counts * (counts - 1) * (2 * counts + 5))
         
         var_s = (n * (n - 1) * (2 * n + 5) - tie_adjustment) / 18
         
-        # Calculate test statistic
+# Copyright (c) 2025 Mohamed Z. Hatim
         if s > 0:
             z = (s - 1) / np.sqrt(var_s)
         elif s < 0:
@@ -470,10 +470,10 @@ class TemporalAnalyzer:
         else:
             z = 0
         
-        # Calculate p-value (two-tailed)
+# Copyright (c) 2025 Mohamed Z. Hatim
         p_value = 2 * (1 - stats.norm.cdf(abs(z)))
         
-        # Trend interpretation
+# Copyright (c) 2025 Mohamed Z. Hatim
         if p_value < alpha:
             if s > 0:
                 trend = 'increasing'
@@ -482,7 +482,7 @@ class TemporalAnalyzer:
         else:
             trend = 'no significant trend'
         
-        # Sen's slope estimator
+# Copyright (c) 2025 Mohamed Z. Hatim
         slopes = []
         for i in range(n - 1):
             for j in range(i + 1, n):
@@ -501,9 +501,9 @@ class TemporalAnalyzer:
             'significant': p_value < alpha
         }
     
-    # =============================================================================
-    # SEASONAL DECOMPOSITION
-    # =============================================================================
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def seasonal_decomposition(self, data: pd.DataFrame,
                              time_col: str = 'date',
@@ -534,18 +534,18 @@ class TemporalAnalyzer:
         dict
             Decomposition results
         """
-        # Prepare data
+# Copyright (c) 2025 Mohamed Z. Hatim
         data_clean = data.dropna(subset=[time_col, response_col]).copy()
         data_clean[time_col] = pd.to_datetime(data_clean[time_col])
         data_clean = data_clean.sort_values(time_col)
         
-        # Create time series
+# Copyright (c) 2025 Mohamed Z. Hatim
         ts = pd.Series(
             data_clean[response_col].values,
             index=data_clean[time_col]
         )
         
-        # Auto-detect period if not provided
+# Copyright (c) 2025 Mohamed Z. Hatim
         if period is None:
             period = self._detect_seasonality(ts)
         
@@ -561,7 +561,7 @@ class TemporalAnalyzer:
         try:
             from statsmodels.tsa.seasonal import seasonal_decompose
             
-            # Perform decomposition
+# Copyright (c) 2025 Mohamed Z. Hatim
             decomposition = seasonal_decompose(ts, model=model, period=period)
             
             return {
@@ -576,7 +576,7 @@ class TemporalAnalyzer:
             
         except ImportError:
             warnings.warn("statsmodels not available, using simple decomposition")
-            # Simple fallback decomposition
+# Copyright (c) 2025 Mohamed Z. Hatim
             return self._simple_decomposition(ts, period)
     
     def _stl_decomposition(self, ts: pd.Series, period: int, **kwargs) -> Dict[str, Any]:
@@ -584,7 +584,7 @@ class TemporalAnalyzer:
         try:
             from statsmodels.tsa.seasonal import STL
             
-            # Perform STL decomposition
+# Copyright (c) 2025 Mohamed Z. Hatim
             stl = STL(ts, seasonal=kwargs.get('seasonal', 7), period=period)
             decomposition = stl.fit()
             
@@ -603,15 +603,15 @@ class TemporalAnalyzer:
     
     def _x11_decomposition(self, ts: pd.Series, period: int, **kwargs) -> Dict[str, Any]:
         """X-11 seasonal adjustment (simplified version)."""
-        # This is a simplified version - full X-11 would require more complex implementation
+# Copyright (c) 2025 Mohamed Z. Hatim
         return self._classical_decomposition(ts, period, model='multiplicative')
     
     def _simple_decomposition(self, ts: pd.Series, period: int) -> Dict[str, Any]:
         """Simple fallback decomposition method."""
-        # Calculate trend using moving average
+# Copyright (c) 2025 Mohamed Z. Hatim
         trend = ts.rolling(window=period, center=True).mean()
         
-        # Calculate seasonal component
+# Copyright (c) 2025 Mohamed Z. Hatim
         detrended = ts - trend
         seasonal_means = detrended.groupby(detrended.index.dayofyear % period).mean()
         seasonal = detrended.copy()
@@ -623,7 +623,7 @@ class TemporalAnalyzer:
             else:
                 seasonal.iloc[i] = 0
         
-        # Calculate residual
+# Copyright (c) 2025 Mohamed Z. Hatim
         residual = ts - trend - seasonal
         
         return {
@@ -637,7 +637,7 @@ class TemporalAnalyzer:
     
     def _detect_seasonality(self, ts: pd.Series) -> int:
         """Auto-detect seasonal period."""
-        # Simple approach: assume daily data has annual seasonality
+# Copyright (c) 2025 Mohamed Z. Hatim
         if isinstance(ts.index, pd.DatetimeIndex):
             freq = pd.infer_freq(ts.index)
             if freq:
@@ -650,12 +650,12 @@ class TemporalAnalyzer:
                 elif 'Q' in freq:
                     return 4
         
-        # Default fallback
+# Copyright (c) 2025 Mohamed Z. Hatim
         return max(4, min(len(ts) // 4, 365))
     
-    # =============================================================================
-    # CLIMATE-VEGETATION RESPONSE ANALYSIS
-    # =============================================================================
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def climate_vegetation_response(self, vegetation_data: pd.DataFrame,
                                   climate_data: pd.DataFrame,
@@ -686,15 +686,15 @@ class TemporalAnalyzer:
         dict
             Climate-vegetation response analysis
         """
-        # Merge datasets on time
+# Copyright (c) 2025 Mohamed Z. Hatim
         veg_clean = vegetation_data.dropna(subset=[time_col, veg_col])
         climate_clean = climate_data.dropna(subset=[time_col])
         
-        # Merge on time
+# Copyright (c) 2025 Mohamed Z. Hatim
         merged = pd.merge(veg_clean, climate_clean, on=time_col, how='inner')
         
         if climate_vars is None:
-            # Auto-detect numeric climate variables
+# Copyright (c) 2025 Mohamed Z. Hatim
             climate_vars = merged.select_dtypes(include=[np.number]).columns.tolist()
             climate_vars = [col for col in climate_vars if col != veg_col]
         
@@ -711,17 +711,17 @@ class TemporalAnalyzer:
                 'response_curve': None
             }
             
-            # Test different lag periods
+# Copyright (c) 2025 Mohamed Z. Hatim
             for lag in lag_periods:
                 if lag == 0:
                     climate_lagged = merged[climate_var]
                     veg_response = merged[veg_col]
                 else:
-                    # Create lagged version
+# Copyright (c) 2025 Mohamed Z. Hatim
                     climate_lagged = merged[climate_var].shift(lag)
                     veg_response = merged[veg_col]
                     
-                    # Remove NaN values
+# Copyright (c) 2025 Mohamed Z. Hatim
                     valid_mask = ~(climate_lagged.isna() | veg_response.isna())
                     climate_lagged = climate_lagged[valid_mask]
                     veg_response = veg_response[valid_mask]
@@ -729,19 +729,19 @@ class TemporalAnalyzer:
                 if len(climate_lagged) < 3:
                     continue
                 
-                # Calculate correlation
+# Copyright (c) 2025 Mohamed Z. Hatim
                 correlation = np.corrcoef(climate_lagged, veg_response)[0, 1]
                 if np.isnan(correlation):
                     correlation = 0
                 
                 var_results['correlations'][lag] = correlation
                 
-                # Track best correlation
+# Copyright (c) 2025 Mohamed Z. Hatim
                 if abs(correlation) > abs(var_results['best_correlation']):
                     var_results['best_correlation'] = correlation
                     var_results['best_lag'] = lag
             
-            # Create response curve for best lag
+# Copyright (c) 2025 Mohamed Z. Hatim
             if var_results['best_lag'] is not None:
                 best_lag = var_results['best_lag']
                 
@@ -755,7 +755,7 @@ class TemporalAnalyzer:
                     y_vals = merged[veg_col][valid_mask].values
                 
                 if len(x_vals) > 3:
-                    # Fit response curve
+# Copyright (c) 2025 Mohamed Z. Hatim
                     response_curve = self._fit_response_curve(x_vals, y_vals)
                     var_results['response_curve'] = response_curve
             
@@ -773,7 +773,7 @@ class TemporalAnalyzer:
     
     def _fit_response_curve(self, x: np.ndarray, y: np.ndarray) -> Dict[str, Any]:
         """Fit response curve to climate-vegetation relationship."""
-        # Try different curve types
+# Copyright (c) 2025 Mohamed Z. Hatim
         curve_types = {
             'linear': lambda x, a, b: a * x + b,
             'quadratic': lambda x, a, b, c: a * x**2 + b * x + c,
@@ -809,9 +809,9 @@ class TemporalAnalyzer:
             'curve_function': curve_types[best_curve] if best_curve else None
         }
     
-    # =============================================================================
-    # GROWTH CURVE FITTING
-    # =============================================================================
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
     
     def growth_curve_fitting(self, data: pd.DataFrame,
                            time_col: str = 'time',
@@ -853,7 +853,7 @@ class TemporalAnalyzer:
         results = {}
         
         if species_col and species_col in data.columns:
-            # Fit curves for each species
+# Copyright (c) 2025 Mohamed Z. Hatim
             for species in data[species_col].unique():
                 species_data = data[data[species_col] == species]
                 if len(species_data) < 4:  # Need minimum points for fitting
@@ -866,7 +866,7 @@ class TemporalAnalyzer:
                 )
                 results[species] = species_results
         else:
-            # Fit single curve
+# Copyright (c) 2025 Mohamed Z. Hatim
             results['combined'] = self._fit_growth_curve(
                 data[time_col].values,
                 data[size_col].values,
@@ -883,22 +883,22 @@ class TemporalAnalyzer:
                          model_func: Callable) -> Dict[str, Any]:
         """Fit individual growth curve."""
         try:
-            # Initial parameter guesses
+# Copyright (c) 2025 Mohamed Z. Hatim
             initial_guess = self._get_growth_initial_guess(t, size, model_func)
             
-            # Fit curve
+# Copyright (c) 2025 Mohamed Z. Hatim
             popt, pcov = optimize.curve_fit(
                 model_func, t, size,
                 p0=initial_guess,
                 maxfev=5000
             )
             
-            # Calculate goodness of fit
+# Copyright (c) 2025 Mohamed Z. Hatim
             size_pred = model_func(t, *popt)
             r_squared = r2_score(size, size_pred)
             rmse = np.sqrt(mean_squared_error(size, size_pred))
             
-            # Calculate growth rate parameters
+# Copyright (c) 2025 Mohamed Z. Hatim
             growth_params = self._extract_growth_parameters(model_func, popt, t)
             
             return {

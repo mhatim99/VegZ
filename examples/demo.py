@@ -26,27 +26,27 @@ def main():
         print(f"✗ Could not import VegZ: {e}")
         return
     
-    # Create synthetic vegetation data
+    # Copyright (c) 2025 Mohamed Z. Hatim
     print("\n1. Creating synthetic vegetation data...")
     np.random.seed(42)
     
-    # Simulate 4 distinct vegetation types
+    # Copyright (c) 2025 Mohamed Z. Hatim
     n_sites_per_type = 15
     n_species = 20
     
-    # Deciduous forest
+    # Copyright (c) 2025 Mohamed Z. Hatim
     deciduous = np.random.poisson(5, (n_sites_per_type, n_species)) * \
                 np.random.binomial(1, 0.4, (n_sites_per_type, n_species))
     
-    # Coniferous forest  
+    # Copyright (c) 2025 Mohamed Z. Hatim
     coniferous = np.random.poisson(8, (n_sites_per_type, n_species)) * \
                  np.random.binomial(1, 0.2, (n_sites_per_type, n_species))
     
-    # Mixed forest
+    # Copyright (c) 2025 Mohamed Z. Hatim
     mixed = np.random.poisson(6, (n_sites_per_type, n_species)) * \
             np.random.binomial(1, 0.3, (n_sites_per_type, n_species))
     
-    # Grassland
+    # Copyright (c) 2025 Mohamed Z. Hatim
     grassland = np.random.poisson(3, (n_sites_per_type, n_species)) * \
                 np.random.binomial(1, 0.5, (n_sites_per_type, n_species))
     
@@ -58,25 +58,25 @@ def main():
     vegetation_data = pd.DataFrame(data, index=site_names, columns=species_names)
     print(f"   Created data: {vegetation_data.shape[0]} sites × {vegetation_data.shape[1]} species")
     
-    # Initialize VegZ
+    # Copyright (c) 2025 Mohamed Z. Hatim
     print("\n2. Initializing VegZ...")
     veg = VegZ()
     veg.species_matrix = vegetation_data
     print("✓ VegZ initialized with synthetic data")
     
-    # Diversity analysis
+    # Copyright (c) 2025 Mohamed Z. Hatim
     print("\n3. Calculating diversity indices...")
     diversity = veg.calculate_diversity(['shannon', 'simpson', 'richness', 'evenness'])
     print(f"   Calculated diversity for {len(diversity)} sites")
     print(f"   Mean Shannon diversity: {diversity['shannon'].mean():.2f}")
     print(f"   Mean species richness: {diversity['richness'].mean():.1f}")
     
-    # Comprehensive elbow analysis
+    # Copyright (c) 2025 Mohamed Z. Hatim
     print("\n4. Performing comprehensive elbow analysis...")
     elbow_results = veg.elbow_analysis(
         k_range=range(1, 12),
         methods=['knee_locator', 'derivative', 'variance_explained', 'distortion_jump'],
-        plot_results=False  # Skip plotting in demo
+        plot_results=False  # Copyright (c) 2025 Mohamed Z. Hatim
     )
     
     print("   Elbow points detected by each method:")
@@ -88,18 +88,18 @@ def main():
     print(f"\n   📊 Consensus recommendation: k = {optimal_k}")
     print(f"   📊 Confidence score: {confidence:.2f}")
     
-    # Clustering with optimal k
+    # Copyright (c) 2025 Mohamed Z. Hatim
     print(f"\n5. Performing clustering with k = {optimal_k}...")
     clusters = veg.kmeans_clustering(n_clusters=optimal_k)
     print(f"   Clustering inertia: {clusters['inertia']:.1f}")
     
-    # Show cluster distribution
+    # Copyright (c) 2025 Mohamed Z. Hatim
     cluster_counts = clusters['cluster_labels'].value_counts().sort_index()
     print("   Cluster sizes:")
     for cluster_id, count in cluster_counts.items():
         print(f"   • Cluster {cluster_id}: {count} sites")
     
-    # Indicator species analysis
+    # Copyright (c) 2025 Mohamed Z. Hatim
     print(f"\n6. Finding indicator species for {optimal_k} clusters...")
     indicators = veg.indicator_species_analysis(clusters['cluster_labels'])
     
@@ -110,7 +110,7 @@ def main():
         for _, row in cluster_indicators.iterrows():
             print(f"     - {row['species']}: {row['indicator_value']:.1f}")
     
-    # Ordination analysis
+    # Copyright (c) 2025 Mohamed Z. Hatim
     print("\n7. Performing ordination analysis...")
     pca_results = veg.pca_analysis(transform='hellinger', n_components=4)
     explained_var = pca_results['explained_variance_ratio']
@@ -119,7 +119,7 @@ def main():
         print(f"   • PC{i+1}: {var:.1%}")
     print(f"   • Cumulative: {sum(explained_var):.1%}")
     
-    # NMDS analysis
+    # Copyright (c) 2025 Mohamed Z. Hatim
     nmds_results = veg.nmds_analysis(distance_metric='bray_curtis', n_dimensions=2)
     print(f"\n   NMDS stress value: {nmds_results['stress']:.3f}")
     if nmds_results['stress'] < 0.2:
@@ -127,14 +127,14 @@ def main():
     else:
         print("   ⚠ High NMDS stress - consider more dimensions")
     
-    # Quick functions demonstration
+    # Copyright (c) 2025 Mohamed Z. Hatim
     print("\n8. Demonstrating quick functions...")
     
-    # Quick elbow analysis
+    # Copyright (c) 2025 Mohamed Z. Hatim
     quick_optimal_k = veg.quick_elbow_analysis(max_k=8)
     print(f"   Quick elbow analysis: k = {quick_optimal_k}")
     
-    # Summary statistics
+    # Copyright (c) 2025 Mohamed Z. Hatim
     stats = veg.summary_statistics()
     print(f"\n📈 Dataset Summary:")
     print(f"   • Total sites: {stats['n_samples']}")

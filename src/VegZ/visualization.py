@@ -17,7 +17,7 @@ from scipy.cluster.hierarchy import dendrogram
 from matplotlib.patches import Ellipse
 from matplotlib.collections import LineCollection
 
-# Set default style
+# Copyright (c) 2025 Mohamed Z. Hatim
 plt.style.use('default')
 sns.set_palette('husl')
 
@@ -94,10 +94,10 @@ class VegetationPlotter:
         for i, index in enumerate(diversity_df.columns):
             values = diversity_df[index]
             
-            # Bar plot
+# Copyright (c) 2025 Mohamed Z. Hatim
             bars = axes[i].bar(range(len(values)), values, alpha=0.7, color=self.colors[i % len(self.colors)])
             
-            # Add value labels on bars
+# Copyright (c) 2025 Mohamed Z. Hatim
             for j, (bar, value) in enumerate(zip(bars, values)):
                 height = bar.get_height()
                 axes[i].text(bar.get_x() + bar.get_width()/2., height + height*0.01,
@@ -114,13 +114,13 @@ class VegetationPlotter:
             
             axes[i].grid(True, alpha=0.3)
             
-            # Add mean line
+# Copyright (c) 2025 Mohamed Z. Hatim
             mean_val = values.mean()
             axes[i].axhline(y=mean_val, color='red', linestyle='--', alpha=0.7,
                           label=f'Mean: {mean_val:.2f}')
             axes[i].legend()
         
-        # Remove empty subplots
+# Copyright (c) 2025 Mohamed Z. Hatim
         for i in range(n_indices, len(axes)):
             axes[i].remove()
         
@@ -149,10 +149,10 @@ class VegetationPlotter:
         
         x_vals = range(1, len(accumulation_data['mean']) + 1)
         
-        # Main curve
+# Copyright (c) 2025 Mohamed Z. Hatim
         ax.plot(x_vals, accumulation_data['mean'], 'b-', linewidth=3, label='Observed')
         
-        # Confidence intervals
+# Copyright (c) 2025 Mohamed Z. Hatim
         if show_ci and 'ci_lower' in accumulation_data and 'ci_upper' in accumulation_data:
             ax.fill_between(x_vals, accumulation_data['ci_lower'], accumulation_data['ci_upper'],
                            alpha=0.3, color='blue', label='95% CI')
@@ -248,13 +248,13 @@ class VegetationPlotter:
         
         fig, ax = plt.subplots(figsize=self.figsize)
         
-        # Plot sites
+# Copyright (c) 2025 Mohamed Z. Hatim
         x = site_scores.iloc[:, axis1]
         y = site_scores.iloc[:, axis2]
         
         if color_by is not None:
             if isinstance(color_by, str):
-                # Assume it's a column name in environmental data or similar
+# Copyright (c) 2025 Mohamed Z. Hatim
                 colors = np.arange(len(x))  # Fallback coloring
             else:
                 colors = color_by
@@ -264,18 +264,18 @@ class VegetationPlotter:
         else:
             ax.scatter(x, y, s=80, alpha=0.7, color='blue')
         
-        # Add site labels
+# Copyright (c) 2025 Mohamed Z. Hatim
         if show_labels:
             for i, site in enumerate(site_scores.index):
                 ax.annotate(site, (x.iloc[i], y.iloc[i]), 
                            xytext=(5, 5), textcoords='offset points', 
                            fontsize=8, alpha=0.8)
         
-        # Add species arrows if available and requested
+# Copyright (c) 2025 Mohamed Z. Hatim
         if show_species and 'species_scores' in ordination_results:
             species_scores = ordination_results['species_scores']
             
-            # Scale species scores for visibility
+# Copyright (c) 2025 Mohamed Z. Hatim
             scale_factor = 0.8 * max(x.max() - x.min(), y.max() - y.min()) / \
                           max(species_scores.iloc[:, axis1].max() - species_scores.iloc[:, axis1].min(),
                               species_scores.iloc[:, axis2].max() - species_scores.iloc[:, axis2].min())
@@ -288,7 +288,7 @@ class VegetationPlotter:
                         fc='red', ec='red', alpha=0.7)
                 ax.text(sp_x * 1.1, sp_y * 1.1, species, fontsize=8, color='red')
         
-        # Get axis labels with variance explained if available
+# Copyright (c) 2025 Mohamed Z. Hatim
         explained_var = ordination_results.get('explained_variance_ratio', [])
         if len(explained_var) > max(axis1, axis2):
             xlabel = f'Axis {axis1 + 1} ({explained_var[axis1]:.1%})'
@@ -386,7 +386,7 @@ class VegetationPlotter:
             ax.scatter(cluster_sites.iloc[:, axis1], cluster_sites.iloc[:, axis2],
                       color=colors[i], label=f'Cluster {cluster}', s=80, alpha=0.7)
         
-        # Get axis labels
+# Copyright (c) 2025 Mohamed Z. Hatim
         explained_var = ordination_results.get('explained_variance_ratio', [])
         if len(explained_var) > max(axis1, axis2):
             xlabel = f'Axis {axis1 + 1} ({explained_var[axis1]:.1%})'
@@ -428,30 +428,30 @@ class VegetationPlotter:
         
         fig, ax = plt.subplots(figsize=self.figsize)
         
-        # Plot sites
+# Copyright (c) 2025 Mohamed Z. Hatim
         ax.scatter(site_scores.iloc[:, 0], site_scores.iloc[:, 1], 
                   alpha=0.7, s=80, color='lightblue', edgecolors='black')
         
-        # Plot significant environmental vectors
+# Copyright (c) 2025 Mohamed Z. Hatim
         for var, data in env_vectors.items():
             if data['p_value'] < significance_threshold:
                 arrow = data['arrow_coords']
                 r2 = data['r_squared']
                 
-                # Scale arrow for visibility
+# Copyright (c) 2025 Mohamed Z. Hatim
                 scale = 2.0
                 ax.arrow(0, 0, arrow[0] * scale, arrow[1] * scale,
                         head_width=0.05, head_length=0.05,
                         fc='red', ec='red', linewidth=2)
                 
-                # Add label with R² value
+# Copyright (c) 2025 Mohamed Z. Hatim
                 label_pos = np.array(arrow) * scale * 1.2
                 ax.text(label_pos[0], label_pos[1], f'{var}\n(R²={r2:.3f})',
                        fontsize=10, fontweight='bold', color='red',
                        ha='center', va='center',
                        bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
         
-        # Get axis labels
+# Copyright (c) 2025 Mohamed Z. Hatim
         explained_var = ordination_results.get('explained_variance_ratio', [])
         if len(explained_var) >= 2:
             xlabel = f'Axis 1 ({explained_var[0]:.1%})'
@@ -489,7 +489,7 @@ class VegetationPlotter:
         """
         fig, ax = plt.subplots(figsize=(10, 8))
         
-        # Create heatmap
+# Copyright (c) 2025 Mohamed Z. Hatim
         sns.heatmap(correlation_matrix, annot=True, cmap='RdBu_r', center=0,
                    square=True, fmt='.3f', ax=ax,
                    cbar_kws={'label': f'{method.title()} Correlation'})
@@ -548,7 +548,7 @@ class VegetationPlotter:
             ax.scatter(traits_subset.iloc[:, 0], traits_subset.iloc[:, 1],
                       s=80, alpha=0.7, color='blue')
         
-        # Add species labels
+# Copyright (c) 2025 Mohamed Z. Hatim
         for i, species in enumerate(traits_subset.index):
             ax.annotate(species, (traits_subset.iloc[i, 0], traits_subset.iloc[i, 1]),
                        xytext=(5, 5), textcoords='offset points', fontsize=8, alpha=0.7)
@@ -565,7 +565,7 @@ class VegetationPlotter:
         return fig
 
 
-# Convenience functions for quick plotting
+# Copyright (c) 2025 Mohamed Z. Hatim
 def plot_diversity(diversity_results: Dict[str, Any], 
                   indices: List[str] = None) -> plt.Figure:
     """
@@ -694,7 +694,7 @@ def create_summary_plot(diversity_results: Dict[str, Any] = None,
     plt.Figure
         Figure object with multiple subplots
     """
-    # Determine subplot layout based on available data
+# Copyright (c) 2025 Mohamed Z. Hatim
     n_plots = sum([diversity_results is not None, 
                    ordination_results is not None,
                    clustering_results is not None])
@@ -709,11 +709,11 @@ def create_summary_plot(diversity_results: Dict[str, Any] = None,
     plotter = VegetationPlotter()
     plot_idx = 0
     
-    # Diversity plot
+# Copyright (c) 2025 Mohamed Z. Hatim
     if diversity_results is not None:
         if 'diversity_indices' in diversity_results:
             diversity_df = pd.DataFrame(diversity_results['diversity_indices']).T
-            # Plot first diversity index
+# Copyright (c) 2025 Mohamed Z. Hatim
             first_index = diversity_df.columns[0]
             values = diversity_df[first_index]
             
@@ -724,7 +724,7 @@ def create_summary_plot(diversity_results: Dict[str, Any] = None,
         
         plot_idx += 1
     
-    # Ordination plot
+# Copyright (c) 2025 Mohamed Z. Hatim
     if ordination_results is not None:
         if 'site_scores' in ordination_results:
             site_scores = ordination_results['site_scores']
@@ -746,10 +746,10 @@ def create_summary_plot(diversity_results: Dict[str, Any] = None,
         
         plot_idx += 1
     
-    # Clustering plot
+# Copyright (c) 2025 Mohamed Z. Hatim
     if clustering_results is not None:
         if 'linkage_matrix' in clustering_results:
-            # Simple dendrogram
+# Copyright (c) 2025 Mohamed Z. Hatim
             dendrogram(clustering_results['linkage_matrix'], ax=axes[plot_idx], 
                       no_labels=True)
             axes[plot_idx].set_title('Clustering')

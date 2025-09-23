@@ -16,18 +16,18 @@ class TestVegZCore:
     @pytest.fixture
     def sample_data(self):
         """Create sample vegetation data for testing."""
-        # Create synthetic data with 4 distinct groups
+# Copyright (c) 2025 Mohamed Z. Hatim
         np.random.seed(42)
         n_sites = 30
         n_species = 15
         
-        # Group 1: High diversity deciduous
+# Copyright (c) 2025 Mohamed Z. Hatim
         group1 = np.random.poisson(5, (8, n_species)) * np.random.binomial(1, 0.4, (8, n_species))
-        # Group 2: Medium diversity mixed
+# Copyright (c) 2025 Mohamed Z. Hatim
         group2 = np.random.poisson(3, (7, n_species)) * np.random.binomial(1, 0.3, (7, n_species))
-        # Group 3: Low diversity coniferous  
+# Copyright (c) 2025 Mohamed Z. Hatim
         group3 = np.random.poisson(8, (8, n_species)) * np.random.binomial(1, 0.2, (8, n_species))
-        # Group 4: Edge/grassland
+# Copyright (c) 2025 Mohamed Z. Hatim
         group4 = np.random.poisson(2, (7, n_species)) * np.random.binomial(1, 0.5, (7, n_species))
         
         data = np.vstack([group1, group2, group3, group4])
@@ -67,7 +67,7 @@ class TestVegZCore:
         assert 'richness' in diversity.columns
         assert len(diversity) == len(sample_data)
         
-        # Check values are reasonable
+# Copyright (c) 2025 Mohamed Z. Hatim
         assert all(diversity['shannon'] >= 0)
         assert all(diversity['simpson'] >= 0)
         assert all(diversity['simpson'] <= 1)
@@ -149,11 +149,11 @@ class TestVegZCore:
         assert 'recommendations' in elbow_results
         assert 'metrics' in elbow_results
         
-        # Check that methods were applied
+# Copyright (c) 2025 Mohamed Z. Hatim
         assert 'knee_locator' in elbow_results['elbow_points']
         assert 'derivative' in elbow_results['elbow_points']
         
-        # Check consensus recommendation exists
+# Copyright (c) 2025 Mohamed Z. Hatim
         assert 'consensus' in elbow_results['recommendations']
     
     def test_quick_elbow_analysis(self, sample_data):
@@ -171,10 +171,10 @@ class TestVegZCore:
         veg = VegZ()
         veg.species_matrix = sample_data
         
-        # First get clusters
+# Copyright (c) 2025 Mohamed Z. Hatim
         clusters = veg.kmeans_clustering(n_clusters=3)
         
-        # Then analyze indicator species
+# Copyright (c) 2025 Mohamed Z. Hatim
         indicators = veg.indicator_species_analysis(clusters['cluster_labels'])
         
         assert isinstance(indicators, pd.DataFrame)
@@ -182,7 +182,7 @@ class TestVegZCore:
         assert 'cluster' in indicators.columns
         assert 'indicator_value' in indicators.columns
         
-        # Check indicator values are between 0 and 100
+# Copyright (c) 2025 Mohamed Z. Hatim
         assert all(indicators['indicator_value'] >= 0)
         assert all(indicators['indicator_value'] <= 100)
 
@@ -240,7 +240,7 @@ class TestDataTransformations:
         transformed = veg._transform_data(sample_data, 'hellinger')
         
         assert transformed.shape == sample_data.shape
-        # Check that values are between 0 and 1 (Hellinger property)
+# Copyright (c) 2025 Mohamed Z. Hatim
         assert np.all(transformed >= 0)
         assert np.all(transformed <= 1)
     
@@ -250,7 +250,7 @@ class TestDataTransformations:
         transformed = veg._transform_data(sample_data, 'log')
         
         assert transformed.shape == sample_data.shape
-        # log1p should handle zeros correctly
+# Copyright (c) 2025 Mohamed Z. Hatim
         assert np.all(np.isfinite(transformed))
     
     def test_sqrt_transformation(self, sample_data):

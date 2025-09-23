@@ -31,12 +31,12 @@ class CoordinateTransformer:
     
     def __init__(self):
         self.common_crs = {
-            # Geographic coordinate systems
+# Copyright (c) 2025 Mohamed Z. Hatim
             'WGS84': 'EPSG:4326',
             'NAD83': 'EPSG:4269',
             'NAD27': 'EPSG:4267',
             
-            # UTM zones (Northern hemisphere examples)
+# Copyright (c) 2025 Mohamed Z. Hatim
             'UTM10N': 'EPSG:32610',
             'UTM11N': 'EPSG:32611',
             'UTM12N': 'EPSG:32612',
@@ -48,12 +48,12 @@ class CoordinateTransformer:
             'UTM18N': 'EPSG:32618',
             'UTM19N': 'EPSG:32619',
             
-            # Popular projected systems
+# Copyright (c) 2025 Mohamed Z. Hatim
             'WEB_MERCATOR': 'EPSG:3857',
             'ALBERS_US': 'EPSG:5070',
             'LAMBERT_CONFORMAL_US': 'EPSG:2163',
             
-            # State Plane examples
+# Copyright (c) 2025 Mohamed Z. Hatim
             'SPCS_CA_I': 'EPSG:2225',
             'SPCS_CA_II': 'EPSG:2226',
             'SPCS_FL_E': 'EPSG:2236',
@@ -93,11 +93,11 @@ class CoordinateTransformer:
         if not PYPROJ_AVAILABLE:
             raise ImportError("PyProj required for coordinate transformations")
         
-        # Resolve CRS names to EPSG codes
+# Copyright (c) 2025 Mohamed Z. Hatim
         source_crs = self._resolve_crs(source_crs)
         target_crs = self._resolve_crs(target_crs)
         
-        # Create transformer
+# Copyright (c) 2025 Mohamed Z. Hatim
         transformer_key = f"{source_crs}_{target_crs}"
         if transformer_key not in self.transformers:
             self.transformers[transformer_key] = Transformer.from_crs(
@@ -122,17 +122,17 @@ class CoordinateTransformer:
         elif crs.startswith('+proj'):
             return crs
         elif crs_upper == 'UTM':
-            # Default to UTM Zone 17N (common for eastern North America) 
+# Copyright (c) 2025 Mohamed Z. Hatim
             warnings.warn("Generic 'UTM' specified, defaulting to UTM Zone 17N (EPSG:32617). "
                          "For better results, specify exact UTM zone (e.g., 'UTM17N')")
             return 'EPSG:32617'
         else:
-            # Try to interpret as EPSG code number
+# Copyright (c) 2025 Mohamed Z. Hatim
             try:
                 epsg_code = int(crs)
                 return f"EPSG:{epsg_code}"
             except ValueError:
-                # More helpful error message with suggestions
+# Copyright (c) 2025 Mohamed Z. Hatim
                 available_crs = list(self.common_crs.keys())
                 raise ValueError(f"Unknown CRS: {crs}. Available CRS names: {available_crs[:10]}... "
                                f"or use EPSG codes (e.g., 'EPSG:4326') or PROJ strings")
@@ -148,24 +148,24 @@ class CoordinateTransformer:
         if x_col not in df.columns or y_col not in df.columns:
             raise ValueError(f"Columns {x_col} and/or {y_col} not found in DataFrame")
         
-        # Extract coordinates
+# Copyright (c) 2025 Mohamed Z. Hatim
         x_coords = df[x_col].values
         y_coords = df[y_col].values
         
-        # Remove rows with NaN coordinates
+# Copyright (c) 2025 Mohamed Z. Hatim
         valid_mask = ~(pd.isna(x_coords) | pd.isna(y_coords))
         
         if not valid_mask.any():
             warnings.warn("No valid coordinates found for transformation")
             return result_df
         
-        # Transform valid coordinates
+# Copyright (c) 2025 Mohamed Z. Hatim
         x_valid = x_coords[valid_mask]
         y_valid = y_coords[valid_mask]
         
         x_transformed, y_transformed = transformer.transform(x_valid, y_valid)
         
-        # Update DataFrame with transformed coordinates
+# Copyright (c) 2025 Mohamed Z. Hatim
         result_df.loc[valid_mask, x_col] = x_transformed
         result_df.loc[valid_mask, y_col] = y_transformed
         
@@ -199,10 +199,10 @@ class CoordinateTransformer:
         str
             UTM zone EPSG code
         """
-        # Calculate UTM zone number
+# Copyright (c) 2025 Mohamed Z. Hatim
         zone_number = int((longitude + 180) / 6) + 1
         
-        # Handle special cases in Norway
+# Copyright (c) 2025 Mohamed Z. Hatim
         if 56 <= latitude < 64 and 3 <= longitude < 12:
             zone_number = 32
         elif 72 <= latitude < 84:
@@ -215,10 +215,10 @@ class CoordinateTransformer:
             elif 33 <= longitude < 42:
                 zone_number = 37
         
-        # Determine hemisphere
+# Copyright (c) 2025 Mohamed Z. Hatim
         hemisphere = 'N' if latitude >= 0 else 'S'
         
-        # Calculate EPSG code
+# Copyright (c) 2025 Mohamed Z. Hatim
         if hemisphere == 'N':
             epsg_code = 32600 + zone_number
         else:
@@ -258,7 +258,7 @@ class CoordinateTransformer:
                 center_lon = np.mean(lons) if center_lon is None else center_lon
                 center_lat = np.mean(lats) if center_lat is None else center_lat
         
-        # Create Albers Equal Area projection centered on data
+# Copyright (c) 2025 Mohamed Z. Hatim
         albers_proj = (f"+proj=aea +lat_1={center_lat - 10} +lat_2={center_lat + 10} "
                       f"+lat_0={center_lat} +lon_0={center_lon} +x_0=0 +y_0=0 "
                       f"+datum=WGS84 +units=m +no_defs")
@@ -328,7 +328,7 @@ class CoordinateTransformer:
                     distances[j, i] = dist
         
         elif method == 'euclidean':
-            # Convert to equal area projection first
+# Copyright (c) 2025 Mohamed Z. Hatim
             projected_coords = self.reproject_to_equal_area(coords)
             
             for i in range(n_points):
@@ -366,12 +366,12 @@ class CoordinateTransformer:
         dlat = lat2 - lat1
         dlon = lon2 - lon1
         
-        # Haversine formula
+# Copyright (c) 2025 Mohamed Z. Hatim
         a = (np.sin(dlat/2)**2 + 
              np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2)
         c = 2 * np.arcsin(np.sqrt(a))
         
-        # Earth's radius in meters
+# Copyright (c) 2025 Mohamed Z. Hatim
         R = 6371000
         
         return R * c
@@ -399,14 +399,14 @@ class CoordinateTransformer:
         """
         min_x, min_y, max_x, max_y = bounds
         
-        # Create grid coordinates
+# Copyright (c) 2025 Mohamed Z. Hatim
         x_coords = np.arange(min_x + cell_size/2, max_x, cell_size)
         y_coords = np.arange(min_y + cell_size/2, max_y, cell_size)
         
-        # Create meshgrid
+# Copyright (c) 2025 Mohamed Z. Hatim
         xx, yy = np.meshgrid(x_coords, y_coords)
         
-        # Create DataFrame
+# Copyright (c) 2025 Mohamed Z. Hatim
         grid_df = pd.DataFrame({
             'grid_id': range(len(xx.flatten())),
             'x': xx.flatten(),

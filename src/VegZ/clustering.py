@@ -39,9 +39,8 @@ class VegetationClustering:
             'cophenetic': self._cophenetic_correlation
         }
     
-    # =============================================================================
-    # TWINSPAN IMPLEMENTATION
-    # =============================================================================
+    # Copyright (c) 2025 Mohamed Z. Hatim
+
     
     def twinspan(self, data: pd.DataFrame,
                  cut_levels: List[float] = [0, 2, 5, 10, 20],
@@ -66,17 +65,17 @@ class VegetationClustering:
         dict
             TWINSPAN results including classification and indicator species
         """
-        # Convert to pseudospecies
+        # Copyright (c) 2025 Mohamed Z. Hatim
         pseudo_species_data = self._create_pseudospecies(data, cut_levels)
         
-        # Initialize classification tree
+        # Copyright (c) 2025 Mohamed Z. Hatim
         classification_tree = {
             'divisions': [],
             'groups': {},
             'indicator_species': {}
         }
         
-        # Start with all sites in one group
+        # Copyright (c) 2025 Mohamed Z. Hatim
         initial_group = {
             'sites': data.index.tolist(),
             'level': 0,
@@ -91,17 +90,17 @@ class VegetationClustering:
             if not groups_to_process:
                 break
             
-            # Find group with highest eigenvalue for next division
+            # Copyright (c) 2025 Mohamed Z. Hatim
             current_group = max(groups_to_process, key=lambda x: x['eigenvalue'])
             groups_to_process.remove(current_group)
             
             if len(current_group['sites']) < min_group_size * 2:
-                # Don't divide if group too small
+# Copyright (c) 2025 Mohamed Z. Hatim
                 classification_tree['groups'][group_id] = current_group
                 group_id += 1
                 continue
             
-            # Perform division
+            # Copyright (c) 2025 Mohamed Z. Hatim
             division_result = self._twinspan_division(
                 pseudo_species_data.loc[current_group['sites']]
             )
@@ -111,7 +110,7 @@ class VegetationClustering:
                 group_id += 1
                 continue
             
-            # Create child groups
+            # Copyright (c) 2025 Mohamed Z. Hatim
             group1_sites = [current_group['sites'][i] for i in division_result['group1_indices']]
             group2_sites = [current_group['sites'][i] for i in division_result['group2_indices']]
             
@@ -129,7 +128,7 @@ class VegetationClustering:
                 'eigenvalue': division_result['eigenvalue'] * 0.8
             }
             
-            # Add to processing queue if large enough
+            # Copyright (c) 2025 Mohamed Z. Hatim
             if len(group1_sites) >= min_group_size:
                 groups_to_process.append(group1)
             else:
@@ -140,7 +139,7 @@ class VegetationClustering:
             else:
                 classification_tree['groups'][group_id + 2] = group2
             
-            # Store division information
+            # Copyright (c) 2025 Mohamed Z. Hatim
             classification_tree['divisions'].append({
                 'division_id': division,
                 'parent_group': group_id,
@@ -151,12 +150,12 @@ class VegetationClustering:
             
             group_id += 3
         
-        # Add remaining unprocessed groups
+        # Copyright (c) 2025 Mohamed Z. Hatim
         for remaining_group in groups_to_process:
             classification_tree['groups'][group_id] = remaining_group
             group_id += 1
         
-        # Create final classification
+        # Copyright (c) 2025 Mohamed Z. Hatim
         site_classification = self._assign_final_groups(classification_tree, data.index)
         
         results = {
@@ -185,9 +184,9 @@ class VegetationClustering:
     
     def _twinspan_division(self, pseudo_data: pd.DataFrame) -> Dict[str, Any]:
         """Perform a single TWINSPAN division."""
-        # Correspondence analysis on pseudospecies data
+        # Copyright (c) 2025 Mohamed Z. Hatim
         try:
-            # Simple reciprocal averaging approximation
+            # Copyright (c) 2025 Mohamed Z. Hatim
             data_matrix = pseudo_data.values.astype(float)
             
             if data_matrix.sum() == 0:
@@ -198,41 +197,41 @@ class VegetationClustering:
                     'indicator_species': []
                 }
             
-            # Row and column totals
+            # Copyright (c) 2025 Mohamed Z. Hatim
             row_totals = data_matrix.sum(axis=1)
             col_totals = data_matrix.sum(axis=0)
             
-            # Avoid division by zero
+            # Copyright (c) 2025 Mohamed Z. Hatim
             row_totals[row_totals == 0] = 1
             col_totals[col_totals == 0] = 1
             
-            # Correspondence analysis approximation
+            # Copyright (c) 2025 Mohamed Z. Hatim
             row_profiles = data_matrix / row_totals[:, np.newaxis]
             col_profiles = data_matrix.T / col_totals[:, np.newaxis]
             
-            # Simple first axis extraction (power iteration)
+            # Copyright (c) 2025 Mohamed Z. Hatim
             scores = np.ones(len(pseudo_data))
             
             for iteration in range(20):  # Power iteration
                 old_scores = scores.copy()
                 
-                # Update species scores
+                # Copyright (c) 2025 Mohamed Z. Hatim
                 species_scores = col_profiles @ scores
                 species_scores = species_scores / np.linalg.norm(species_scores)
                 
-                # Update site scores
+                # Copyright (c) 2025 Mohamed Z. Hatim
                 scores = row_profiles @ species_scores
                 
-                # Check convergence
+                # Copyright (c) 2025 Mohamed Z. Hatim
                 if np.corrcoef(scores, old_scores)[0, 1] > 0.999:
                     break
             
-            # Find optimal division point
+            # Copyright (c) 2025 Mohamed Z. Hatim
             sorted_indices = np.argsort(scores)
             best_division = len(scores) // 2
             best_eigenvalue = 0
             
-            # Try different division points
+            # Copyright (c) 2025 Mohamed Z. Hatim
             for div_point in range(len(scores)//4, 3*len(scores)//4):
                 group1_idx = sorted_indices[:div_point]
                 group2_idx = sorted_indices[div_point:]
@@ -240,7 +239,7 @@ class VegetationClustering:
                 if len(group1_idx) < 2 or len(group2_idx) < 2:
                     continue
                 
-                # Calculate separation (simplified eigenvalue)
+                # Copyright (c) 2025 Mohamed Z. Hatim
                 group1_mean = scores[group1_idx].mean()
                 group2_mean = scores[group2_idx].mean()
                 separation = abs(group1_mean - group2_mean)
@@ -252,14 +251,14 @@ class VegetationClustering:
             group1_indices = sorted_indices[:best_division].tolist()
             group2_indices = sorted_indices[best_division:].tolist()
             
-            # Identify indicator species
+            # Copyright (c) 2025 Mohamed Z. Hatim
             indicator_species = self._identify_indicator_pseudospecies(
                 pseudo_data, group1_indices, group2_indices
             )
             
         except Exception as e:
             warnings.warn(f"TWINSPAN division failed: {e}")
-            # Fallback to simple split
+            # Copyright (c) 2025 Mohamed Z. Hatim
             mid_point = len(pseudo_data) // 2
             group1_indices = list(range(mid_point))
             group2_indices = list(range(mid_point, len(pseudo_data)))
@@ -283,7 +282,7 @@ class VegetationClustering:
             group1_freq = pseudo_data.iloc[group1_indices][species].mean()
             group2_freq = pseudo_data.iloc[group2_indices][species].mean()
             
-            # High difference indicates good indicator
+            # Copyright (c) 2025 Mohamed Z. Hatim
             freq_diff = abs(group1_freq - group2_freq)
             
             if freq_diff > 0.3:  # Threshold for indicator species
@@ -294,10 +293,10 @@ class VegetationClustering:
                     'group2_frequency': group2_freq
                 })
         
-        # Sort by frequency difference
+        # Copyright (c) 2025 Mohamed Z. Hatim
         indicators.sort(key=lambda x: x['frequency_difference'], reverse=True)
         
-        return indicators[:5]  # Top 5 indicators
+        return indicators[:5]  # Copyright (c) 2025 Mohamed Z. Hatim
     
     def _assign_final_groups(self, classification_tree: Dict[str, Any],
                            site_index: pd.Index) -> pd.Series:
@@ -312,9 +311,7 @@ class VegetationClustering:
         
         return site_groups
     
-    # =============================================================================
-    # ADVANCED CLUSTERING METHODS
-    # =============================================================================
+    # Copyright (c) 2025 Mohamed Z. Hatim
     
     def fuzzy_cmeans_clustering(self, data: pd.DataFrame,
                                n_clusters: int = 3,
@@ -345,19 +342,19 @@ class VegetationClustering:
         X = data.values
         n_samples, n_features = X.shape
         
-        # Initialize membership matrix randomly
+        # Copyright (c) 2025 Mohamed Z. Hatim
         membership = np.random.rand(n_samples, n_clusters)
         membership = membership / membership.sum(axis=1)[:, np.newaxis]
         
         centers = np.zeros((n_clusters, n_features))
         
         for iteration in range(max_iter):
-            # Update cluster centers
+            # Copyright (c) 2025 Mohamed Z. Hatim
             for c in range(n_clusters):
                 weights = membership[:, c] ** fuzziness
                 centers[c] = (weights[:, np.newaxis] * X).sum(axis=0) / weights.sum()
             
-            # Update membership matrix
+            # Copyright (c) 2025 Mohamed Z. Hatim
             new_membership = np.zeros((n_samples, n_clusters))
             
             for i in range(n_samples):
@@ -368,13 +365,13 @@ class VegetationClustering:
                     sum_term = np.sum((distances[c] / distances) ** (2 / (fuzziness - 1)))
                     new_membership[i, c] = 1 / sum_term
             
-            # Check convergence
+            # Copyright (c) 2025 Mohamed Z. Hatim
             if np.max(np.abs(membership - new_membership)) < tol:
                 break
             
             membership = new_membership
         
-        # Assign hard clusters (highest membership)
+        # Copyright (c) 2025 Mohamed Z. Hatim
         hard_clusters = np.argmax(membership, axis=1)
         
         results = {
@@ -422,11 +419,11 @@ class VegetationClustering:
         dbscan = DBSCAN(eps=eps, min_samples=min_samples, metric=distance_metric)
         cluster_labels = dbscan.fit_predict(data.values)
         
-        # Identify core samples
+        # Copyright (c) 2025 Mohamed Z. Hatim
         core_samples = np.zeros_like(cluster_labels, dtype=bool)
         core_samples[dbscan.core_sample_indices_] = True
         
-        # Number of clusters (excluding noise)
+        # Copyright (c) 2025 Mohamed Z. Hatim
         n_clusters = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
         n_noise = list(cluster_labels).count(-1)
         
@@ -493,9 +490,7 @@ class VegetationClustering:
         
         return results
     
-    # =============================================================================
-    # CLUSTERING VALIDATION
-    # =============================================================================
+    # Copyright (c) 2025 Mohamed Z. Hatim
     
     def _silhouette_analysis(self, data: pd.DataFrame, 
                            labels: pd.Series) -> Dict[str, Any]:
@@ -505,7 +500,7 @@ class VegetationClustering:
         
         silhouette_avg = silhouette_score(data.values, labels)
         
-        # Individual silhouette scores
+        # Copyright (c) 2025 Mohamed Z. Hatim
         from sklearn.metrics import silhouette_samples
         silhouette_scores = silhouette_samples(data.values, labels)
         
@@ -532,7 +527,7 @@ class VegetationClustering:
         errors = []
         
         for k in k_range:
-            # Compute within-cluster sum of squares for actual data
+            # Copyright (c) 2025 Mohamed Z. Hatim
             if k == 1:
                 wk_actual = np.sum((data.values - data.values.mean(axis=0))**2)
             else:
@@ -540,11 +535,11 @@ class VegetationClustering:
                 labels = kmeans.fit_predict(data.values)
                 wk_actual = kmeans.inertia_
             
-            # Compute expected within-cluster sum of squares from random data
+            # Copyright (c) 2025 Mohamed Z. Hatim
             wk_refs = []
             
             for _ in range(n_refs):
-                # Generate random data with same range as original
+                # Copyright (c) 2025 Mohamed Z. Hatim
                 random_data = np.random.uniform(
                     data.values.min(axis=0),
                     data.values.max(axis=0),
@@ -560,15 +555,15 @@ class VegetationClustering:
                 
                 wk_refs.append(wk_ref)
             
-            # Gap statistic
+            # Copyright (c) 2025 Mohamed Z. Hatim
             gap = np.log(np.mean(wk_refs)) - np.log(wk_actual)
             gaps.append(gap)
             
-            # Standard error
+# Copyright (c) 2025 Mohamed Z. Hatim
             se = np.std(np.log(wk_refs)) * np.sqrt(1 + 1/n_refs)
             errors.append(se)
         
-        # Find optimal k (first k where gap(k) >= gap(k+1) - se(k+1))
+        # Copyright (c) 2025 Mohamed Z. Hatim
         optimal_k = 1
         for i in range(len(gaps) - 1):
             if gaps[i] >= gaps[i + 1] - errors[i + 1]:
@@ -587,13 +582,13 @@ class VegetationClustering:
     def _cophenetic_correlation(self, data: pd.DataFrame,
                               linkage_matrix: np.ndarray) -> float:
         """Cophenetic correlation coefficient."""
-        # Calculate original distance matrix
+        # Copyright (c) 2025 Mohamed Z. Hatim
         distances = pdist(data.values)
         
-        # Calculate cophenetic distances
+        # Copyright (c) 2025 Mohamed Z. Hatim
         cophenetic_distances = cophenet(linkage_matrix)
         
-        # Correlation
+        # Copyright (c) 2025 Mohamed Z. Hatim
         correlation = np.corrcoef(distances, cophenetic_distances)[0, 1]
         
         return correlation
@@ -624,7 +619,7 @@ class VegetationClustering:
             'recommendations': {}
         }
         
-        # Silhouette analysis
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if 'silhouette' in methods:
             silhouette_scores = []
             
@@ -638,13 +633,13 @@ class VegetationClustering:
             optimal_k_silhouette = k_range[np.argmax(silhouette_scores)]
             results['recommendations']['silhouette'] = optimal_k_silhouette
         
-        # Gap statistic
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if 'gap_statistic' in methods:
             gap_results = self._gap_statistic(data, k_range)
             results['validation_scores']['gap_statistic'] = gap_results['gap_values']
             results['recommendations']['gap_statistic'] = gap_results['optimal_k']
         
-        # Elbow method (within-cluster sum of squares)
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if 'elbow' in methods:
             wcss = []
             
@@ -655,7 +650,7 @@ class VegetationClustering:
             
             results['validation_scores']['wcss'] = wcss
             
-            # Find elbow point (simplified)
+            # Copyright (c) 2025 Mohamed Z. Hatim
             if len(wcss) > 2:
                 diffs = np.diff(wcss)
                 diff2 = np.diff(diffs)
@@ -688,7 +683,7 @@ class VegetationClustering:
         dict
             Hierarchical clustering results with validation
         """
-        # Calculate linkage
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if metric == 'precomputed':
             distances = data.values
         else:
@@ -703,11 +698,11 @@ class VegetationClustering:
         }
         
         if n_clusters:
-            # Extract clusters
+            # Copyright (c) 2025 Mohamed Z. Hatim
             cluster_labels = fcluster(linkage_matrix, n_clusters, criterion='maxclust')
             results['cluster_labels'] = pd.Series(cluster_labels, index=data.index, name='cluster')
             
-            # Validation metrics
+            # Copyright (c) 2025 Mohamed Z. Hatim
             if len(set(cluster_labels)) > 1:
                 silhouette_results = self._silhouette_analysis(data, cluster_labels)
                 results['silhouette_score'] = silhouette_results['mean_silhouette_score']
@@ -715,7 +710,7 @@ class VegetationClustering:
                 
                 results['calinski_harabasz_score'] = self._calinski_harabasz_score(data, cluster_labels)
         
-        # Cophenetic correlation
+        # Copyright (c) 2025 Mohamed Z. Hatim
         results['cophenetic_correlation'] = self._cophenetic_correlation(data, linkage_matrix)
         
         return results
@@ -764,7 +759,7 @@ class VegetationClustering:
             'method': 'K_means'
         }
         
-        # Validation metrics
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if len(set(cluster_labels)) > 1:
             silhouette_results = self._silhouette_analysis(data, cluster_labels)
             results['silhouette_score'] = silhouette_results['mean_silhouette_score']
@@ -806,11 +801,11 @@ class VegetationClustering:
         calinski_scores = []
         
         for k in k_range:
-            # Fit K-means
+            # Copyright (c) 2025 Mohamed Z. Hatim
             kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
             labels = kmeans.fit_predict(data.values)
             
-            # Store metrics
+            # Copyright (c) 2025 Mohamed Z. Hatim
             inertias.append(kmeans.inertia_)
             
             if len(set(labels)) > 1:  # Need more than 1 cluster for these metrics
@@ -824,31 +819,31 @@ class VegetationClustering:
         results['metrics']['silhouette_scores'] = silhouette_scores
         results['metrics']['calinski_harabasz_scores'] = calinski_scores
         
-        # Elbow method
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if 'elbow' in methods:
             optimal_k_elbow = self._find_elbow_point(list(k_range), inertias)
             results['optimal_k']['elbow'] = optimal_k_elbow
         
-        # Silhouette method
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if 'silhouette' in methods:
             optimal_k_silhouette = list(k_range)[np.argmax(silhouette_scores)]
             results['optimal_k']['silhouette'] = optimal_k_silhouette
         
-        # Gap statistic (simplified version)
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if 'gap' in methods:
             gap_stats = self._calculate_gap_statistic(data, k_range)
             optimal_k_gap = list(k_range)[np.argmax(gap_stats)]
             results['optimal_k']['gap'] = optimal_k_gap
             results['metrics']['gap_statistic'] = gap_stats
         
-        # Overall recommendation
+        # Copyright (c) 2025 Mohamed Z. Hatim
         optimal_ks = list(results['optimal_k'].values())
         if optimal_ks:
-            # Use mode (most frequent) or median if no clear winner
+            # Copyright (c) 2025 Mohamed Z. Hatim
             from collections import Counter
             counter = Counter(optimal_ks)
             most_common = counter.most_common(1)[0]
-            if most_common[1] > 1:  # If there's a clear winner
+            if most_common[1] > 1:  # Copyright (c) 2025 Mohamed Z. Hatim
                 results['recommendations']['consensus'] = most_common[0]
             else:
                 results['recommendations']['consensus'] = int(np.median(optimal_ks))
@@ -881,9 +876,9 @@ class VegetationClustering:
         dict
             Comprehensive elbow analysis results
         """
-        # Transform data if needed
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if transform == 'hellinger':
-            # Hellinger transformation
+            # Copyright (c) 2025 Mohamed Z. Hatim
             row_sums = data.sum(axis=1)
             row_sums[row_sums == 0] = 1
             transformed_data = np.sqrt(data.div(row_sums, axis=0).fillna(0))
@@ -894,7 +889,7 @@ class VegetationClustering:
         else:
             transformed_data = data
         
-        # Calculate metrics for each k
+        # Copyright (c) 2025 Mohamed Z. Hatim
         inertias = []
         silhouette_scores = []
         calinski_scores = []
@@ -922,7 +917,7 @@ class VegetationClustering:
                     calinski_scores.append(0)
                     davies_bouldin_scores.append(float('inf'))
         
-        # Apply different elbow detection methods
+        # Copyright (c) 2025 Mohamed Z. Hatim
         results = {
             'k_values': list(k_range),
             'metrics': {
@@ -936,7 +931,7 @@ class VegetationClustering:
             'recommendations': {}
         }
         
-        # Method 1: Knee Locator (Kneedle algorithm)
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if 'knee_locator' in methods:
             elbow_k = self._knee_locator_method(list(k_range), inertias)
             results['elbow_points']['knee_locator'] = elbow_k
@@ -945,7 +940,7 @@ class VegetationClustering:
                 'reference': 'Satopaa et al. (2011)'
             }
         
-        # Method 2: Derivative-based detection
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if 'derivative' in methods:
             elbow_k = self._derivative_elbow_method(list(k_range), inertias)
             results['elbow_points']['derivative'] = elbow_k
@@ -953,7 +948,7 @@ class VegetationClustering:
                 'description': 'Second derivative maximum for curvature detection'
             }
         
-        # Method 3: Variance explained approach
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if 'variance_explained' in methods:
             elbow_k = self._variance_explained_elbow(list(k_range), inertias)
             results['elbow_points']['variance_explained'] = elbow_k
@@ -961,7 +956,7 @@ class VegetationClustering:
                 'description': 'Point where additional clusters explain <10% more variance'
             }
         
-        # Method 4: Distortion jump method
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if 'distortion_jump' in methods:
             elbow_k = self._distortion_jump_method(list(k_range), inertias)
             results['elbow_points']['distortion_jump'] = elbow_k
@@ -970,7 +965,7 @@ class VegetationClustering:
                 'reference': 'Sugar & James (2003)'
             }
         
-        # Method 5: L-method
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if 'l_method' in methods:
             elbow_k = self._l_method_elbow(list(k_range), inertias)
             results['elbow_points']['l_method'] = elbow_k
@@ -979,14 +974,14 @@ class VegetationClustering:
                 'reference': 'Salvador & Chan (2004)'
             }
         
-        # Consensus recommendation
+        # Copyright (c) 2025 Mohamed Z. Hatim
         elbow_points = [v for v in results['elbow_points'].values() if v is not None]
         if elbow_points:
             from collections import Counter
             counter = Counter(elbow_points)
             most_common = counter.most_common(1)[0]
             
-            if most_common[1] > 1:  # If there's agreement
+            if most_common[1] > 1:  # Copyright (c) 2025 Mohamed Z. Hatim
                 results['recommendations']['consensus'] = most_common[0]
             else:
                 results['recommendations']['consensus'] = int(np.median(elbow_points))
@@ -996,16 +991,16 @@ class VegetationClustering:
             results['recommendations']['consensus'] = None
             results['recommendations']['confidence'] = 0
         
-        # Additional recommendations based on other criteria
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if silhouette_scores:
-            best_silhouette_idx = np.argmax(silhouette_scores[1:]) + 1  # Skip k=1
+            best_silhouette_idx = np.argmax(silhouette_scores[1:]) + 1  # Copyright (c) 2025 Mohamed Z. Hatim
             results['recommendations']['silhouette_optimal'] = list(k_range)[best_silhouette_idx]
         
         if calinski_scores:
-            best_calinski_idx = np.argmax(calinski_scores[1:]) + 1  # Skip k=1
+            best_calinski_idx = np.argmax(calinski_scores[1:]) + 1  # Copyright (c) 2025 Mohamed Z. Hatim
             results['recommendations']['calinski_optimal'] = list(k_range)[best_calinski_idx]
         
-        # Create visualization if requested
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if plot_results:
             results['plots'] = self._create_elbow_plots(results)
         
@@ -1025,21 +1020,21 @@ class VegetationClustering:
         if len(inertias) < 3:
             return None
         
-        # Normalize the curve to [0,1]
+        # Copyright (c) 2025 Mohamed Z. Hatim
         x_norm = np.array(k_values, dtype=float)
         y_norm = np.array(inertias, dtype=float)
         
         x_norm = (x_norm - x_norm.min()) / (x_norm.max() - x_norm.min())
         y_norm = (y_norm - y_norm.min()) / (y_norm.max() - y_norm.min())
         
-        # For decreasing curves, we need to flip y
+        # Copyright (c) 2025 Mohamed Z. Hatim
         y_norm = 1 - y_norm
         
-        # Calculate differences between curve and diagonal
+        # Copyright (c) 2025 Mohamed Z. Hatim
         diagonal = x_norm
         differences = y_norm - diagonal
         
-        # Find the knee point (maximum difference)
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if len(differences) > 0:
             knee_idx = np.argmax(differences)
             return k_values[knee_idx]
@@ -1051,11 +1046,11 @@ class VegetationClustering:
         if len(inertias) < 3:
             return None
         
-        # Calculate first and second derivatives
+        # Copyright (c) 2025 Mohamed Z. Hatim
         first_deriv = np.diff(inertias)
         second_deriv = np.diff(first_deriv)
         
-        # Find maximum second derivative (point of maximum curvature)
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if len(second_deriv) > 0:
             elbow_idx = np.argmax(np.abs(second_deriv)) + 1
             if elbow_idx < len(k_values):
@@ -1068,12 +1063,12 @@ class VegetationClustering:
         if len(inertias) < 3:
             return None
         
-        # Calculate percentage of variance explained by adding each cluster
-        total_variance = inertias[0]  # k=1 represents total variance
-        threshold = 0.1  # 10% threshold
+        # Copyright (c) 2025 Mohamed Z. Hatim
+        total_variance = inertias[0]  
+        threshold = 0.1  
         
         for i in range(1, len(inertias)):
-            if i == len(inertias) - 1:  # Last point
+            if i == len(inertias) - 1:  
                 return k_values[i-1]
             
             current_explained = (total_variance - inertias[i]) / total_variance
@@ -1096,17 +1091,17 @@ class VegetationClustering:
         if len(inertias) < 4:
             return None
         
-        # Calculate distortion changes
+# Copyright (c) 2025 Mohamed Z. Hatim
         distortions = np.array(inertias)
         
-        # Calculate jumps (differences in distortion reduction rates)
+# Copyright (c) 2025 Mohamed Z. Hatim
         jumps = []
         for i in range(1, len(distortions) - 1):
             jump = (distortions[i-1] - distortions[i]) - (distortions[i] - distortions[i+1])
             jumps.append(jump)
         
         if jumps:
-            # Find the largest jump
+# Copyright (c) 2025 Mohamed Z. Hatim
             max_jump_idx = np.argmax(jumps)
             return k_values[max_jump_idx + 1]  # +1 because jumps is offset
         

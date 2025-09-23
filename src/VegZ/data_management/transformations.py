@@ -64,23 +64,23 @@ class DataTransformer:
         and p_i+ is the total abundance in sample i
         """
         if isinstance(data, pd.DataFrame):
-            # Get numeric columns only
+# Copyright (c) 2025 Mohamed Z. Hatim
             numeric_data = data.select_dtypes(include=[np.number])
             transformed_data = data.copy()
         else:
             numeric_data = data.copy()
         
-        # Replace negative values with 0
+# Copyright (c) 2025 Mohamed Z. Hatim
         numeric_data = np.maximum(numeric_data, 0)
         
-        # Calculate row sums (total abundance per sample)
+# Copyright (c) 2025 Mohamed Z. Hatim
         numeric_values = numeric_data.values if isinstance(numeric_data, pd.DataFrame) else numeric_data
         row_sums = np.sum(numeric_values, axis=1)
         
-        # Avoid division by zero
+# Copyright (c) 2025 Mohamed Z. Hatim
         row_sums[row_sums == 0] = 1
         
-        # Apply Hellinger transformation
+# Copyright (c) 2025 Mohamed Z. Hatim
         proportions = numeric_values / row_sums[:, np.newaxis]
         hellinger_data = np.sqrt(proportions)
         
@@ -103,14 +103,14 @@ class DataTransformer:
         else:
             numeric_data = data.copy()
         
-        # Replace negative values with 0
+# Copyright (c) 2025 Mohamed Z. Hatim
         numeric_data = np.maximum(numeric_data, 0)
         
-        # Calculate chord distances (Euclidean norms)
+# Copyright (c) 2025 Mohamed Z. Hatim
         norms = np.sqrt(np.sum(numeric_data**2, axis=1))
         norms[norms == 0] = 1  # Avoid division by zero
         
-        # Apply chord transformation
+# Copyright (c) 2025 Mohamed Z. Hatim
         chord_data = numeric_data / norms[:, np.newaxis]
         
         if isinstance(data, pd.DataFrame):
@@ -124,10 +124,10 @@ class DataTransformer:
         """
         Log-chord transformation: log transform followed by chord transformation.
         """
-        # First apply log transformation
+# Copyright (c) 2025 Mohamed Z. Hatim
         log_data = self.log_transform(data, **kwargs)
         
-        # Then apply chord transformation
+# Copyright (c) 2025 Mohamed Z. Hatim
         return self.chord_transform(log_data)
     
     def wisconsin_transform(self, data: Union[pd.DataFrame, np.ndarray],
@@ -144,15 +144,15 @@ class DataTransformer:
         else:
             numeric_data = data.copy()
         
-        # Replace negative values with 0
+# Copyright (c) 2025 Mohamed Z. Hatim
         numeric_data = np.maximum(numeric_data, 0)
         
-        # Step 1: Standardize species to unit maxima
+# Copyright (c) 2025 Mohamed Z. Hatim
         column_maxs = np.max(numeric_data, axis=0)
         column_maxs[column_maxs == 0] = 1  # Avoid division by zero
         species_std = numeric_data / column_maxs
         
-        # Step 2: Standardize samples to unit totals
+# Copyright (c) 2025 Mohamed Z. Hatim
         species_values = species_std.values if isinstance(species_std, pd.DataFrame) else species_std
         row_sums = np.sum(species_values, axis=1)
         row_sums[row_sums == 0] = 1  # Avoid division by zero
@@ -177,24 +177,24 @@ class DataTransformer:
         else:
             numeric_data = data.copy()
         
-        # Replace negative values with 0
+# Copyright (c) 2025 Mohamed Z. Hatim
         numeric_data = np.maximum(numeric_data, 0)
         
-        # Calculate total sum
+# Copyright (c) 2025 Mohamed Z. Hatim
         total_sum = np.sum(numeric_data)
         if total_sum == 0:
             warnings.warn("Total sum is zero, returning original data")
             return data
         
-        # Calculate row and column sums
+# Copyright (c) 2025 Mohamed Z. Hatim
         row_sums = np.sum(numeric_data, axis=1)
         col_sums = np.sum(numeric_data, axis=0)
         
-        # Calculate expected values
+# Copyright (c) 2025 Mohamed Z. Hatim
         expected = np.outer(row_sums, col_sums) / total_sum
         expected[expected == 0] = 1  # Avoid division by zero
         
-        # Apply chi-square transformation
+# Copyright (c) 2025 Mohamed Z. Hatim
         chi_sq_data = np.sqrt(numeric_data * total_sum / expected)
         
         if isinstance(data, pd.DataFrame):
@@ -223,11 +223,11 @@ class DataTransformer:
         else:
             numeric_data = data.copy()
         
-        # Add constant and ensure positive values
+# Copyright (c) 2025 Mohamed Z. Hatim
         adjusted_data = numeric_data + constant
         adjusted_data = np.maximum(adjusted_data, 1e-10)  # Avoid log(0)
         
-        # Apply logarithmic transformation
+# Copyright (c) 2025 Mohamed Z. Hatim
         if base == 'natural':
             log_data = np.log(adjusted_data)
         elif base == 'log10':
@@ -252,10 +252,10 @@ class DataTransformer:
         else:
             numeric_data = data.copy()
         
-        # Ensure non-negative values
+# Copyright (c) 2025 Mohamed Z. Hatim
         numeric_data = np.maximum(numeric_data, 0)
         
-        # Apply square root transformation
+# Copyright (c) 2025 Mohamed Z. Hatim
         sqrt_data = np.sqrt(numeric_data)
         
         if isinstance(data, pd.DataFrame):
@@ -277,10 +277,10 @@ class DataTransformer:
         else:
             numeric_data = data.copy()
         
-        # Ensure values are between 0 and 1
+# Copyright (c) 2025 Mohamed Z. Hatim
         numeric_data = np.clip(numeric_data, 0, 1)
         
-        # Apply arcsine square root transformation
+# Copyright (c) 2025 Mohamed Z. Hatim
         arcsine_data = np.arcsin(np.sqrt(numeric_data))
         
         if isinstance(data, pd.DataFrame):
@@ -307,14 +307,14 @@ class DataTransformer:
             numeric_data = data.copy()
         
         if method == 'zscore':
-            # Z-score standardization
+# Copyright (c) 2025 Mohamed Z. Hatim
             means = np.mean(numeric_data, axis=0)
             stds = np.std(numeric_data, axis=0, ddof=1)
             stds[stds == 0] = 1  # Avoid division by zero
             standardized_data = (numeric_data - means) / stds
             
         elif method == 'robust':
-            # Robust standardization using median and MAD
+# Copyright (c) 2025 Mohamed Z. Hatim
             medians = np.median(numeric_data, axis=0)
             mads = stats.median_abs_deviation(numeric_data, axis=0)
             mads[mads == 0] = 1  # Avoid division by zero
@@ -347,7 +347,7 @@ class DataTransformer:
             numeric_data = data.copy()
         
         if method == 'minmax':
-            # Min-max scaling to [0, 1]
+# Copyright (c) 2025 Mohamed Z. Hatim
             mins = np.min(numeric_data, axis=0)
             maxs = np.max(numeric_data, axis=0)
             ranges = maxs - mins
@@ -355,7 +355,7 @@ class DataTransformer:
             normalized_data = (numeric_data - mins) / ranges
             
         elif method == 'unit_vector':
-            # Unit vector scaling (same as chord transformation)
+# Copyright (c) 2025 Mohamed Z. Hatim
             return self.chord_transform(data, **kwargs)
             
         else:

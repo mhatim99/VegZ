@@ -37,9 +37,9 @@ class VegZ:
         self.environmental_data = None
         self.metadata = {}
         
-    # =============================================================================
-    # DATA MANAGEMENT
-    # =============================================================================
+    # Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
     
     def load_data(self, filepath: str, 
                   format_type: str = 'csv',
@@ -73,10 +73,10 @@ class VegZ:
         else:
             raise ValueError(f"Unsupported format: {format_type}")
         
-        # Auto-detect species columns if not provided
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if species_cols is None:
             numeric_cols = self.data.select_dtypes(include=[np.number]).columns
-            # Assume species columns are numeric columns (abundance/cover data)
+            # Copyright (c) 2025 Mohamed Z. Hatim
             self.species_matrix = self.data[numeric_cols]
         else:
             self.species_matrix = self.data[species_cols]
@@ -104,10 +104,10 @@ class VegZ:
             if pd.isna(name):
                 return ''
             name = str(name).strip()
-            # Remove author names (simple approach)
+            # Copyright (c) 2025 Mohamed Z. Hatim
             words = name.split()
             if len(words) >= 2:
-                # Capitalize genus, lowercase species
+                # Copyright (c) 2025 Mohamed Z. Hatim
                 words[0] = words[0].capitalize()
                 words[1] = words[1].lower()
                 return ' '.join(words[:2])  # Keep only genus and species
@@ -136,13 +136,13 @@ class VegZ:
         if self.species_matrix is None:
             raise ValueError("Species matrix not available")
         
-        # Count occurrences (non-zero values)
+        # Copyright (c) 2025 Mohamed Z. Hatim
         occurrences = (self.species_matrix > 0).sum(axis=0)
         
-        # Calculate total abundance
+        # Copyright (c) 2025 Mohamed Z. Hatim
         total_abundance = self.species_matrix.sum(axis=0)
         
-        # Filter species
+        # Copyright (c) 2025 Mohamed Z. Hatim
         keep_species = (occurrences >= min_occurrences) & (total_abundance >= min_abundance)
         
         self.species_matrix = self.species_matrix.loc[:, keep_species]
@@ -151,9 +151,9 @@ class VegZ:
         
         return self.species_matrix
     
-    # =============================================================================
-    # DIVERSITY ANALYSIS
-    # =============================================================================
+    # Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
     
     def calculate_diversity(self, indices: List[str] = ['shannon', 'simpson', 'richness']) -> pd.DataFrame:
         """
@@ -258,20 +258,20 @@ class VegZ:
         expected = 0
         
         for count in species_counts:
-            # Probability of not selecting this species
+            # Copyright (c) 2025 Mohamed Z. Hatim
             prob_not_selected = 1
             for i in range(sample_size):
                 prob_not_selected *= (total - count - i) / (total - i)
             
-            # Probability of selecting this species
+            # Copyright (c) 2025 Mohamed Z. Hatim
             prob_selected = 1 - prob_not_selected
             expected += prob_selected
         
         return expected
     
-    # =============================================================================
-    # MULTIVARIATE ANALYSIS
-    # =============================================================================
+    # Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
     
     def pca_analysis(self, transform: str = 'hellinger', 
                      n_components: Optional[int] = None) -> Dict[str, Any]:
@@ -293,10 +293,10 @@ class VegZ:
         if self.species_matrix is None:
             raise ValueError("Species matrix not available")
         
-        # Transform data
+        # Copyright (c) 2025 Mohamed Z. Hatim
         transformed_data = self._transform_data(self.species_matrix, transform)
         
-        # Fit PCA
+        # Copyright (c) 2025 Mohamed Z. Hatim
         pca = PCA(n_components=n_components)
         scores = pca.fit_transform(transformed_data)
         
@@ -337,10 +337,10 @@ class VegZ:
         if self.species_matrix is None:
             raise ValueError("Species matrix not available")
         
-        # Transform data
+        # Copyright (c) 2025 Mohamed Z. Hatim
         transformed_data = self._transform_data(self.species_matrix, transform)
         
-        # Calculate distance matrix
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if distance_metric == 'bray_curtis':
             distances = self._bray_curtis_distance(transformed_data)
         elif distance_metric == 'euclidean':
@@ -348,7 +348,7 @@ class VegZ:
         else:
             distances = pdist(transformed_data, metric=distance_metric)
         
-        # Fit NMDS
+        # Copyright (c) 2025 Mohamed Z. Hatim
         mds = MDS(n_components=n_dimensions, dissimilarity='precomputed', random_state=42)
         scores = mds.fit_transform(squareform(distances))
         
@@ -397,9 +397,9 @@ class VegZ:
         
         return np.array(distances)
     
-    # =============================================================================
-    # CLUSTERING ANALYSIS
-    # =============================================================================
+    # Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
     
     def hierarchical_clustering(self, distance_metric: str = 'bray_curtis',
                                linkage_method: str = 'average',
@@ -424,13 +424,13 @@ class VegZ:
         if self.species_matrix is None:
             raise ValueError("Species matrix not available")
         
-        # Calculate distance matrix
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if distance_metric == 'bray_curtis':
             distances = self._bray_curtis_distance(self.species_matrix.values)
         else:
             distances = pdist(self.species_matrix.values, metric=distance_metric)
         
-        # Perform hierarchical clustering
+        # Copyright (c) 2025 Mohamed Z. Hatim
         linkage_matrix = linkage(distances, method=linkage_method)
         
         results = {
@@ -466,10 +466,10 @@ class VegZ:
         if self.species_matrix is None:
             raise ValueError("Species matrix not available")
         
-        # Transform data
+        # Copyright (c) 2025 Mohamed Z. Hatim
         transformed_data = self._transform_data(self.species_matrix, transform)
         
-        # Fit K-means
+        # Copyright (c) 2025 Mohamed Z. Hatim
         kmeans = KMeans(n_clusters=n_clusters, random_state=42)
         cluster_labels = kmeans.fit_predict(transformed_data)
         
@@ -507,14 +507,14 @@ class VegZ:
             for cluster in clusters.unique():
                 cluster_mask = clusters == cluster
                 
-                # Calculate relative frequency and relative abundance
+                # Copyright (c) 2025 Mohamed Z. Hatim
                 freq_in_cluster = (self.species_matrix.loc[cluster_mask, species] > 0).mean()
                 freq_out_cluster = (self.species_matrix.loc[~cluster_mask, species] > 0).mean()
                 
                 abund_in_cluster = self.species_matrix.loc[cluster_mask, species].mean()
                 abund_out_cluster = self.species_matrix.loc[~cluster_mask, species].mean()
                 
-                # Calculate indicator value
+                # Copyright (c) 2025 Mohamed Z. Hatim
                 if freq_out_cluster + freq_in_cluster > 0 and abund_out_cluster + abund_in_cluster > 0:
                     rel_freq = freq_in_cluster / (freq_in_cluster + freq_out_cluster)
                     rel_abund = abund_in_cluster / (abund_in_cluster + abund_out_cluster)
@@ -532,9 +532,9 @@ class VegZ:
         
         return pd.DataFrame(results)
     
-    # =============================================================================
-    # VISUALIZATION
-    # =============================================================================
+    # Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
     
     def plot_diversity(self, diversity_data: pd.DataFrame, 
                       index_name: str = 'shannon') -> plt.Figure:
@@ -598,7 +598,7 @@ class VegZ:
         ax.set_xlabel(f'{scores.columns[0]}')
         ax.set_ylabel(f'{scores.columns[1]}')
         
-        # Add explained variance if available
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if 'explained_variance_ratio' in ordination_results:
             var_exp = ordination_results['explained_variance_ratio']
             ax.set_xlabel(f'{scores.columns[0]} ({var_exp[0]:.1%})')
@@ -650,13 +650,13 @@ class VegZ:
         """
         fig, ax = plt.subplots(1, 1, figsize=(10, 6))
         
-        # Plot individual curves
+        # Copyright (c) 2025 Mohamed Z. Hatim
         for sample_id in rarefaction_data['sample_id'].unique():
             sample_data = rarefaction_data[rarefaction_data['sample_id'] == sample_id]
             ax.plot(sample_data['sample_size'], sample_data['expected_species'], 
                    alpha=0.3, color='gray')
         
-        # Plot mean curve
+        # Copyright (c) 2025 Mohamed Z. Hatim
         mean_curve = rarefaction_data.groupby('sample_size')['expected_species'].mean()
         ax.plot(mean_curve.index, mean_curve.values, 'b-', linewidth=2, label='Mean')
         
@@ -668,9 +668,9 @@ class VegZ:
         plt.tight_layout()
         return fig
     
-    # =============================================================================
-    # UTILITY FUNCTIONS
-    # =============================================================================
+    # Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
     
     def summary_statistics(self) -> Dict[str, Any]:
         """
@@ -714,7 +714,7 @@ class VegZ:
             if isinstance(results, pd.DataFrame):
                 results.to_csv(output_path)
             elif isinstance(results, dict):
-                # Export each DataFrame in the results
+                # Copyright (c) 2025 Mohamed Z. Hatim
                 for key, value in results.items():
                     if isinstance(value, pd.DataFrame):
                         filepath = f"{output_path}_{key}.csv"
@@ -723,9 +723,9 @@ class VegZ:
         else:
             raise ValueError(f"Unsupported export format: {format_type}")
     
-    # =============================================================================
-    # ELBOW ANALYSIS FOR OPTIMAL CLUSTERING
-    # =============================================================================
+    # Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
     
     def elbow_analysis(self, k_range: range = range(1, 16),
                       methods: List[str] = ['knee_locator', 'derivative', 'variance_explained'],
@@ -760,7 +760,7 @@ class VegZ:
         if self.species_matrix is None:
             raise ValueError("Species matrix not available. Please load data first.")
         
-        # Use the comprehensive clustering analysis
+        # Copyright (c) 2025 Mohamed Z. Hatim
         from .clustering import VegetationClustering
         clustering = VegetationClustering()
         
@@ -798,11 +798,11 @@ class VegZ:
         if results['recommendations']['consensus']:
             return results['recommendations']['consensus']
         else:
-            # Fallback to silhouette method
+            # Copyright (c) 2025 Mohamed Z. Hatim
             return results['recommendations'].get('silhouette_optimal', 3)
 
 
-# Convenience functions for quick analysis
+# Copyright (c) 2025 Mohamed Z. Hatim
 def quick_diversity_analysis(data: pd.DataFrame, 
                            species_cols: Optional[List[str]] = None) -> pd.DataFrame:
     """Quick diversity analysis."""

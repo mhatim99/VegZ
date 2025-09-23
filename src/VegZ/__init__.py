@@ -1,5 +1,5 @@
 """
-VegZ: A comprehensive Python package for vegetation data analysis and environmental modeling.
+VegZ: A comprehensive Python package for vegetation data analysis and environmental modelling.
 
 Copyright (c) 2025 Mohamed Z. Hatim
 
@@ -16,19 +16,19 @@ This package provides tools for:
 - Visualization and reporting
 """
 
-__version__ = "1.0.3"
+__version__ = "1.1.0"
 __author__ = "Mohamed Z. Hatim"
-__email__ = ""
+__email__ = "mhatim4040@gmail.com"
 __copyright__ = "Copyright (c) 2025 Mohamed Z. Hatim"
 
-# Import main classes and functions
+# Copyright (c) 2025 Mohamed Z. Hatim
 from .core import VegZ, quick_diversity_analysis, quick_ordination, quick_clustering, quick_elbow_analysis
 from .diversity import DiversityAnalyzer
 from .multivariate import MultivariateAnalyzer
 from .clustering import VegetationClustering
 from .statistics import EcologicalStatistics
 
-# Import specialized analyzers
+# Copyright (c) 2025 Mohamed Z. Hatim
 from .temporal import TemporalAnalyzer
 from .spatial import SpatialAnalyzer
 from .environmental import EnvironmentalModeler
@@ -38,7 +38,7 @@ from .nestedness import NestednessAnalyzer, NullModels, NestednessSignificance
 from .specialized_methods import PhylogeneticDiversityAnalyzer, MetacommunityAnalyzer, NetworkAnalyzer
 from .interactive_viz import InteractiveVisualizer, ReportGenerator
 
-# Import submodules
+# Copyright (c) 2025 Mohamed Z. Hatim
 from . import data_management
 from . import data_quality
 from . import diversity
@@ -56,14 +56,14 @@ from . import interactive_viz
 from . import visualization
 
 __all__ = [
-    # Main classes
+    # Copyright (c) 2025 Mohamed Z. Hatim
     'VegZ',
     'DiversityAnalyzer', 
     'MultivariateAnalyzer',
     'VegetationClustering',
     'EcologicalStatistics',
     
-    # Specialized analyzers
+    # Copyright (c) 2025 Mohamed Z. Hatim
     'TemporalAnalyzer',
     'SpatialAnalyzer', 
     'EnvironmentalModeler',
@@ -80,13 +80,13 @@ __all__ = [
     'InteractiveVisualizer',
     'ReportGenerator',
     
-    # Quick functions
+    # Copyright (c) 2025 Mohamed Z. Hatim
     'quick_diversity_analysis',
     'quick_ordination', 
     'quick_clustering',
     'quick_elbow_analysis',
     
-    # Submodules
+    # Copyright (c) 2025 Mohamed Z. Hatim
     'data_management',
     'data_quality',
     'diversity',
@@ -104,7 +104,7 @@ __all__ = [
     'visualization'
 ]
 
-# Package metadata
+# Copyright (c) 2025 Mohamed Z. Hatim
 DESCRIPTION = "A comprehensive Python package for vegetation data analysis and environmental modeling"
 LONG_DESCRIPTION = """
 VegZ is a professional-grade Python package designed specifically for vegetation data analysis 
@@ -175,28 +175,28 @@ Example Usage:
 import pandas as pd
 from VegZ import VegZ
 
-# Initialize VegZ
+# Copyright (c) 2025 Mohamed Z. Hatim
 veg = VegZ()
 
-# Load your vegetation data
+# Copyright (c) 2025 Mohamed Z. Hatim
 data = veg.load_data('vegetation_data.csv')
 
-# Calculate diversity indices
+# Copyright (c) 2025 Mohamed Z. Hatim
 diversity = veg.calculate_diversity(['shannon', 'simpson', 'richness'])
 
-# Perform multivariate analysis
+# Copyright (c) 2025 Mohamed Z. Hatim
 pca_results = veg.pca_analysis(transform='hellinger')
 nmds_results = veg.nmds_analysis(distance_metric='bray_curtis')
 
-# Advanced clustering
+# Copyright (c) 2025 Mohamed Z. Hatim
 twinspan_results = veg.clustering.twinspan(data)
 hierarchical_results = veg.hierarchical_clustering(n_clusters=5)
 
-# Statistical tests
+# Copyright (c) 2025 Mohamed Z. Hatim
 permanova_results = veg.statistics.permanova(distance_matrix, groups)
 mantel_results = veg.statistics.mantel_test(matrix1, matrix2)
 
-# Create visualizations
+# Copyright (c) 2025 Mohamed Z. Hatim
 diversity_plot = veg.plot_diversity(diversity, 'shannon')
 ordination_plot = veg.plot_ordination(pca_results)
 ```
@@ -229,7 +229,7 @@ pip install git+https://github.com/mhatim99/VegZ.git
 
 Documentation and Support:
 ==========================
-- Documentation: https://vegz.readthedocs.io/
+- Documentation: https://mhatim99.github.io/VegZ/
 - GitHub: https://github.com/mhatim99/VegZ
 - Issues: https://github.com/mhatim99/VegZ/issues
 
@@ -237,10 +237,10 @@ License: MIT
 Copyright (c) 2025 Mohamed Z. Hatim
 """
 
-# Version information
+# Copyright (c) 2025 Mohamed Z. Hatim
 VERSION_INFO = {
     'major': 1,
-    'minor': 0, 
+    'minor': 1,
     'patch': 0,
     'release': 'stable',
     'version': __version__
@@ -256,7 +256,7 @@ def show_versions():
     print(f"Copyright: {__copyright__}")
     print()
     
-    # Check for key dependencies
+# Copyright (c) 2025 Mohamed Z. Hatim
     dependencies = [
         'numpy', 'pandas', 'scipy', 'matplotlib', 'sklearn', 
         'geopandas', 'pyproj', 'fuzzywuzzy'
@@ -296,15 +296,15 @@ BibTeX entry:
 }}
 """
 
-# Module-level configuration
+# Copyright (c) 2025 Mohamed Z. Hatim
 import warnings
 
-# Configure warnings for VegZ
+# Copyright (c) 2025 Mohamed Z. Hatim
 def configure_warnings():
     """Configure warning filters for VegZ."""
     warnings.filterwarnings('default', category=UserWarning, module='vegz')
     warnings.filterwarnings('ignore', category=FutureWarning, module='sklearn')
     warnings.filterwarnings('ignore', category=DeprecationWarning, module='scipy')
 
-# Auto-configure warnings on import
+# Copyright (c) 2025 Mohamed Z. Hatim
 configure_warnings()

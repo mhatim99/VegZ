@@ -24,7 +24,7 @@ try:
 except ImportError:
     NUMBA_AVAILABLE = False
     warnings.warn("Numba not available, some computations will be slower")
-    # Create dummy decorators
+# Copyright (c) 2025 Mohamed Z. Hatim
     def jit(*args, **kwargs):
         def decorator(func):
             return func
@@ -66,7 +66,7 @@ class NestednessAnalyzer:
         presence_threshold : float, optional
             Threshold for converting abundance to presence/absence, by default 0
         """
-        # Convert to presence-absence if needed
+# Copyright (c) 2025 Mohamed Z. Hatim
         if presence_threshold > 0:
             self.matrix_data = (data > presence_threshold).astype(int)
         else:
@@ -96,7 +96,7 @@ class NestednessAnalyzer:
         if metrics is None:
             metrics = ['nodf', 'temperature', 'c_score', 'togetherness']
         
-        # Sort matrix for nestedness analysis
+# Copyright (c) 2025 Mohamed Z. Hatim
         sorted_matrix = self._sort_matrix(sort_by)
         
         results = {
@@ -106,7 +106,7 @@ class NestednessAnalyzer:
             'metrics': {}
         }
         
-        # Calculate each metric
+# Copyright (c) 2025 Mohamed Z. Hatim
         for metric in metrics:
             if metric == 'nodf':
                 results['metrics']['nodf'] = self._calculate_nodf(sorted_matrix)
@@ -125,16 +125,16 @@ class NestednessAnalyzer:
     def _sort_matrix(self, sort_by: str) -> pd.DataFrame:
         """Sort matrix according to specified criteria."""
         if sort_by == 'total':
-            # Sort sites by species richness (descending)
+# Copyright (c) 2025 Mohamed Z. Hatim
             site_totals = self.matrix_data.sum(axis=1).sort_values(ascending=False)
             sorted_sites = site_totals.index
             
-            # Sort species by frequency (descending)
+# Copyright (c) 2025 Mohamed Z. Hatim
             species_totals = self.matrix_data.sum(axis=0).sort_values(ascending=False)
             sorted_species = species_totals.index
             
         elif sort_by == 'richness':
-            # Same as total for presence-absence data
+# Copyright (c) 2025 Mohamed Z. Hatim
             site_totals = self.matrix_data.sum(axis=1).sort_values(ascending=False)
             sorted_sites = site_totals.index
             species_totals = self.matrix_data.sum(axis=0).sort_values(ascending=False)
@@ -142,13 +142,13 @@ class NestednessAnalyzer:
             
         elif sort_by == 'abundance':
             if (self.matrix_data > 1).any().any():
-                # For abundance data, sort by total abundance
+# Copyright (c) 2025 Mohamed Z. Hatim
                 site_totals = self.matrix_data.sum(axis=1).sort_values(ascending=False)
                 sorted_sites = site_totals.index
                 species_totals = self.matrix_data.sum(axis=0).sort_values(ascending=False)
                 sorted_species = species_totals.index
             else:
-                # Fall back to richness for presence-absence data
+# Copyright (c) 2025 Mohamed Z. Hatim
                 return self._sort_matrix('richness')
         else:
             raise ValueError(f"Unknown sorting method: {sort_by}")
@@ -172,7 +172,7 @@ class NestednessAnalyzer:
         matrix_values = matrix.values.astype(float)
         n_sites, n_species = matrix_values.shape
         
-        # Calculate row nestedness (sites)
+# Copyright (c) 2025 Mohamed Z. Hatim
         row_nodf = 0
         row_pairs = 0
         
@@ -182,12 +182,12 @@ class NestednessAnalyzer:
                 marginal_j = np.sum(matrix_values[j, :])
                 
                 if marginal_i > marginal_j and marginal_j > 0:
-                    # Count shared species where both are present
+# Copyright (c) 2025 Mohamed Z. Hatim
                     paired_species = np.sum(matrix_values[i, :] * matrix_values[j, :])
                     row_nodf += (paired_species / marginal_j) * 100
                     row_pairs += 1
         
-        # Calculate column nestedness (species)
+# Copyright (c) 2025 Mohamed Z. Hatim
         col_nodf = 0
         col_pairs = 0
         
@@ -197,12 +197,12 @@ class NestednessAnalyzer:
                 marginal_j = np.sum(matrix_values[:, j])
                 
                 if marginal_i > marginal_j and marginal_j > 0:
-                    # Count shared sites where both species are present
+# Copyright (c) 2025 Mohamed Z. Hatim
                     paired_sites = np.sum(matrix_values[:, i] * matrix_values[:, j])
                     col_nodf += (paired_sites / marginal_j) * 100
                     col_pairs += 1
         
-        # Calculate overall NODF
+# Copyright (c) 2025 Mohamed Z. Hatim
         total_pairs = row_pairs + col_pairs
         if total_pairs > 0:
             overall_nodf = (row_nodf + col_nodf) / total_pairs
@@ -234,12 +234,12 @@ class NestednessAnalyzer:
         matrix_values = matrix.values.astype(float)
         n_sites, n_species = matrix_values.shape
         
-        # Calculate number of unexpected absences and presences
+# Copyright (c) 2025 Mohamed Z. Hatim
         unexpected_absences = 0
         unexpected_presences = 0
         total_comparisons = 0
         
-        # Check all pairs of cells
+# Copyright (c) 2025 Mohamed Z. Hatim
         for i in range(n_sites):
             for j in range(n_species):
                 for ii in range(i, n_sites):
@@ -247,12 +247,12 @@ class NestednessAnalyzer:
                         if i == ii and j == jj:
                             continue
                         
-                        # Current cell and comparison cell
+# Copyright (c) 2025 Mohamed Z. Hatim
                         current = matrix_values[i, j]
                         comparison = matrix_values[ii, jj]
                         
-                        # In a perfectly nested matrix, if a species is present in a less rich site,
-                        # it should be present in all richer sites
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
                         if i < ii and j < jj:  # More rich site and more frequent species
                             if current == 0 and comparison == 1:
                                 unexpected_presences += 1
@@ -261,7 +261,7 @@ class NestednessAnalyzer:
                         
                         total_comparisons += 1
         
-        # Temperature calculation
+# Copyright (c) 2025 Mohamed Z. Hatim
         if total_comparisons > 0:
             temperature = (unexpected_absences + unexpected_presences) / total_comparisons * 100
         else:
@@ -294,22 +294,22 @@ class NestednessAnalyzer:
         total_c_score = 0
         n_pairs = 0
         
-        # Calculate C-score for all species pairs
+# Copyright (c) 2025 Mohamed Z. Hatim
         for i in range(n_species - 1):
             for j in range(i + 1, n_species):
                 species_i = matrix_values[:, i]
                 species_j = matrix_values[:, j]
                 
-                # Count sites where only one species is present
+# Copyright (c) 2025 Mohamed Z. Hatim
                 only_i = np.sum((species_i == 1) & (species_j == 0))
                 only_j = np.sum((species_i == 0) & (species_j == 1))
                 
-                # C-score for this pair
+# Copyright (c) 2025 Mohamed Z. Hatim
                 c_score_pair = only_i * only_j
                 total_c_score += c_score_pair
                 n_pairs += 1
         
-        # Average C-score
+# Copyright (c) 2025 Mohamed Z. Hatim
         avg_c_score = total_c_score / n_pairs if n_pairs > 0 else 0
         
         return {
@@ -338,19 +338,19 @@ class NestednessAnalyzer:
         total_togetherness = 0
         n_pairs = 0
         
-        # Calculate togetherness for all species pairs
+# Copyright (c) 2025 Mohamed Z. Hatim
         for i in range(n_species - 1):
             for j in range(i + 1, n_species):
                 species_i = matrix_values[:, i]
                 species_j = matrix_values[:, j]
                 
-                # Count co-occurrences
+# Copyright (c) 2025 Mohamed Z. Hatim
                 both_present = np.sum((species_i == 1) & (species_j == 1))
                 
-                # Count sites where at least one is present
+# Copyright (c) 2025 Mohamed Z. Hatim
                 at_least_one = np.sum((species_i == 1) | (species_j == 1))
                 
-                # Togetherness for this pair
+# Copyright (c) 2025 Mohamed Z. Hatim
                 if at_least_one > 0:
                     togetherness_pair = both_present / at_least_one
                 else:
@@ -359,7 +359,7 @@ class NestednessAnalyzer:
                 total_togetherness += togetherness_pair
                 n_pairs += 1
         
-        # Average togetherness
+# Copyright (c) 2025 Mohamed Z. Hatim
         avg_togetherness = total_togetherness / n_pairs if n_pairs > 0 else 0
         
         return {
@@ -385,44 +385,44 @@ class NestednessAnalyzer:
         matrix_values = matrix.values.astype(float)
         n_sites, n_species = matrix_values.shape
         
-        # Calculate site and species weights
+# Copyright (c) 2025 Mohamed Z. Hatim
         site_totals = np.sum(matrix_values, axis=1)
         species_totals = np.sum(matrix_values, axis=0)
         
         total_wine = 0
         total_weight = 0
         
-        # Calculate WINE for all site pairs
+# Copyright (c) 2025 Mohamed Z. Hatim
         for i in range(n_sites - 1):
             for j in range(i + 1, n_sites):
                 if site_totals[i] >= site_totals[j] and site_totals[j] > 0:
-                    # Calculate overlap
+# Copyright (c) 2025 Mohamed Z. Hatim
                     overlap = np.sum(matrix_values[i, :] * matrix_values[j, :])
                     
-                    # Weight by less rich site
+# Copyright (c) 2025 Mohamed Z. Hatim
                     weight = site_totals[j]
                     
-                    # WINE contribution
+# Copyright (c) 2025 Mohamed Z. Hatim
                     wine_contribution = (overlap / site_totals[j]) * weight
                     total_wine += wine_contribution
                     total_weight += weight
         
-        # Calculate WINE for all species pairs
+# Copyright (c) 2025 Mohamed Z. Hatim
         for i in range(n_species - 1):
             for j in range(i + 1, n_species):
                 if species_totals[i] >= species_totals[j] and species_totals[j] > 0:
-                    # Calculate overlap
+# Copyright (c) 2025 Mohamed Z. Hatim
                     overlap = np.sum(matrix_values[:, i] * matrix_values[:, j])
                     
-                    # Weight by less frequent species
+# Copyright (c) 2025 Mohamed Z. Hatim
                     weight = species_totals[j]
                     
-                    # WINE contribution
+# Copyright (c) 2025 Mohamed Z. Hatim
                     wine_contribution = (overlap / species_totals[j]) * weight
                     total_wine += wine_contribution
                     total_weight += weight
         
-        # Final WINE value
+# Copyright (c) 2025 Mohamed Z. Hatim
         wine = (total_wine / total_weight) * 100 if total_weight > 0 else 0
         
         return {
@@ -492,10 +492,10 @@ class NullModels:
         total_occurrences = np.sum(matrix)
         
         if fixed_marginals == 'both':
-            # Preserve both row and column sums (complex algorithm)
+# Copyright (c) 2025 Mohamed Z. Hatim
             return self._fixed_fixed_model(matrix)
         elif fixed_marginals == 'rows':
-            # Preserve row sums only
+# Copyright (c) 2025 Mohamed Z. Hatim
             null_matrix = np.zeros_like(matrix)
             for i in range(n_sites):
                 row_sum = np.sum(matrix[i, :])
@@ -503,7 +503,7 @@ class NullModels:
                     chosen_cols = np.random.choice(n_species, size=row_sum, replace=False)
                     null_matrix[i, chosen_cols] = 1
         elif fixed_marginals == 'columns':
-            # Preserve column sums only
+# Copyright (c) 2025 Mohamed Z. Hatim
             null_matrix = np.zeros_like(matrix)
             for j in range(n_species):
                 col_sum = np.sum(matrix[:, j])
@@ -511,7 +511,7 @@ class NullModels:
                     chosen_rows = np.random.choice(n_sites, size=col_sum, replace=False)
                     null_matrix[chosen_rows, j] = 1
         else:  # none
-            # Random placement maintaining total number of occurrences
+# Copyright (c) 2025 Mohamed Z. Hatim
             null_matrix = np.zeros_like(matrix)
             flat_indices = np.random.choice(
                 n_sites * n_species, size=total_occurrences, replace=False
@@ -524,7 +524,7 @@ class NullModels:
         """Generate null matrix with proportional probabilities."""
         n_sites, n_species = matrix.shape
         
-        # Calculate probabilities
+# Copyright (c) 2025 Mohamed Z. Hatim
         row_probs = np.sum(matrix, axis=1) / np.sum(matrix) if np.sum(matrix) > 0 else np.ones(n_sites) / n_sites
         col_probs = np.sum(matrix, axis=0) / np.sum(matrix) if np.sum(matrix) > 0 else np.ones(n_species) / n_species
         
@@ -547,7 +547,7 @@ class NullModels:
                     chosen_rows = np.random.choice(n_sites, size=col_sum, replace=False, p=probs)
                     null_matrix[chosen_rows, j] = 1
         else:  # none
-            # Use outer product of probabilities
+# Copyright (c) 2025 Mohamed Z. Hatim
             prob_matrix = np.outer(row_probs, col_probs)
             prob_matrix = prob_matrix / np.sum(prob_matrix)  # Normalize
             
@@ -564,8 +564,8 @@ class NullModels:
     
     def _fixed_fixed_model(self, matrix: np.ndarray) -> np.ndarray:
         """Generate null matrix preserving both row and column sums."""
-        # This is a simplified version - in practice, this requires more sophisticated algorithms
-        # like the Patefield algorithm or sequential swapping
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
         return self._sequential_swap_model(matrix, n_swaps=1000)
     
     def _sequential_swap_model(self, matrix: np.ndarray, n_swaps: int = None) -> np.ndarray:
@@ -576,7 +576,7 @@ class NullModels:
         if n_swaps is None:
             n_swaps = n_sites * n_species * 10  # Default number of swaps
         
-        # Find all 1s and 0s
+# Copyright (c) 2025 Mohamed Z. Hatim
         ones = np.where(null_matrix == 1)
         zeros = np.where(null_matrix == 0)
         
@@ -584,7 +584,7 @@ class NullModels:
             if len(ones[0]) < 2 or len(zeros[0]) < 2:
                 break
             
-            # Choose two random 1s
+# Copyright (c) 2025 Mohamed Z. Hatim
             idx1 = np.random.randint(len(ones[0]))
             idx2 = np.random.randint(len(ones[0]))
             
@@ -594,17 +594,17 @@ class NullModels:
             r1, c1 = ones[0][idx1], ones[1][idx1]
             r2, c2 = ones[0][idx2], ones[1][idx2]
             
-            # Check if we can swap (different rows and columns)
+# Copyright (c) 2025 Mohamed Z. Hatim
             if r1 != r2 and c1 != c2:
-                # Check if the swap positions are currently 0
+# Copyright (c) 2025 Mohamed Z. Hatim
                 if null_matrix[r1, c2] == 0 and null_matrix[r2, c1] == 0:
-                    # Perform the swap
+# Copyright (c) 2025 Mohamed Z. Hatim
                     null_matrix[r1, c1] = 0
                     null_matrix[r2, c2] = 0
                     null_matrix[r1, c2] = 1
                     null_matrix[r2, c1] = 1
                     
-                    # Update ones and zeros indices
+# Copyright (c) 2025 Mohamed Z. Hatim
                     ones = np.where(null_matrix == 1)
                     zeros = np.where(null_matrix == 0)
         
@@ -646,16 +646,16 @@ class NestednessSignificance:
         Dict[str, Any]
             Significance test results
         """
-        # Calculate observed nestedness
+# Copyright (c) 2025 Mohamed Z. Hatim
         self.nestedness_analyzer.load_matrix(matrix)
         observed_results = self.nestedness_analyzer.calculate_nestedness_metrics(metrics=metrics)
         
-        # Generate null matrices
+# Copyright (c) 2025 Mohamed Z. Hatim
         null_matrices = self.null_models.generate_null_matrices(
             matrix, n_iterations, null_model
         )
         
-        # Calculate nestedness for each null matrix
+# Copyright (c) 2025 Mohamed Z. Hatim
         null_results = {metric: [] for metric in observed_results['metrics']}
         
         for null_matrix in null_matrices:
@@ -668,13 +668,13 @@ class NestednessSignificance:
             for metric in observed_results['metrics']:
                 if metric in null_nestedness['metrics']:
                     if isinstance(null_nestedness['metrics'][metric], dict):
-                        # Take the overall metric value
+# Copyright (c) 2025 Mohamed Z. Hatim
                         key = f'{metric}_overall' if f'{metric}_overall' in null_nestedness['metrics'][metric] else list(null_nestedness['metrics'][metric].keys())[0]
                         null_results[metric].append(null_nestedness['metrics'][metric][key])
                     else:
                         null_results[metric].append(null_nestedness['metrics'][metric])
         
-        # Calculate significance
+# Copyright (c) 2025 Mohamed Z. Hatim
         significance_results = {}
         
         for metric in observed_results['metrics']:
@@ -688,12 +688,12 @@ class NestednessSignificance:
             
             null_values = np.array(null_results[metric])
             
-            # Calculate p-values
+# Copyright (c) 2025 Mohamed Z. Hatim
             p_greater = np.sum(null_values >= observed_value) / len(null_values)
             p_lesser = np.sum(null_values <= observed_value) / len(null_values)
             p_two_tailed = 2 * min(p_greater, p_lesser)
             
-            # Calculate standardized effect size (SES)
+# Copyright (c) 2025 Mohamed Z. Hatim
             null_mean = np.mean(null_values)
             null_std = np.std(null_values)
             ses = (observed_value - null_mean) / null_std if null_std > 0 else 0
@@ -755,15 +755,15 @@ class NestednessSignificance:
             
             result = sig_tests[metric]
             
-            # Plot null distribution
+# Copyright (c) 2025 Mohamed Z. Hatim
             axes[i].hist(result['null_distribution'], bins=30, alpha=0.7, 
                         color='lightblue', edgecolor='black', density=True)
             
-            # Plot observed value
+# Copyright (c) 2025 Mohamed Z. Hatim
             axes[i].axvline(result['observed'], color='red', linestyle='--', linewidth=2,
                           label=f"Observed: {result['observed']:.3f}")
             
-            # Plot null mean
+# Copyright (c) 2025 Mohamed Z. Hatim
             axes[i].axvline(result['null_mean'], color='blue', linestyle='-', linewidth=1,
                           label=f"Null mean: {result['null_mean']:.3f}")
             
@@ -772,12 +772,12 @@ class NestednessSignificance:
             axes[i].set_title(f'{metric.upper()}: p = {result["p_two_tailed"]:.3f}, SES = {result["ses"]:.2f}')
             axes[i].legend()
             
-            # Add significance annotation
+# Copyright (c) 2025 Mohamed Z. Hatim
             if result['significant']:
                 axes[i].text(0.95, 0.95, 'Significant', transform=axes[i].transAxes,
                            va='top', ha='right', bbox=dict(boxstyle='round', facecolor='yellow', alpha=0.7))
         
-        # Remove empty subplots
+# Copyright (c) 2025 Mohamed Z. Hatim
         for i in range(n_metrics, len(axes)):
             axes[i].remove()
         
@@ -785,7 +785,7 @@ class NestednessSignificance:
         return fig
 
 
-# Additional analysis functions
+# Copyright (c) 2025 Mohamed Z. Hatim
 class CooccurrenceAnalysis:
     """
     Analysis of species co-occurrence patterns.
@@ -817,7 +817,7 @@ class CooccurrenceAnalysis:
         n_sites, n_species = matrix_values.shape
         species_names = matrix.columns
         
-        # Initialize association matrix
+# Copyright (c) 2025 Mohamed Z. Hatim
         associations = np.zeros((n_species, n_species))
         
         for i in range(n_species):
@@ -825,24 +825,24 @@ class CooccurrenceAnalysis:
                 species_i = matrix_values[:, i]
                 species_j = matrix_values[:, j]
                 
-                # Calculate co-occurrence statistics
+# Copyright (c) 2025 Mohamed Z. Hatim
                 both_present = np.sum((species_i == 1) & (species_j == 1))
                 i_only = np.sum((species_i == 1) & (species_j == 0))
                 j_only = np.sum((species_i == 0) & (species_j == 1))
                 both_absent = np.sum((species_i == 0) & (species_j == 0))
                 
                 if method == 'jaccard':
-                    # Jaccard index
+# Copyright (c) 2025 Mohamed Z. Hatim
                     denominator = both_present + i_only + j_only
                     association = both_present / denominator if denominator > 0 else 0
                     
                 elif method == 'ochiai':
-                    # Ochiai index
+# Copyright (c) 2025 Mohamed Z. Hatim
                     denominator = np.sqrt((both_present + i_only) * (both_present + j_only))
                     association = both_present / denominator if denominator > 0 else 0
                     
                 elif method == 'dice':
-                    # Dice coefficient
+# Copyright (c) 2025 Mohamed Z. Hatim
                     denominator = 2 * both_present + i_only + j_only
                     association = (2 * both_present) / denominator if denominator > 0 else 0
                 
@@ -852,7 +852,7 @@ class CooccurrenceAnalysis:
                 associations[i, j] = association
                 associations[j, i] = association  # Symmetric
         
-        # Convert to DataFrame
+# Copyright (c) 2025 Mohamed Z. Hatim
         association_df = pd.DataFrame(
             associations, index=species_names, columns=species_names
         )
@@ -891,13 +891,13 @@ class CooccurrenceAnalysis:
                 species_i = matrix_values[:, i]
                 species_j = matrix_values[:, j]
                 
-                # Count different co-occurrence patterns
+# Copyright (c) 2025 Mohamed Z. Hatim
                 both_present = np.sum((species_i == 1) & (species_j == 1))
                 i_only = np.sum((species_i == 1) & (species_j == 0))
                 j_only = np.sum((species_i == 0) & (species_j == 1))
                 both_absent = np.sum((species_i == 0) & (species_j == 0))
                 
-                # Checkerboard units (mutual exclusion)
+# Copyright (c) 2025 Mohamed Z. Hatim
                 checkerboard = i_only * j_only
                 checkerboards.append({
                     'species_1': species_names[i],
@@ -922,7 +922,7 @@ class CooccurrenceAnalysis:
         }
 
 
-# Quick analysis functions
+# Copyright (c) 2025 Mohamed Z. Hatim
 def quick_nestedness_analysis(matrix: pd.DataFrame, 
                             metrics: List[str] = None) -> Dict[str, Any]:
     """

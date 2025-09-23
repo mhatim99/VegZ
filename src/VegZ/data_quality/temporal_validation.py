@@ -26,7 +26,7 @@ class TemporalValidator:
             'future_threshold': datetime.now() + timedelta(days=30)  # Future dates threshold
         }
         
-        # Date format patterns
+# Copyright (c) 2025 Mohamed Z. Hatim
         self.date_patterns = [
             r'\d{4}-\d{2}-\d{2}',      # YYYY-MM-DD
             r'\d{2}/\d{2}/\d{4}',      # MM/DD/YYYY
@@ -67,7 +67,7 @@ class TemporalValidator:
             'issues_found': []
         }
         
-        # Create flags DataFrame
+# Copyright (c) 2025 Mohamed Z. Hatim
         flags_df = pd.DataFrame(index=df.index)
         
         for date_col in date_cols:
@@ -77,7 +77,7 @@ class TemporalValidator:
             
             col_results = self._validate_single_date_column(df, date_col)
             
-            # Add flags for this column
+# Copyright (c) 2025 Mohamed Z. Hatim
             for flag_type, flag_data in col_results['flags'].items():
                 flag_col_name = f"{date_col}_{flag_type}"
                 flags_df[flag_col_name] = flag_data
@@ -85,22 +85,22 @@ class TemporalValidator:
             
             results['valid_dates'][date_col] = col_results['valid_dates']
         
-        # Cross-column validation if multiple date columns
+# Copyright (c) 2025 Mohamed Z. Hatim
         if len(date_cols) > 1:
             cross_validation = self._cross_validate_dates(df, date_cols)
             results['cross_validation'] = cross_validation
             
-            # Add cross-validation flags
+# Copyright (c) 2025 Mohamed Z. Hatim
             for flag_type, flag_data in cross_validation['flags'].items():
                 flags_df[flag_type] = flag_data
                 results['flags'][flag_type] = flag_data.sum()
         
-        # Temporal consistency checks
+# Copyright (c) 2025 Mohamed Z. Hatim
         if event_date_col and event_date_col in df.columns:
             consistency_results = self._check_temporal_consistency(df, event_date_col, date_cols)
             results['temporal_consistency'] = consistency_results
         
-        # Add seasonal and phenological validation
+# Copyright (c) 2025 Mohamed Z. Hatim
         seasonal_validation = self._validate_seasonal_patterns(df, date_cols)
         results['seasonal_validation'] = seasonal_validation
         
@@ -117,50 +117,50 @@ class TemporalValidator:
             'parsed_dates': None
         }
         
-        # Try to parse dates
+# Copyright (c) 2025 Mohamed Z. Hatim
         parsed_dates, parse_success = self._parse_dates_robust(df[date_col])
         results['parsed_dates'] = parsed_dates
         
-        # Flag unparseable dates
+# Copyright (c) 2025 Mohamed Z. Hatim
         unparseable = ~parse_success
         results['flags']['unparseable'] = unparseable
         
-        # Flag missing dates
+# Copyright (c) 2025 Mohamed Z. Hatim
         missing = df[date_col].isna()
         results['flags']['missing'] = missing
         
-        # For successfully parsed dates, perform additional checks
+# Copyright (c) 2025 Mohamed Z. Hatim
         valid_mask = parse_success & ~missing
         
         if valid_mask.any():
             valid_dates = parsed_dates[valid_mask]
             
-            # Flag suspicious default dates
+# Copyright (c) 2025 Mohamed Z. Hatim
             suspicious_defaults = self._detect_suspicious_default_dates(parsed_dates)
             results['flags']['suspicious_defaults'] = suspicious_defaults
             
-            # Flag future dates
+# Copyright (c) 2025 Mohamed Z. Hatim
             future_dates = self._detect_future_dates(parsed_dates)
             results['flags']['future_dates'] = future_dates
             
-            # Flag very old dates (before 1800)
+# Copyright (c) 2025 Mohamed Z. Hatim
             very_old = self._detect_very_old_dates(parsed_dates)
             results['flags']['very_old'] = very_old
             
-            # Flag impossible dates (Feb 30, etc.)
+# Copyright (c) 2025 Mohamed Z. Hatim
             impossible = self._detect_impossible_dates(df[date_col], parsed_dates, parse_success)
             results['flags']['impossible'] = impossible
             
-            # Flag dates with suspicious temporal patterns
+# Copyright (c) 2025 Mohamed Z. Hatim
             suspicious_patterns = self._detect_suspicious_temporal_patterns(parsed_dates)
             results['flags']['suspicious_patterns'] = suspicious_patterns
             
-            # Count valid dates
+# Copyright (c) 2025 Mohamed Z. Hatim
             all_flags = (unparseable | missing | suspicious_defaults | 
                         future_dates | very_old | impossible | suspicious_patterns)
             results['valid_dates'] = (~all_flags).sum()
         else:
-            # Initialize empty flags if no valid dates
+# Copyright (c) 2025 Mohamed Z. Hatim
             for flag_type in ['suspicious_defaults', 'future_dates', 'very_old', 
                              'impossible', 'suspicious_patterns']:
                 results['flags'][flag_type] = pd.Series(False, index=df.index)
@@ -172,7 +172,7 @@ class TemporalValidator:
         parsed_dates = pd.Series(pd.NaT, index=date_series.index, dtype='datetime64[ns]')
         parse_success = pd.Series(False, index=date_series.index)
         
-        # First try pandas default parsing
+# Copyright (c) 2025 Mohamed Z. Hatim
         try:
             default_parsed = pd.to_datetime(date_series, errors='coerce', infer_datetime_format=True)
             success_mask = ~default_parsed.isna()
@@ -181,7 +181,7 @@ class TemporalValidator:
         except:
             pass
         
-        # Try additional formats for remaining unparsed dates
+# Copyright (c) 2025 Mohamed Z. Hatim
         remaining_mask = ~parse_success & date_series.notna()
         
         if remaining_mask.any():
@@ -222,10 +222,10 @@ class TemporalValidator:
             default_dt = pd.to_datetime(default_date)
             suspicious |= (parsed_dates == default_dt)
         
-        # Also check for dates on suspicious days (1st, 15th, 31st)
+# Copyright (c) 2025 Mohamed Z. Hatim
         suspicious_days = parsed_dates.dt.day.isin(self.suspicious_patterns['suspicious_days'])
         
-        # Check for January 1st dates (often default)
+# Copyright (c) 2025 Mohamed Z. Hatim
         jan_first = (parsed_dates.dt.month == 1) & (parsed_dates.dt.day == 1)
         
         return suspicious | suspicious_days | jan_first
@@ -245,14 +245,14 @@ class TemporalValidator:
         """Detect dates that look valid but are impossible."""
         impossible = pd.Series(False, index=parsed_dates.index)
         
-        # Check original string for impossible combinations
+# Copyright (c) 2025 Mohamed Z. Hatim
         for idx, (orig, parsed, success) in enumerate(zip(original_series, parsed_dates, parse_success)):
             if not success or pd.isna(parsed) or pd.isna(orig):
                 continue
             
             orig_str = str(orig)
             
-            # Check for impossible day/month combinations
+# Copyright (c) 2025 Mohamed Z. Hatim
             if re.search(r'(02|2)[-/](3[01]|29)', orig_str):  # Feb 30, 31
                 impossible.iloc[idx] = True
             elif re.search(r'(04|4|06|6|09|9|11)[-/](31)', orig_str):  # 30-day months with 31
@@ -269,7 +269,7 @@ class TemporalValidator:
         if len(valid_dates) == 0:
             return suspicious
         
-        # Check for too many identical dates
+# Copyright (c) 2025 Mohamed Z. Hatim
         date_counts = valid_dates.value_counts()
         common_dates = date_counts[date_counts > max(2, len(valid_dates) * 0.1)]
         
@@ -277,7 +277,7 @@ class TemporalValidator:
             for common_date in common_dates.index:
                 suspicious |= (parsed_dates == common_date)
         
-        # Check for unrealistic clustering of dates
+# Copyright (c) 2025 Mohamed Z. Hatim
         if len(valid_dates) > 10:
             date_range = (valid_dates.max() - valid_dates.min()).days
             if date_range < 7 and len(valid_dates) > 5:  # All dates within a week
@@ -295,7 +295,7 @@ class TemporalValidator:
         
         flags_df = pd.DataFrame(index=df.index)
         
-        # Parse all date columns
+# Copyright (c) 2025 Mohamed Z. Hatim
         parsed_dates = {}
         for col in date_cols:
             if col in df.columns:
@@ -305,14 +305,14 @@ class TemporalValidator:
         if len(parsed_dates) < 2:
             return results
         
-        # Check for logical inconsistencies
+# Copyright (c) 2025 Mohamed Z. Hatim
         date_cols_list = list(parsed_dates.keys())
         
         for i in range(len(date_cols_list)):
             for j in range(i + 1, len(date_cols_list)):
                 col1, col2 = date_cols_list[i], date_cols_list[j]
                 
-                # Check if dates are logically consistent
+# Copyright (c) 2025 Mohamed Z. Hatim
                 inconsistent = self._check_date_logic(
                     parsed_dates[col1], parsed_dates[col2], col1, col2
                 )
@@ -340,18 +340,18 @@ class TemporalValidator:
         if not valid_mask.any():
             return inconsistent
         
-        # Define logical relationships based on column names
+# Copyright (c) 2025 Mohamed Z. Hatim
         relationships = self._infer_date_relationships(col1, col2)
         
         for relationship in relationships:
             if relationship == 'before':
-                # col1 should be before col2
+# Copyright (c) 2025 Mohamed Z. Hatim
                 inconsistent[valid_mask] |= (dates1[valid_mask] > dates2[valid_mask])
             elif relationship == 'after':
-                # col1 should be after col2
+# Copyright (c) 2025 Mohamed Z. Hatim
                 inconsistent[valid_mask] |= (dates1[valid_mask] < dates2[valid_mask])
             elif relationship == 'same_year':
-                # Should be in the same year
+# Copyright (c) 2025 Mohamed Z. Hatim
                 inconsistent[valid_mask] |= (
                     dates1[valid_mask].dt.year != dates2[valid_mask].dt.year
                 )
@@ -365,7 +365,7 @@ class TemporalValidator:
         col1_lower = col1.lower()
         col2_lower = col2.lower()
         
-        # Define relationship patterns
+# Copyright (c) 2025 Mohamed Z. Hatim
         before_after_patterns = [
             ('start', 'end'), ('begin', 'end'), ('first', 'last'),
             ('birth', 'death'), ('collection', 'identification'),
@@ -378,7 +378,7 @@ class TemporalValidator:
             elif after_term in col1_lower and before_term in col2_lower:
                 relationships.append('after')
         
-        # Same year patterns
+# Copyright (c) 2025 Mohamed Z. Hatim
         same_year_patterns = ['year', 'annual', 'season']
         if any(pattern in col1_lower and pattern in col2_lower for pattern in same_year_patterns):
             relationships.append('same_year')
@@ -403,14 +403,14 @@ class TemporalValidator:
             
             other_dates, other_success = self._parse_dates_robust(df[date_col])
             
-            # Check consistency
+# Copyright (c) 2025 Mohamed Z. Hatim
             valid_mask = event_success & other_success
             
             if valid_mask.any():
-                # Calculate time differences
+# Copyright (c) 2025 Mohamed Z. Hatim
                 time_diff = (other_dates - event_dates)[valid_mask]
                 
-                # Flag dates with extreme differences (> 1 year)
+# Copyright (c) 2025 Mohamed Z. Hatim
                 extreme_diff = abs(time_diff) > timedelta(days=365)
                 
                 flag_series = pd.Series(False, index=df.index)
@@ -444,21 +444,21 @@ class TemporalValidator:
             if len(valid_dates) == 0:
                 continue
             
-            # Monthly distribution
+# Copyright (c) 2025 Mohamed Z. Hatim
             monthly_dist = valid_dates.dt.month.value_counts().sort_index()
             results['monthly_patterns'][date_col] = monthly_dist.to_dict()
             
-            # Seasonal distribution
+# Copyright (c) 2025 Mohamed Z. Hatim
             seasons = valid_dates.dt.month.map(self._month_to_season)
             seasonal_dist = seasons.value_counts()
             results['seasonal_distribution'][date_col] = seasonal_dist.to_dict()
             
-            # Flag unusual seasonal patterns
-            # (This is simplified - real implementation would consider geographic location)
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
             unusual_seasons = pd.Series(False, index=df.index)
             
-            # Example: Flag December-February flowering in northern hemisphere
-            # This would need to be more sophisticated based on location and species
+# Copyright (c) 2025 Mohamed Z. Hatim
+# Copyright (c) 2025 Mohamed Z. Hatim
             winter_months = valid_dates.dt.month.isin([12, 1, 2])
             if 'flower' in date_col.lower() or 'bloom' in date_col.lower():
                 unusual_seasons[success] = winter_months
@@ -508,7 +508,7 @@ class TemporalValidator:
             
             parsed_dates, success = self._parse_dates_robust(df[date_col])
             
-            # Extract components
+# Copyright (c) 2025 Mohamed Z. Hatim
             result_df[f'{date_col}_year'] = parsed_dates.dt.year
             result_df[f'{date_col}_month'] = parsed_dates.dt.month
             result_df[f'{date_col}_day'] = parsed_dates.dt.day
@@ -549,11 +549,11 @@ class TemporalValidator:
             }
         }
         
-        # Date validation
+# Copyright (c) 2025 Mohamed Z. Hatim
         validation_results = self.validate_dates(df, date_cols, event_date_col)
         report['date_validation'] = validation_results
         
-        # Summary statistics
+# Copyright (c) 2025 Mohamed Z. Hatim
         summary_stats = {}
         for date_col in date_cols:
             if date_col in df.columns:
@@ -571,7 +571,7 @@ class TemporalValidator:
         
         report['summary_statistics'] = summary_stats
         
-        # Recommendations
+# Copyright (c) 2025 Mohamed Z. Hatim
         recommendations = []
         total_flags = validation_results['flags']
         
