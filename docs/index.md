@@ -111,7 +111,7 @@ print(f"NMDS stress: {nmds_results['stress']:.3f}")
 
 # K-means clustering
 kmeans_results = veg.kmeans_clustering(n_clusters=3, transform='hellinger')
-print(f"K-means silhouette score: {kmeans_results['silhouette_score']:.3f}")
+print(f"K-means inertia: {kmeans_results['inertia']:.3f}")
 
 # Hierarchical clustering
 hier_results = veg.hierarchical_clustering(distance_metric='bray_curtis', linkage_method='average')
