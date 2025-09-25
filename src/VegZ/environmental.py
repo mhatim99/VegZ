@@ -462,7 +462,7 @@ class EnvironmentalModeler:
         from .multivariate import MultivariateAnalyzer
         
         mv_analyzer = MultivariateAnalyzer()
-        cca_results = mv_analyzer.canonical_correspondence_analysis(species_data, env_data)
+        cca_results = mv_analyzer.cca_analysis(species_data, env_data)
         
 # Copyright (c) 2025 Mohamed Z. Hatim
         gradient_results = {
@@ -488,7 +488,7 @@ class EnvironmentalModeler:
         from .multivariate import MultivariateAnalyzer
         
         mv_analyzer = MultivariateAnalyzer()
-        dca_results = mv_analyzer.detrended_correspondence_analysis(species_data)
+        dca_results = mv_analyzer.dca_analysis(species_data)
         
 # Copyright (c) 2025 Mohamed Z. Hatim
         axis_env_correlations = {}
@@ -526,7 +526,7 @@ class EnvironmentalModeler:
         from .multivariate import MultivariateAnalyzer
         
         mv_analyzer = MultivariateAnalyzer()
-        rda_results = mv_analyzer.redundancy_analysis(species_data, env_data)
+        rda_results = mv_analyzer.rda_analysis(species_data, env_data)
         
         gradient_results = {
             'method': 'RDA',

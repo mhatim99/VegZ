@@ -5,6 +5,61 @@ All notable changes to VegZ will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-01-16
+
+### Added
+
+#### Scientific Method Abbreviations for Professional Use
+- **Abbreviated multivariate analysis method names** for professional ecological workflow:
+  - `ca_analysis()` - Correspondence Analysis (abbreviated from `correspondence_analysis()`)
+  - `dca_analysis()` - Detrended Correspondence Analysis (abbreviated from `detrended_correspondence_analysis()`)
+  - `cca_analysis()` - Canonical Correspondence Analysis (abbreviated from `canonical_correspondence_analysis()`)
+  - `rda_analysis()` - Redundancy Analysis (abbreviated from `redundancy_analysis()`)
+  - `pcoa_analysis()` - Principal Coordinates Analysis (abbreviated from `principal_coordinates_analysis()`)
+- **Full backward compatibility** - all existing method names continue to work unchanged
+- **Professional ecological nomenclature** following scientific conventions
+
+#### Enhanced Ecological Terminology
+- **Domain-specific terminology improvements**:
+  - Use of "sites" instead of generic "samples" for ecological sampling locations
+  - Improved consistency in ecological terminology throughout package
+  - Enhanced professional language in method documentation
+- **Systematic terminology standardization** across all modules
+- **Maintains backward compatibility** with existing data structures
+
+### Enhanced
+
+#### Documentation and Examples
+- **Complete manual verification** - all documentation examples tested and verified to work correctly
+- **Fixed example inconsistencies**:
+  - Corrected key structure differences between VegZ and MultivariateAnalyzer classes
+  - Fixed environmental fitting examples to use correct result keys
+  - Updated goodness of fit examples with proper key names
+  - Corrected cumulative variance calculations for MultivariateAnalyzer
+- **Comprehensive systematic testing** of all manual examples
+- **Professional method name updates** in documentation
+
+#### Code Quality and Consistency
+- **Systematic package review** for terminology consistency
+- **Method name standardization** following scientific abbreviation conventions
+- **Enhanced error handling** for method compatibility
+- **Improved API consistency** across all analysis modules
+
+### Fixed
+- **Manual example corrections**:
+  - Fixed PCA key structure differences between classes (VegZ uses 'scores', MultivariateAnalyzer uses 'site_scores')
+  - Corrected environmental vector fitting result parsing
+  - Fixed goodness of fit correlation key references
+  - Updated cumulative variance calculations for MultivariateAnalyzer class
+- **Method accessibility issues** resolved through proper alias implementation
+- **Documentation accuracy** - all examples now work correctly
+
+### Technical Improvements
+- **Comprehensive method compatibility** with backward compatibility aliases
+- **Enhanced class structure consistency** between VegZ and MultivariateAnalyzer
+- **Improved error detection and reporting** for method calls
+- **Systematic testing framework** for documentation examples
+
 ## [1.1.0] - 2025-09-23
 
 ### Added

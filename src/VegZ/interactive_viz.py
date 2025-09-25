@@ -757,7 +757,7 @@ class ReportGenerator:
 **Generated:** {{ timestamp }}
 
 {% if data_summary %}
-## Data Summary
+# Copyright (c) 2025 Mohamed Z. Hatim
 
 - **Sites:** {{ data_summary.get('n_sites', 'N/A') }}
 - **Species:** {{ data_summary.get('n_species', 'N/A') }}  
@@ -765,7 +765,7 @@ class ReportGenerator:
 {% endif %}
 
 {% if summary_stats %}
-## Analysis Summary
+# Copyright (c) 2025 Mohamed Z. Hatim
 
 {% for stat in summary_stats %}
 - {{ stat }}
@@ -773,10 +773,10 @@ class ReportGenerator:
 {% endif %}
 
 {% for analysis_type, analysis_results in results.items() %}
-## {{ analysis_type.replace('_', ' ').title() }}
+# Copyright (c) 2025 Mohamed Z. Hatim
 
 {% if analysis_type == 'diversity' %}
-### Key Results
+# Copyright (c) 2025 Mohamed Z. Hatim
 - Analysis completed with {{ analysis_results.diversity_indices|length if analysis_results.diversity_indices else 0 }} sites
 {% endif %}
 

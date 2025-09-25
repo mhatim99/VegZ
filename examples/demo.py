@@ -137,9 +137,9 @@ def main():
     # Copyright (c) 2025 Mohamed Z. Hatim
     stats = veg.summary_statistics()
     print(f"\n📈 Dataset Summary:")
-    print(f"   • Total sites: {stats['n_samples']}")
+    print(f"   • Total sites: {stats['n_sites']}")
     print(f"   • Total species: {stats['n_species']}")
-    print(f"   • Mean species per site: {stats['mean_species_per_sample']:.1f}")
+    print(f"   • Mean species per site: {stats['mean_species_per_site']:.1f}")
     print(f"   • Total abundance: {stats['total_abundance']}")
     
     print("\n" + "=" * 60)

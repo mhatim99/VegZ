@@ -35,11 +35,11 @@ class MultivariateAnalyzer:
             'chord': self._chord_distance,
             'hellinger': self._hellinger_distance
         }
-    
-# Copyright (c) 2025 Mohamed Z. Hatim
-# Copyright (c) 2025 Mohamed Z. Hatim
-# Copyright (c) 2025 Mohamed Z. Hatim
-    
+
+        # Copyright (c) 2025 Mohamed Z. Hatim
+        # Copyright (c) 2025 Mohamed Z. Hatim
+        # Copyright (c) 2025 Mohamed Z. Hatim
+
     def pca_analysis(self, data: pd.DataFrame,
                     transform: str = 'hellinger',
                     n_components: Optional[int] = None) -> Dict[str, Any]:
@@ -62,9 +62,9 @@ class MultivariateAnalyzer:
         """
         from sklearn.decomposition import PCA
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         if transform == 'hellinger':
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
             transformed_data = np.sqrt(data.div(data.sum(axis=1), axis=0).fillna(0))
         elif transform == 'log':
             transformed_data = np.log1p(data)
@@ -80,14 +80,14 @@ class MultivariateAnalyzer:
         else:
             transformed_data = data
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         if n_components is None:
             n_components = min(data.shape[0] - 1, data.shape[1])
         
         pca = PCA(n_components=n_components)
         site_scores = pca.fit_transform(transformed_data)
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         species_scores = pca.components_.T * np.sqrt(pca.explained_variance_)
         
         results = {
@@ -141,7 +141,7 @@ class MultivariateAnalyzer:
         from sklearn.manifold import MDS
         from scipy.spatial.distance import squareform, pdist
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         if distance_metric == 'bray_curtis':
             distances = pdist(data.values, metric='braycurtis')
         elif distance_metric == 'jaccard':
@@ -153,7 +153,7 @@ class MultivariateAnalyzer:
         
         distance_matrix = squareform(distances)
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         mds = MDS(
             n_components=n_dimensions,
             metric=False,  # Non-metric MDS
@@ -183,77 +183,88 @@ class MultivariateAnalyzer:
         }
         
         return results
-    
-    def correspondence_analysis(self, data: pd.DataFrame,
-                              scaling: int = 1) -> Dict[str, Any]:
+
+    def ca_analysis(self, data: pd.DataFrame,
+                   scaling: int = 1) -> Dict[str, Any]:
         """
         Correspondence Analysis (CA) - reciprocal averaging.
-        
+
+        Alias for correspondence_analysis(). Use this abbreviated form for new code.
+
         Parameters:
         -----------
         data : pd.DataFrame
             Species abundance matrix (sites x species)
         scaling : int
             Scaling type (1 or 2)
-            
+
         Returns:
         --------
         dict
             CA results including scores, eigenvalues, and diagnostics
         """
-# Copyright (c) 2025 Mohamed Z. Hatim
+        return self.correspondence_analysis(data, scaling)
+
+    def correspondence_analysis(self, data: pd.DataFrame, scaling: int = 1) -> Dict[str, Any]:
+        """
+        Correspondence Analysis (CA).
+
+        This method is kept for backward compatibility.
+        Use ca_analysis() for new code.
+        """
+    # Copyright (c) 2025 Mohamed Z. Hatim
         data_clean = data.loc[(data.sum(axis=1) > 0), (data.sum(axis=0) > 0)]
-        
+
         if data_clean.empty:
             raise ValueError("Data matrix is empty after removing zero rows/columns")
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
+    # Copyright (c) 2025 Mohamed Z. Hatim
         X = data_clean.values.astype(float)
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
+    # Copyright (c) 2025 Mohamed Z. Hatim
         n, p = X.shape
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
+    # Copyright (c) 2025 Mohamed Z. Hatim
         grand_total = X.sum()
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
+    # Copyright (c) 2025 Mohamed Z. Hatim
         row_totals = X.sum(axis=1)
         col_totals = X.sum(axis=0)
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
+    # Copyright (c) 2025 Mohamed Z. Hatim
         expected = np.outer(row_totals, col_totals) / grand_total
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
+    # Copyright (c) 2025 Mohamed Z. Hatim
         residuals = (X - expected) / np.sqrt(expected)
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
+    # Copyright (c) 2025 Mohamed Z. Hatim
         residuals = np.nan_to_num(residuals, nan=0.0, posinf=0.0, neginf=0.0)
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
+    # Copyright (c) 2025 Mohamed Z. Hatim
         U, s, Vt = svd(residuals, full_matrices=False)
         V = Vt.T
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
+    # Copyright (c) 2025 Mohamed Z. Hatim
         eigenvalues = s**2
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
+    # Copyright (c) 2025 Mohamed Z. Hatim
         total_inertia = eigenvalues.sum()
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
+    # Copyright (c) 2025 Mohamed Z. Hatim
         explained_variance = eigenvalues / total_inertia if total_inertia > 0 else eigenvalues
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
+    # Copyright (c) 2025 Mohamed Z. Hatim
         if scaling == 1:
             site_scores = U @ np.diag(s) / np.sqrt(row_totals[:, np.newaxis])
             species_scores = V
         else:  # scaling 2: distances among species preserved
             site_scores = U
             species_scores = V @ np.diag(s) / np.sqrt(col_totals[:, np.newaxis])
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
+    # Copyright (c) 2025 Mohamed Z. Hatim
         site_scores = np.nan_to_num(site_scores, nan=0.0, posinf=0.0, neginf=0.0)
         species_scores = np.nan_to_num(species_scores, nan=0.0, posinf=0.0, neginf=0.0)
-        
+
         results = {
             'site_scores': pd.DataFrame(
                 site_scores,
@@ -271,11 +282,11 @@ class MultivariateAnalyzer:
             'scaling': scaling,
             'method': 'CA'
         }
-        
+
         return results
-    
-    def detrended_correspondence_analysis(self, data: pd.DataFrame,
-                                        segments: int = 26) -> Dict[str, Any]:
+
+    def dca_analysis(self, data: pd.DataFrame,
+                     segments: int = 26) -> Dict[str, Any]:
         """
         Detrended Correspondence Analysis (DCA).
         
@@ -291,19 +302,19 @@ class MultivariateAnalyzer:
         dict
             DCA results
         """
-# Copyright (c) 2025 Mohamed Z. Hatim
-        ca_results = self.correspondence_analysis(data)
+    # Copyright (c) 2025 Mohamed Z. Hatim
+        ca_results = self.ca_analysis(data)
         
         site_scores = ca_results['site_scores'].values
         species_scores = ca_results['species_scores'].values
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         detrended_site_scores = site_scores.copy()
         detrended_species_scores = species_scores.copy()
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         if site_scores.shape[1] > 1:
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
             axis1_range = site_scores[:, 0].max() - site_scores[:, 0].min()
             segment_width = axis1_range / segments
             
@@ -311,17 +322,17 @@ class MultivariateAnalyzer:
                 segment_min = site_scores[:, 0].min() + i * segment_width
                 segment_max = segment_min + segment_width
                 
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
                 in_segment = (site_scores[:, 0] >= segment_min) & (site_scores[:, 0] <= segment_max)
                 
                 if in_segment.sum() > 1:
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
                     segment_mean = site_scores[in_segment, 1].mean()
                     
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
                     detrended_site_scores[in_segment, 1] -= segment_mean
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         for axis in range(detrended_site_scores.shape[1]):
             if detrended_site_scores[:, axis].std() > 0:
                 detrended_site_scores[:, axis] /= detrended_site_scores[:, axis].std()
@@ -341,9 +352,18 @@ class MultivariateAnalyzer:
             'gradient_lengths': self._calculate_gradient_lengths(detrended_site_scores),
             'method': 'DCA'
         }
-        
+
         return results
-    
+
+    def detrended_correspondence_analysis(self, data: pd.DataFrame, segments: int = 26) -> Dict[str, Any]:
+        """
+        Detrended Correspondence Analysis (DCA) - alias for dca_analysis.
+
+        This method is kept for backward compatibility.
+        Use dca_analysis() for new code.
+        """
+        return self.dca_analysis(data, segments)
+
     def canonical_correspondence_analysis(self, species_data: pd.DataFrame,
                                         env_data: pd.DataFrame,
                                         scaling: int = 1) -> Dict[str, Any]:
@@ -364,12 +384,12 @@ class MultivariateAnalyzer:
         dict
             CCA results
         """
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         common_index = species_data.index.intersection(env_data.index)
         species_aligned = species_data.loc[common_index]
         env_aligned = env_data.loc[common_index]
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         complete_cases = ~env_aligned.isnull().any(axis=1)
         species_complete = species_aligned.loc[complete_cases]
         env_complete = env_aligned.loc[complete_cases]
@@ -377,44 +397,44 @@ class MultivariateAnalyzer:
         if len(species_complete) == 0:
             raise ValueError("No complete cases found")
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         scaler = StandardScaler()
         env_std = scaler.fit_transform(env_complete)
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         X = species_complete.values
         Z = env_std
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         row_totals = X.sum(axis=1)
         row_weights = row_totals / row_totals.sum()
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         W_diag = np.diag(row_weights)
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         Y = X / row_totals[:, np.newaxis]  # Profiles
         Y = np.nan_to_num(Y, nan=0.0, posinf=0.0, neginf=0.0)
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         try:
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
             U, s, Vt = svd(Z.T @ W_diag @ Y, full_matrices=False)
             
             eigenvalues = s**2
             
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
             site_scores = Z @ U
             
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
             species_scores = Y.T @ W_diag @ Z @ U
             
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
             env_scores = U.T
             
         except np.linalg.LinAlgError:
             warnings.warn("CCA computation failed, using simplified approach")
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
             eigenvalues = np.array([1.0])
             site_scores = np.column_stack([np.arange(len(species_complete))])
             species_scores = np.column_stack([np.arange(len(species_complete.columns))])
@@ -465,8 +485,8 @@ class MultivariateAnalyzer:
         """
         return self.canonical_correspondence_analysis(species_data, env_data, scaling)
     
-    def redundancy_analysis(self, species_data: pd.DataFrame,
-                           env_data: pd.DataFrame) -> Dict[str, Any]:
+    def rda_analysis(self, species_data: pd.DataFrame,
+                     env_data: pd.DataFrame) -> Dict[str, Any]:
         """
         Redundancy Analysis (RDA).
         
@@ -482,12 +502,12 @@ class MultivariateAnalyzer:
         dict
             RDA results
         """
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         common_index = species_data.index.intersection(env_data.index)
         species_aligned = species_data.loc[common_index]
         env_aligned = env_data.loc[common_index]
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         complete_cases = ~env_aligned.isnull().any(axis=1)
         species_complete = species_aligned.loc[complete_cases]
         env_complete = env_aligned.loc[complete_cases]
@@ -495,33 +515,33 @@ class MultivariateAnalyzer:
         if len(species_complete) == 0:
             raise ValueError("No complete cases found")
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         species_scaler = StandardScaler()
         env_scaler = StandardScaler()
         
         Y = species_scaler.fit_transform(species_complete)
         X = env_scaler.fit_transform(env_complete)
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         try:
-# Copyright (c) 2025 Mohamed Z. Hatim
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
             XtX_inv = np.linalg.pinv(X.T @ X)
             projection_matrix = X @ XtX_inv @ X.T
             Y_fitted = projection_matrix @ Y
             
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
             U, s, Vt = svd(Y_fitted, full_matrices=False)
             
             eigenvalues = s**2
             
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
             site_scores_constrained = U @ np.diag(s)
             
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
             species_scores = Vt.T
             
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
             env_scores = XtX_inv @ X.T @ Y_fitted
             
         except np.linalg.LinAlgError:
@@ -552,11 +572,20 @@ class MultivariateAnalyzer:
             'explained_variance_ratio': eigenvalues / eigenvalues.sum() if eigenvalues.sum() > 0 else eigenvalues,
             'method': 'RDA'
         }
-        
+
         return results
-    
-    def principal_coordinates_analysis(self, data: pd.DataFrame,
-                                     distance_metric: str = 'bray_curtis') -> Dict[str, Any]:
+
+    def redundancy_analysis(self, species_data: pd.DataFrame, env_data: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Redundancy Analysis (RDA) - alias for rda_analysis.
+
+        This method is kept for backward compatibility.
+        Use rda_analysis() for new code.
+        """
+        return self.rda_analysis(species_data, env_data)
+
+    def pcoa_analysis(self, data: pd.DataFrame,
+                      distance_metric: str = 'bray_curtis') -> Dict[str, Any]:
         """
         Principal Coordinates Analysis (PCoA).
         
@@ -572,7 +601,7 @@ class MultivariateAnalyzer:
         dict
             PCoA results
         """
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         if distance_metric in self.distance_metrics:
             distances = self.distance_metrics[distance_metric](data.values)
         else:
@@ -580,25 +609,25 @@ class MultivariateAnalyzer:
         
         distance_matrix = squareform(distances)
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         n = len(distance_matrix)
         H = np.eye(n) - np.ones((n, n)) / n
         B = -0.5 * H @ (distance_matrix**2) @ H
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         eigenvalues, eigenvectors = eig(B)
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         idx = np.argsort(eigenvalues)[::-1]
         eigenvalues = eigenvalues[idx].real
         eigenvectors = eigenvectors[:, idx].real
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         positive_eigenvalues = eigenvalues > 1e-8
         eigenvalues = eigenvalues[positive_eigenvalues]
         eigenvectors = eigenvectors[:, positive_eigenvalues]
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         coordinates = eigenvectors @ np.diag(np.sqrt(eigenvalues))
         
         results = {
@@ -615,10 +644,19 @@ class MultivariateAnalyzer:
         }
         
         return results
-    
-# Copyright (c) 2025 Mohamed Z. Hatim
-# Copyright (c) 2025 Mohamed Z. Hatim
-# Copyright (c) 2025 Mohamed Z. Hatim
+
+    def principal_coordinates_analysis(self, data: pd.DataFrame, distance_metric: str = 'bray_curtis') -> Dict[str, Any]:
+        """
+        Principal Coordinates Analysis (PCoA) - alias for pcoa_analysis.
+
+        This method is kept for backward compatibility.
+        Use pcoa_analysis() for new code.
+        """
+        return self.pcoa_analysis(data, distance_metric)
+
+    # Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
     
     def _bray_curtis_distance(self, data: np.ndarray) -> np.ndarray:
         """Calculate Bray-Curtis distance."""
@@ -641,7 +679,7 @@ class MultivariateAnalyzer:
     
     def _jaccard_distance(self, data: np.ndarray) -> np.ndarray:
         """Calculate Jaccard distance."""
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         binary_data = (data > 0).astype(int)
         
         n_samples = binary_data.shape[0]
@@ -696,7 +734,7 @@ class MultivariateAnalyzer:
     
     def _chord_distance(self, data: np.ndarray) -> np.ndarray:
         """Calculate chord distance."""
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         norms = np.sqrt(np.sum(data**2, axis=1))
         norms[norms == 0] = 1  # Avoid division by zero
         normalized_data = data / norms[:, np.newaxis]
@@ -705,7 +743,7 @@ class MultivariateAnalyzer:
     
     def _hellinger_distance(self, data: np.ndarray) -> np.ndarray:
         """Calculate Hellinger distance."""
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         row_sums = np.sum(data, axis=1)
         row_sums[row_sums == 0] = 1
         proportions = data / row_sums[:, np.newaxis]
@@ -713,9 +751,9 @@ class MultivariateAnalyzer:
         
         return pdist(hellinger_data, metric='euclidean')
     
-# Copyright (c) 2025 Mohamed Z. Hatim
-# Copyright (c) 2025 Mohamed Z. Hatim
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
     
     def _calculate_gradient_lengths(self, site_scores: np.ndarray) -> np.ndarray:
         """Calculate gradient lengths for DCA axes."""
@@ -746,10 +784,10 @@ class MultivariateAnalyzer:
         """
         from scipy.spatial.distance import procrustes
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         mtx1, mtx2, disparity = procrustes(data1, data2)
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         correlation = np.corrcoef(mtx1.flatten(), mtx2.flatten())[0, 1]
         
         results = {
@@ -782,7 +820,7 @@ class MultivariateAnalyzer:
         dict
             Environmental fitting results
         """
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         common_index = ordination_scores.index.intersection(env_data.index)
         scores_aligned = ordination_scores.loc[common_index]
         env_aligned = env_data.loc[common_index]
@@ -795,12 +833,12 @@ class MultivariateAnalyzer:
         }
         
         if method == 'vector':
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
             for env_var in env_aligned.columns:
                 if env_aligned[env_var].notna().sum() < 3:
                     continue
                 
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
                 valid_data = env_aligned[env_var].notna()
                 
                 if valid_data.sum() < 3:
@@ -809,23 +847,23 @@ class MultivariateAnalyzer:
                 X = scores_aligned.loc[valid_data].values
                 y = env_aligned.loc[valid_data, env_var].values
                 
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
                 try:
                     from sklearn.linear_model import LinearRegression
                     
                     reg = LinearRegression()
                     reg.fit(X, y)
                     
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
                     r_squared = reg.score(X, y)
                     
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
                     direction_cosines = reg.coef_
                     
                     results['environmental_vectors'][env_var] = direction_cosines
                     results['r_squared'][env_var] = r_squared
                     
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
                     n_samples = len(y)
                     n_axes = X.shape[1]
                     
@@ -835,7 +873,7 @@ class MultivariateAnalyzer:
                         results['p_values'][env_var] = p_value
                 
                 except ImportError:
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
                     correlation = np.corrcoef(X[:, 0], y)[0, 1] if X.shape[1] > 0 else 0
                     results['environmental_vectors'][env_var] = [correlation, 0]
                     results['r_squared'][env_var] = correlation**2
@@ -863,7 +901,7 @@ class MultivariateAnalyzer:
         dict
             Goodness of fit statistics
         """
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         if 'site_scores' in ordination_results:
             ord_scores = ordination_results['site_scores']
         elif 'scores' in ordination_results:
@@ -873,22 +911,22 @@ class MultivariateAnalyzer:
         else:
             raise ValueError("No ordination scores found in results")
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         if distance_metric in self.distance_metrics:
             orig_distances = self.distance_metrics[distance_metric](original_data.values)
         else:
             orig_distances = pdist(original_data.values, metric=distance_metric)
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         ord_distances = pdist(ord_scores.values, metric='euclidean')
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         correlation = np.corrcoef(orig_distances, ord_distances)[0, 1]
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         stress = np.sqrt(np.sum((orig_distances - ord_distances)**2) / np.sum(ord_distances**2))
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+    # Copyright (c) 2025 Mohamed Z. Hatim
         shepard_data = pd.DataFrame({
             'original_distance': orig_distances,
             'ordination_distance': ord_distances

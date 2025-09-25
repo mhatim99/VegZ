@@ -241,6 +241,7 @@ print(f"Jackknife2 range: {jack2.min():.1f} - {jack2.max():.1f}")
 
 ```python
 from VegZ import MultivariateAnalyzer
+import numpy as np
 
 multivar = MultivariateAnalyzer()
 
@@ -248,7 +249,8 @@ multivar = MultivariateAnalyzer()
 pca_results = multivar.pca_analysis(data, transform='hellinger')
 print("PCA Analysis:")
 print(f"Explained variance ratio: {pca_results['explained_variance_ratio'][:3]}")
-print(f"Cumulative variance: {pca_results['cumulative_variance'][:3]}")
+cumulative_variance = np.cumsum(pca_results['explained_variance_ratio'])
+print(f"Cumulative variance: {cumulative_variance[:3]}")
 
 # NMDS Analysis
 nmds_results = multivar.nmds_analysis(
@@ -265,7 +267,7 @@ ca_results = multivar.correspondence_analysis(data, scaling=1)
 print("CA Analysis completed")
 print(f"Available keys: {list(ca_results.keys())}")
 
-# Detrended Correspondence Analysis (DCA) - correct method name
+# Detrended Correspondence Analysis (DCA)
 dca_results = multivar.detrended_correspondence_analysis(data, segments=26)
 print("DCA Analysis completed")
 print(f"Gradient lengths: {dca_results['gradient_lengths']}")
@@ -282,19 +284,19 @@ env_data = pd.DataFrame({
     'Elevation': np.random.uniform(100, 2000, n_sites)
 })
 
-# Canonical Correspondence Analysis (CCA) - correct parameter name
+# Canonical Correspondence Analysis (CCA)
 cca_results = multivar.canonical_correspondence_analysis(
     species_data=data,
-    env_data=env_data,  # Note: correct parameter name
+    env_data=env_data,
     scaling=1
 )
 print("CCA Analysis completed")
 print(f"Eigenvalues: {cca_results['eigenvalues'][:3]}")
 print(f"Species-environment correlations: {cca_results['species_env_correlation'][:3]}")
 
-# Alternative method name (same function)
+# Alternative abbreviated method name (same function)
 cca_results2 = multivar.cca_analysis(species_data=data, env_data=env_data)
-print("CCA using cca_analysis method completed")
+print("CCA using abbreviated method completed")
 ```
 
 ### Environmental Vector Fitting
@@ -302,15 +304,17 @@ print("CCA using cca_analysis method completed")
 ```python
 # Environmental vector fitting
 env_fit = multivar.environmental_fitting(
-    ordination_scores=pca_results['scores'].iloc[:, :2],  # First 2 PC axes
+    ordination_scores=pca_results['site_scores'].iloc[:, :2],  # First 2 PC axes
     env_data=env_data,
     method='vector'
 )
 
 print("Environmental vector fitting:")
 print("Significant vectors (p < 0.05):")
-significant_vectors = env_fit['vectors'][env_fit['vectors']['p_value'] < 0.05]
-print(significant_vectors[['r2', 'p_value']])
+for env_var, p_value in env_fit['p_values'].items():
+    if p_value < 0.05:
+        r2_value = env_fit['r_squared'][env_var]
+        print(f"  {env_var}: R² = {r2_value:.3f}, p = {p_value:.3f}")
 ```
 
 ### Goodness of Fit
@@ -324,7 +328,7 @@ gof_results = multivar.goodness_of_fit_test(
 )
 
 print("Goodness of fit:")
-print(f"Procrustes correlation: {gof_results['procrustes_correlation']:.3f}")
+print(f"Correlation: {gof_results['correlation']:.3f}")
 print(f"Stress: {gof_results['stress']:.3f}")
 ```
 
@@ -1327,7 +1331,7 @@ This manual provides complete, verified examples for all major VegZ functionalit
 
 - **VegZ**: `calculate_diversity()`, `pca_analysis()`, `nmds_analysis()`, `kmeans_clustering()`
 - **DiversityAnalyzer**: `calculate_all_indices()`, `calculate_index()`, `hill_numbers()`
-- **MultivariateAnalyzer**: `pca_analysis()`, `detrended_correspondence_analysis()`, `canonical_correspondence_analysis()`
+- **MultivariateAnalyzer**: `pca_analysis()`, `correspondence_analysis()`, `detrended_correspondence_analysis()`, `cca_analysis()`, `redundancy_analysis()`, `principal_coordinates_analysis()`
 - **VegetationClustering**: `kmeans_clustering()`, `fuzzy_cmeans_clustering()`, `comprehensive_elbow_analysis()`
 - **EcologicalStatistics**: `permanova()`, `anosim()`, `mantel_test()`, `indicator_species_analysis()`
 - **SpatialAnalyzer**: `spatial_interpolation()`, `spatial_autocorrelation()`

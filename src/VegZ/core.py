@@ -685,13 +685,13 @@ class VegZ:
             raise ValueError("Species matrix not available")
         
         stats = {
-            'n_samples': len(self.species_matrix),
+            'n_sites': len(self.species_matrix),
             'n_species': len(self.species_matrix.columns),
             'total_abundance': self.species_matrix.sum().sum(),
-            'mean_species_per_sample': (self.species_matrix > 0).sum(axis=1).mean(),
-            'mean_abundance_per_sample': self.species_matrix.sum(axis=1).mean(),
+            'mean_species_per_site': (self.species_matrix > 0).sum(axis=1).mean(),
+            'mean_abundance_per_site': self.species_matrix.sum(axis=1).mean(),
             'species_occurrence_frequency': (self.species_matrix > 0).sum(axis=0).describe(),
-            'sample_abundance_distribution': self.species_matrix.sum(axis=1).describe()
+            'site_abundance_distribution': self.species_matrix.sum(axis=1).describe()
         }
         
         return stats

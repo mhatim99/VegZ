@@ -1120,33 +1120,33 @@ class VegetationClustering:
         best_k = None
         best_score = float('inf')
         
-        # Try different split points
+        # Copyright (c) 2025 Mohamed Z. Hatim
         for split_idx in range(2, len(inertias) - 1):
-            # Fit lines to left and right parts
+            # Copyright (c) 2025 Mohamed Z. Hatim
             left_x = np.array(k_values[:split_idx])
             left_y = np.array(inertias[:split_idx])
             right_x = np.array(k_values[split_idx:])
             right_y = np.array(inertias[split_idx:])
             
-            # Linear regression for both parts
+            # Copyright (c) 2025 Mohamed Z. Hatim
             try:
                 left_coef = np.polyfit(left_x, left_y, 1)
                 right_coef = np.polyfit(right_x, right_y, 1)
                 
-                # Calculate R-squared for both fits
+                # Copyright (c) 2025 Mohamed Z. Hatim
                 left_pred = np.polyval(left_coef, left_x)
                 right_pred = np.polyval(right_coef, right_x)
                 
                 left_r2 = 1 - np.sum((left_y - left_pred)**2) / np.sum((left_y - np.mean(left_y))**2)
                 right_r2 = 1 - np.sum((right_y - right_pred)**2) / np.sum((right_y - np.mean(right_y))**2)
                 
-                # Combined score (weighted by segment length)
+                # Copyright (c) 2025 Mohamed Z. Hatim
                 left_weight = len(left_x) / len(k_values)
                 right_weight = len(right_x) / len(k_values)
                 
                 combined_r2 = left_weight * left_r2 + right_weight * right_r2
                 
-                # Lower score is better (we want high R-squared, so use negative)
+                # Copyright (c) 2025 Mohamed Z. Hatim
                 score = -combined_r2
                 
                 if score < best_score:
@@ -1164,11 +1164,11 @@ class VegetationClustering:
         metrics = results['metrics']
         elbow_points = results['elbow_points']
         
-        # Create subplots
+        # Copyright (c) 2025 Mohamed Z. Hatim
         fig, axes = plt.subplots(2, 2, figsize=(15, 12))
         fig.suptitle('Comprehensive Elbow Analysis for Optimal K Selection', fontsize=16)
         
-        # Plot 1: Inertia (Elbow) curve with detected elbows
+        # Copyright (c) 2025 Mohamed Z. Hatim
         ax1 = axes[0, 0]
         ax1.plot(k_values, metrics['inertia'], 'bo-', linewidth=2, markersize=8)
         ax1.set_xlabel('Number of Clusters (k)')
@@ -1176,7 +1176,7 @@ class VegetationClustering:
         ax1.set_title('Elbow Method - Inertia Curve')
         ax1.grid(True, alpha=0.3)
         
-        # Mark elbow points
+        # Copyright (c) 2025 Mohamed Z. Hatim
         colors = ['red', 'orange', 'green', 'purple', 'brown']
         for i, (method, elbow_k) in enumerate(elbow_points.items()):
             if elbow_k and elbow_k in k_values:
@@ -1185,7 +1185,7 @@ class VegetationClustering:
                            linestyle='--', alpha=0.7, label=f'{method}: k={elbow_k}')
         ax1.legend()
         
-        # Plot 2: Silhouette scores
+        # Copyright (c) 2025 Mohamed Z. Hatim
         ax2 = axes[0, 1]
         silhouette_k = k_values[1:]  # Skip k=1
         silhouette_scores = metrics['silhouette_scores'][1:]
@@ -1201,7 +1201,7 @@ class VegetationClustering:
                        label=f'Best: k={best_silhouette_k}')
             ax2.legend()
         
-        # Plot 3: Calinski-Harabasz scores
+        # Copyright (c) 2025 Mohamed Z. Hatim
         ax3 = axes[1, 0]
         calinski_k = k_values[1:]  # Skip k=1
         calinski_scores = metrics['calinski_harabasz_scores'][1:]
@@ -1217,11 +1217,11 @@ class VegetationClustering:
                        label=f'Best: k={best_calinski_k}')
             ax3.legend()
         
-        # Plot 4: Davies-Bouldin scores (lower is better)
+        # Copyright (c) 2025 Mohamed Z. Hatim
         ax4 = axes[1, 1]
         db_k = k_values[1:]  # Skip k=1
         db_scores = metrics['davies_bouldin_scores'][1:]
-        # Filter out infinite values for plotting
+        # Copyright (c) 2025 Mohamed Z. Hatim
         finite_db = [(k, score) for k, score in zip(db_k, db_scores) if np.isfinite(score)]
         if finite_db:
             finite_k, finite_scores = zip(*finite_db)
@@ -1246,23 +1246,23 @@ class VegetationClustering:
     
     def _find_elbow_point(self, k_values: List[int], inertias: List[float]) -> int:
         """Find elbow point in inertia curve using knee locator method."""
-        # Use the more sophisticated knee locator method
+        # Copyright (c) 2025 Mohamed Z. Hatim
         elbow_k = self._knee_locator_method(k_values, inertias)
         if elbow_k is not None:
             return elbow_k
         
-        # Fallback to simple derivative method
+        # Copyright (c) 2025 Mohamed Z. Hatim
         if len(inertias) < 3:
             return k_values[0]
         
-        # Calculate second differences
+        # Copyright (c) 2025 Mohamed Z. Hatim
         first_diff = np.diff(inertias)
         second_diff = np.diff(first_diff)
         
-        # Find point with maximum second derivative (elbow)
+        # Copyright (c) 2025 Mohamed Z. Hatim
         elbow_idx = np.argmax(np.abs(second_diff)) + 1  # +1 because of double diff
         
-        # Ensure we're within bounds
+        # Copyright (c) 2025 Mohamed Z. Hatim
         elbow_idx = min(elbow_idx, len(k_values) - 1)
         
         return k_values[elbow_idx]
@@ -1272,11 +1272,11 @@ class VegetationClustering:
         gap_stats = []
         
         for k in k_range:
-            # Observed within-cluster sum of squares
+            # Copyright (c) 2025 Mohamed Z. Hatim
             kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
             labels = kmeans.fit_predict(data.values)
             
-            # Calculate WCSS
+            # Copyright (c) 2025 Mohamed Z. Hatim
             wcss_obs = 0
             for i in range(k):
                 cluster_points = data.values[labels == i]
@@ -1284,12 +1284,12 @@ class VegetationClustering:
                     centroid = np.mean(cluster_points, axis=0)
                     wcss_obs += np.sum((cluster_points - centroid) ** 2)
             
-            # Expected WCSS from reference distribution
+            # Copyright (c) 2025 Mohamed Z. Hatim
             n_refs = 10  # Number of reference datasets
             ref_wcss = []
             
             for _ in range(n_refs):
-                # Generate reference data with same bounds as original
+                # Copyright (c) 2025 Mohamed Z. Hatim
                 ref_data = np.random.uniform(
                     low=data.values.min(axis=0),
                     high=data.values.max(axis=0),
@@ -1308,7 +1308,7 @@ class VegetationClustering:
                 
                 ref_wcss.append(wcss_ref)
             
-            # Gap statistic
+            # Copyright (c) 2025 Mohamed Z. Hatim
             expected_wcss = np.mean(ref_wcss)
             gap = np.log(expected_wcss) - np.log(wcss_obs) if wcss_obs > 0 else 0
             gap_stats.append(gap)
