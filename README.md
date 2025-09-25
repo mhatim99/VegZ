@@ -17,6 +17,9 @@
 - Multiple data transformation methods (Hellinger, chord, Wisconsin, log, sqrt, standardize)
 - Automatic species matrix detection
 - Support for heterogeneous data integration
+- **Improved Ecological Terminology** (New in v1.2.0) - Domain-specific language:
+  - Use of "sites" instead of generic "samples" for ecological sampling locations
+  - Professional ecological nomenclature throughout the package
 
 ### Data Quality & Validation
 - Comprehensive spatial coordinate validation
@@ -28,7 +31,7 @@
 - Transposed coordinate detection
 - Country boundary consistency checks
 - Automated quality reporting
-- **Enhanced Species Name Error Detection** (New in v1.1.0):
+- **Enhanced Species Name Error Detection** (Introduced in v1.1.0):
   - 10+ error categories: incomplete binomial, formatting issues, author citations
   - Hybrid marker detection and validation
   - Infraspecific rank validation (var., subsp., f., cv.)
@@ -56,6 +59,13 @@
 - **RDA** - Redundancy Analysis for linear relationships
 - **NMDS** - Non-metric Multidimensional Scaling with stress assessment
 - **PCoA** - Principal Coordinates Analysis (metric MDS)
+- **Scientific Method Names** (New in v1.2.0) - Professional abbreviated method names:
+  - `ca_analysis()` for Correspondence Analysis
+  - `dca_analysis()` for Detrended Correspondence Analysis
+  - `cca_analysis()` for Canonical Correspondence Analysis
+  - `rda_analysis()` for Redundancy Analysis
+  - `pcoa_analysis()` for Principal Coordinates Analysis
+  - Full backward compatibility with existing method names
 - **Environmental vector fitting** to ordination axes
 - **Procrustes analysis** for ordination comparison
 - **Goodness-of-fit diagnostics**
@@ -281,7 +291,7 @@ print("Site classification:", twinspan_results['site_classification'])
 print("Indicator species:", twinspan_results['classification_tree']['indicator_species'])
 ```
 
-### Enhanced Species Name Error Detection (New in v1.1.0)
+### Enhanced Species Name Error Detection (Introduced in v1.1.0)
 
 ```python
 from VegZ.data_management.standardization import SpeciesNameStandardizer
@@ -384,7 +394,7 @@ If you use VegZ in your research, please cite:
     author = {Hatim, Mohamed Z.},
     title = {VegZ: A comprehensive Python package for vegetation data analysis and environmental modeling},
     year = {2025},
-    version = {1.1.0},
+    version = {1.2.0},
     url = {https://github.com/mhatim99/VegZ}
 }
 ```

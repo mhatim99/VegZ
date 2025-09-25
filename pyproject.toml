@@ -4,13 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "VegZ"
-version = "1.1.0"
+version = "1.2.0"
 authors = [
   {name="Mohamed Z. Hatim", email="mhatim4040@gmail.com"},
 ]
 description = "A comprehensive Python package for vegetation data analysis and environmental modeling"
 readme = "README.md"
 requires-python = ">=3.8"
+license = {text = "MIT"}
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
@@ -77,13 +78,14 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/mhatim99/VegZ"
-Documentation = "https://github.com/mhatim99/VegZ/tree/main/docs"
+Documentation = "https://mhatim99.github.io/VegZ/"
 Repository = "https://github.com/mhatim99/VegZ.git"
 "Bug Reports" = "https://github.com/mhatim99/VegZ/issues"
 Changelog = "https://github.com/mhatim99/VegZ/blob/main/CHANGELOG.md"
 
-[project.scripts]
-VegZ-demo = "VegZ.examples.demo:main"
+# Temporarily disable demo script until examples module is properly structured
+# [project.scripts]
+# VegZ-demo = "VegZ.examples.demo:main"
 
 [tool.hatch.version]
 path = "src/VegZ/__init__.py"
