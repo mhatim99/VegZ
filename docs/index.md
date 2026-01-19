@@ -1452,12 +1452,6 @@ print(f"Large dataset analysis completed: {large_diversity.shape}")
 
 This manual provides complete, verified examples for all major VegZ functionality:
 
-- All method names are correct
-- All parameter names match the actual API
-- All imports are accurate
-- All examples have been tested and work
-- Complete workflow examples included
-
 ### Key Classes and Their Main Methods:
 
 - **VegZ**: `calculate_diversity()`, `pca_analysis()`, `nmds_analysis()`, `kmeans_clustering()`
