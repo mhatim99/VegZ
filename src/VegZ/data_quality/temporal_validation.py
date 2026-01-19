@@ -178,8 +178,8 @@ class TemporalValidator:
             success_mask = ~default_parsed.isna()
             parsed_dates[success_mask] = default_parsed[success_mask]
             parse_success[success_mask] = True
-        except:
-            pass
+        except (ValueError, TypeError):
+            warnings.warn("Default date parsing failed, trying alternative formats")
         
 # Copyright (c) 2025 Mohamed Z. Hatim
         remaining_mask = ~parse_success & date_series.notna()
@@ -198,18 +198,18 @@ class TemporalValidator:
                 
                 try:
                     format_parsed = pd.to_datetime(
-                        date_series[still_remaining], 
-                        format=date_format, 
+                        date_series[still_remaining],
+                        format=date_format,
                         errors='coerce'
                     )
                     format_success = ~format_parsed.isna()
-                    
+
                     if format_success.any():
                         success_indices = still_remaining[still_remaining].index[format_success]
                         parsed_dates.loc[success_indices] = format_parsed[format_success]
                         parse_success.loc[success_indices] = True
-                        
-                except:
+
+                except (ValueError, TypeError):
                     continue
         
         return parsed_dates, parse_success

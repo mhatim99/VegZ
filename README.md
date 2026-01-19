@@ -17,7 +17,12 @@
 - Multiple data transformation methods (Hellinger, chord, Wisconsin, log, sqrt, standardize)
 - Automatic species matrix detection
 - Support for heterogeneous data integration
-- **Improved Ecological Terminology** (New in v1.2.0) - Domain-specific language:
+- **Online Taxonomic Name Resolution** (New in v1.3.0):
+  - Validate and update species names against 5 online databases
+  - WFO (World Flora Online), POWO (Kew), IPNI, ITIS, GBIF
+  - File-based and DataFrame integration
+  - Confidence scores and synonym retrieval
+- **Improved Ecological Terminology** (v1.2.0) - Domain-specific language:
   - Use of "sites" instead of generic "samples" for ecological sampling locations
   - Professional ecological nomenclature throughout the package
 
@@ -314,6 +319,40 @@ report = standardizer.generate_error_report(df, species_column='species')
 print(f"Validity rate: {report['summary']['validity_percentage']}%")
 ```
 
+### Online Taxonomic Name Resolution (New in v1.3.0)
+
+```python
+from VegZ import TaxonomicResolver, resolve_species_names
+
+# Quick resolution with default source (World Flora Online)
+results = resolve_species_names(['Quercus robur', 'Pinus sylvestris'])
+
+# Using specific source (GBIF)
+resolver = TaxonomicResolver(sources='gbif')
+results = resolver.resolve_names(['Quercus robur', 'Pinus sylvestris'])
+
+# Multiple sources with fallback
+resolver = TaxonomicResolver(
+    sources=['wfo', 'powo', 'gbif'],
+    use_fallback=True
+)
+results = resolver.resolve_names(['Quercus robur', 'Pinus sylvestris'])
+
+# Resolve from file
+results = resolver.resolve_from_file('species_list.csv')
+
+# Update species names in your data
+import pandas as pd
+df = pd.read_csv('vegetation_data.csv')
+df_updated = resolver.resolve_dataframe(df, species_column='species')
+
+# Export results
+resolver.export_results(results, 'resolved_names.xlsx')
+resolver.print_summary(results)
+```
+
+Supported databases: WFO (World Flora Online), POWO (Plants of the World Online - Kew), IPNI (International Plant Names Index), ITIS (Integrated Taxonomic Information System), GBIF (Global Biodiversity Information Facility).
+
 ## Data Format Requirements
 
 VegZ expects data in **site-by-species matrix format**:
@@ -349,6 +388,7 @@ SITE_001,44.2619,-72.5806,850,6.2,18.5,...
 - Matplotlib >= 3.4.0
 - scikit-learn >= 1.0.0
 - Seaborn >= 0.11.0
+- Requests >= 2.25.0
 
 **Optional (for extended functionality):**
 - GeoPandas (spatial analysis)
@@ -394,7 +434,7 @@ If you use VegZ in your research, please cite:
     author = {Hatim, Mohamed Z.},
     title = {VegZ: A comprehensive Python package for vegetation data analysis and environmental modeling},
     year = {2025},
-    version = {1.2.0},
+    version = {1.3.0},
     url = {https://github.com/mhatim99/VegZ}
 }
 ```

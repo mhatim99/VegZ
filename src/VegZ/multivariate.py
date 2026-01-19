@@ -316,7 +316,10 @@ class MultivariateAnalyzer:
         if site_scores.shape[1] > 1:
     # Copyright (c) 2025 Mohamed Z. Hatim
             axis1_range = site_scores[:, 0].max() - site_scores[:, 0].min()
-            segment_width = axis1_range / segments
+            if axis1_range > 0:
+                segment_width = axis1_range / segments
+            else:
+                segment_width = 1.0
             
             for i in range(segments):
                 segment_min = site_scores[:, 0].min() + i * segment_width
@@ -700,7 +703,7 @@ class MultivariateAnalyzer:
         return np.array(distances)
     
     def _sorensen_distance(self, data: np.ndarray) -> np.ndarray:
-        """Calculate Sørensen distance."""
+        """Calculate Sorensen distance."""
         binary_data = (data > 0).astype(int)
         
         n_samples = binary_data.shape[0]

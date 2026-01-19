@@ -574,23 +574,28 @@ class EcologicalStatistics:
         def partial_correlation(x, y, z):
             """Calculate partial correlation between x and y controlling for z."""
 # Copyright (c) 2025 Mohamed Z. Hatim
-            rxy = np.corrcoef(x, y)[0, 1]
-            rxz = np.corrcoef(x, z)[0, 1]
-            ryz = np.corrcoef(y, z)[0, 1]
-            
+            if method.lower() == 'spearman':
+                rxy = stats.spearmanr(x, y)[0]
+                rxz = stats.spearmanr(x, z)[0]
+                ryz = stats.spearmanr(y, z)[0]
+            else:
+                rxy = np.corrcoef(x, y)[0, 1]
+                rxz = np.corrcoef(x, z)[0, 1]
+                ryz = np.corrcoef(y, z)[0, 1]
+
 # Copyright (c) 2025 Mohamed Z. Hatim
             rxy = 0.0 if np.isnan(rxy) else rxy
             rxz = 0.0 if np.isnan(rxz) else rxz
             ryz = 0.0 if np.isnan(ryz) else ryz
-            
+
 # Copyright (c) 2025 Mohamed Z. Hatim
             denominator = np.sqrt((1 - rxz**2) * (1 - ryz**2))
-            
+
             if denominator == 0:
                 return 0.0
-            
+
             partial_r = (rxy - rxz * ryz) / denominator
-            
+
             return partial_r
         
 # Copyright (c) 2025 Mohamed Z. Hatim
@@ -702,29 +707,34 @@ class EcologicalStatistics:
             
 # Copyright (c) 2025 Mohamed Z. Hatim
             permuted_indvals = []
-            
+
             for _ in range(permutations):
                 permuted_groups = np.random.permutation(group_labels)
-                
+
 # Copyright (c) 2025 Mohamed Z. Hatim
-                perm_group_mask = permuted_groups == max_group
-                perm_group_abundance = species_abundances[perm_group_mask]
-                
-                if total_abundance == 0:
-                    perm_rel_abundance = 0
-                else:
-                    perm_rel_abundance = perm_group_abundance.sum() / total_abundance
-                
-                perm_group_presence = (perm_group_abundance > 0).sum()
-                perm_group_size = perm_group_mask.sum()
-                
-                if perm_group_size == 0:
-                    perm_rel_frequency = 0
-                else:
-                    perm_rel_frequency = perm_group_presence / perm_group_size
-                
-                perm_indval = perm_rel_abundance * perm_rel_frequency * 100
-                permuted_indvals.append(perm_indval)
+                perm_max_indval = 0
+                for perm_group in unique_groups:
+                    perm_group_mask = permuted_groups == perm_group
+                    perm_group_abundance = species_abundances[perm_group_mask]
+
+                    if total_abundance == 0:
+                        perm_rel_abundance = 0
+                    else:
+                        perm_rel_abundance = perm_group_abundance.sum() / total_abundance
+
+                    perm_group_presence = (perm_group_abundance > 0).sum()
+                    perm_group_size = perm_group_mask.sum()
+
+                    if perm_group_size == 0:
+                        perm_rel_frequency = 0
+                    else:
+                        perm_rel_frequency = perm_group_presence / perm_group_size
+
+                    perm_indval = perm_rel_abundance * perm_rel_frequency * 100
+                    if perm_indval > perm_max_indval:
+                        perm_max_indval = perm_indval
+
+                permuted_indvals.append(perm_max_indval)
             
 # Copyright (c) 2025 Mohamed Z. Hatim
             p_value = (np.sum(np.array(permuted_indvals) >= max_indval) + 1) / (permutations + 1)
@@ -799,8 +809,11 @@ class EcologicalStatistics:
 # Copyright (c) 2025 Mohamed Z. Hatim
                     for k, species in enumerate(species_data.columns):
 # Copyright (c) 2025 Mohamed Z. Hatim
-                        avg_abundance = (sample1[k] + sample2[k]) / 2
-                        species_contribution = avg_abundance / (sample1.sum() + sample2.sum()) * similarity
+                        total_sum = sample1.sum() + sample2.sum()
+                        if total_sum > 0:
+                            species_contribution = abs(sample1[k] - sample2[k]) / total_sum
+                        else:
+                            species_contribution = 0
                         species_contributions[species].append(species_contribution)
             
 # Copyright (c) 2025 Mohamed Z. Hatim
@@ -845,7 +858,11 @@ class EcologicalStatistics:
                         
 # Copyright (c) 2025 Mohamed Z. Hatim
                         for k, species in enumerate(species_data.columns):
-                            contrib = abs(s1_values[k] - s2_values[k]) / (s1_values.sum() + s2_values.sum()) * dissimilarity
+                            total_sum = s1_values.sum() + s2_values.sum()
+                            if total_sum > 0:
+                                contrib = abs(s1_values[k] - s2_values[k]) / total_sum
+                            else:
+                                contrib = 0
                             species_contributions[species].append(contrib)
                 
 # Copyright (c) 2025 Mohamed Z. Hatim

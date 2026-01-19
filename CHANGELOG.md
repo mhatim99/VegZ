@@ -5,6 +5,85 @@ All notable changes to VegZ will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-01-19
+
+### Added
+
+#### Taxonomic Name Resolution System
+- **TaxonomicResolver class** - Complete online species name validation and resolution system
+- **Five taxonomic database integrations**:
+  - WFO (World Flora Online) - Default source, comprehensive plant checklist
+  - POWO (Plants of the World Online) - Kew Gardens authoritative database
+  - IPNI (International Plant Names Index) - Nomenclatural verification
+  - ITIS (Integrated Taxonomic Information System) - Standardized classification
+  - GBIF (Global Biodiversity Information Facility) - Catalogue of Life backbone
+- **Flexible source selection**: Single source, multiple sources, or fallback chain
+- **File-based resolution**: Direct processing of CSV, Excel, TSV files
+- **DataFrame integration**: Seamless integration with data analysis workflows
+
+#### New Methods and Functions
+- `TaxonomicResolver.resolve_names()` - Resolve list of species names
+- `TaxonomicResolver.resolve_from_file()` - Resolve names directly from files
+- `TaxonomicResolver.resolve_dataframe()` - Update species names in DataFrames
+- `TaxonomicResolver.export_results()` - Export to CSV, Excel, JSON, TSV, Parquet, HTML
+- `TaxonomicResolver.get_summary()` - Generate resolution statistics
+- `TaxonomicResolver.print_summary()` - Display formatted summary
+- `resolve_species_names()` - Convenience function for quick resolution
+- `resolve_species_from_file()` - Convenience function for file-based resolution
+- `update_species_in_dataframe()` - Convenience function for DataFrame updates
+
+#### Resolution Output Features
+- Original and accepted species names
+- Author citations
+- Match confidence scores (0-100)
+- Match type classification (exact, fuzzy, candidate, synonym)
+- Taxonomic status (accepted, synonym, unresolved)
+- Synonym lists from source databases
+- Family and genus extraction
+- Source database identification
+- Direct URLs to source records
+
+#### Auto-detection and Usability
+- Automatic species column detection in files and DataFrames
+- Smart column name matching (species, scientific_name, taxon, etc.)
+- Configurable minimum score threshold for name updates
+- Original names preserved in separate column
+- Taxonomy columns added automatically (family, genus, match_score, status, source)
+
+### Fixed
+
+#### Diversity Index Calculations
+- Fixed division by zero in Pielou's evenness when richness equals 0 or 1
+- Fixed division by zero in Margalef index when total abundance equals 1
+- Fixed division by zero in ACE estimator when N_rare equals 1
+- Fixed empty row handling in Shannon diversity calculation
+- Fixed empty row handling in Simpson diversity calculation
+
+#### Statistical Methods
+- Fixed SIMPER between-group contributions formula (removed incorrect multiplication)
+- Fixed SIMPER within-group contributions formula (corrected dissimilarity calculation)
+- Fixed IndVal p-value computation (now correctly computes max across all groups per permutation)
+- Fixed partial Mantel test Spearman correlation implementation
+
+#### Multivariate Analysis
+- Fixed DCA axis range division by zero when all sites have identical scores
+
+#### Code Quality
+- Fixed Jackknife estimator return type mismatch in calculate_all_indices
+- Fixed bare except clauses with proper exception types (ValueError, TypeError)
+- Fixed nestedness matrix binarization (now uses > 0 instead of int truncation)
+- Fixed Sorensen distance function encoding (removed special character)
+
+### Changed
+- Added `requests>=2.25.0` to core dependencies for API communication
+
+### Technical Improvements
+- API request caching to minimize redundant calls
+- Configurable request delays to respect rate limits
+- Session-based HTTP connections for efficiency
+- Comprehensive error handling for network failures
+- Progress reporting for batch processing
+
 ## [1.2.0] - 2025-01-16
 
 ### Added

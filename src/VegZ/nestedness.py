@@ -70,7 +70,7 @@ class NestednessAnalyzer:
         if presence_threshold > 0:
             self.matrix_data = (data > presence_threshold).astype(int)
         else:
-            self.matrix_data = data.fillna(0).astype(int)
+            self.matrix_data = (data.fillna(0) > 0).astype(int)
     
     def calculate_nestedness_metrics(self, 
                                    sort_by: str = 'total',

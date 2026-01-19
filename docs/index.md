@@ -18,7 +18,8 @@
 14. [Data Quality and Validation](#data-quality-and-validation)
 15. [Interactive Visualization](#interactive-visualization)
 16. [Species Name Standardization](#species-name-standardization)
-17. [Best Practices](#best-practices)
+17. [Taxonomic Name Resolution](#taxonomic-name-resolution)
+18. [Best Practices](#best-practices)
 
 ---
 
@@ -560,7 +561,7 @@ trend_results = temporal.trend_detection(
 print("Trend Detection:")
 print(f"Trend: {trend_results['trend']}")
 print(f"p-value: {trend_results['p_value']:.4f}")
-print(f"Tau: {trend_results['tau']:.3f}")
+print(f"Sen's slope: {trend_results['sens_slope']:.3f}")
 
 # Phenology modeling (correct parameter names)
 phenology_results = temporal.phenology_modeling(
@@ -571,8 +572,10 @@ phenology_results = temporal.phenology_modeling(
 )
 
 print("Phenology modeling:")
-print(f"Model converged: {phenology_results['converged']}")
-print(f"Peak date: {phenology_results['peak_date']}")
+print(f"Model type: {phenology_results['model_type']}")
+model_fit = phenology_results['results']['combined']
+print(f"Model success: {model_fit['success']}")
+print(f"R-squared: {model_fit['r_squared']:.3f}")
 
 # Seasonal decomposition
 seasonal_results = temporal.seasonal_decomposition(
@@ -584,8 +587,9 @@ seasonal_results = temporal.seasonal_decomposition(
 )
 
 print("Seasonal decomposition:")
-print(f"Trend strength: {seasonal_results['trend_strength']:.3f}")
-print(f"Seasonal strength: {seasonal_results['seasonal_strength']:.3f}")
+print(f"Method: {seasonal_results['method']}")
+print(f"Period: {seasonal_results['period']}")
+print(f"Trend component shape: {seasonal_results['trend'].shape}")
 
 # Growth curve fitting
 growth_data = pd.DataFrame({
@@ -602,8 +606,9 @@ growth_results = temporal.growth_curve_fitting(
 )
 
 print("Growth curve fitting:")
-print(f"R-squared: {growth_results['r_squared']:.3f}")
-print(f"Max growth rate: {growth_results['max_growth_rate']:.3f}")
+growth_fit = growth_results['results']['combined']
+print(f"R-squared: {growth_fit['r_squared']:.3f}")
+print(f"Growth parameters: {growth_fit['growth_parameters']}")
 ```
 
 ---
@@ -1164,6 +1169,132 @@ for query, match in matches.items():
 
 ---
 
+## Taxonomic Name Resolution
+
+### TaxonomicResolver Class (New in v1.3.0)
+
+The TaxonomicResolver enables validation and standardization of plant species names against authoritative online taxonomic databases.
+
+```python
+from VegZ import TaxonomicResolver, resolve_species_names
+
+# Initialize with default source (World Flora Online)
+resolver = TaxonomicResolver()
+
+# Or specify sources
+resolver = TaxonomicResolver(sources='gbif')  # Single source
+resolver = TaxonomicResolver(sources=['wfo', 'powo', 'gbif'], use_fallback=True)  # Multiple with fallback
+
+# Resolve a list of species names
+species_list = ['Quercus robur', 'Pinus sylvestris', 'Betula pendula']
+results = resolver.resolve_names(species_list)
+
+print("Resolution results:")
+print(results[['original_name', 'accepted_name', 'match_score', 'family', 'source']])
+```
+
+### Supported Taxonomic Databases
+
+- **WFO** (World Flora Online) - Default, comprehensive plant checklist
+- **POWO** (Plants of the World Online) - Kew Gardens authoritative database
+- **IPNI** (International Plant Names Index) - Nomenclatural verification
+- **ITIS** (Integrated Taxonomic Information System) - Standardized classification
+- **GBIF** (Global Biodiversity Information Facility) - Catalogue of Life backbone
+
+### File-Based Resolution
+
+```python
+# Resolve species names directly from a file
+results = resolver.resolve_from_file('species_list.csv')
+results = resolver.resolve_from_file('data.xlsx', species_column='ScientificName')
+
+# Export results to various formats
+resolver.export_results(results, 'resolved_names.csv')
+resolver.export_results(results, 'resolved_names.xlsx')
+resolver.export_results(results, 'resolved_names.json')
+```
+
+### DataFrame Integration
+
+```python
+import pandas as pd
+
+# Load your vegetation data
+df = pd.read_csv('vegetation_survey.csv')
+
+# Resolve and update species names in the DataFrame
+updated_df = resolver.resolve_dataframe(
+    df,
+    species_column='species',
+    update_names=True,           # Replace with accepted names
+    add_taxonomy_columns=True,   # Add family, genus, match_score columns
+    min_score_threshold=70       # Only update if score >= 70
+)
+
+# Original names are preserved in 'species_original' column
+print(updated_df[['species_original', 'species', 'taxon_family', 'taxon_match_score']])
+```
+
+### Summary and Statistics
+
+```python
+# Get resolution summary
+resolver.print_summary(results)
+
+# Output:
+# ============================================================
+# TAXONOMIC RESOLUTION SUMMARY
+# ============================================================
+# Total names processed:     10
+# Successfully resolved:     9 (90.0%)
+# Unresolved:                1
+# ------------------------------------------------------------
+# High confidence (>=90):    7
+# Medium confidence (70-89): 2
+# Low confidence (<70):      0
+# Average match score:       92.5
+# ------------------------------------------------------------
+# Sources used:              GBIF
+# Unique families found:     5
+# ============================================================
+```
+
+### Convenience Functions
+
+```python
+from VegZ.data_management import resolve_species_names, resolve_species_from_file, update_species_in_dataframe
+
+# Quick resolution
+results = resolve_species_names(['Quercus robur', 'Pinus sylvestris'], sources='gbif')
+
+# Resolve from file with automatic export
+results = resolve_species_from_file('species.csv', output_file='resolved.xlsx')
+
+# Update DataFrame in one line
+df_updated = update_species_in_dataframe(df, sources='gbif', min_score=70)
+```
+
+### Output Columns
+
+The resolution results include:
+
+| Column | Description |
+|--------|-------------|
+| original_name | Input species name |
+| accepted_name | Resolved accepted name |
+| accepted_author | Author citation |
+| match_score | Confidence (0-100) |
+| match_type | exact, fuzzy, candidate, synonym |
+| taxonomic_status | accepted, synonym, unresolved |
+| synonyms | Known synonyms from database |
+| family | Taxonomic family |
+| genus | Genus name |
+| source | Database used (WFO, POWO, etc.) |
+| source_id | Record ID in source database |
+| source_url | Direct link to record |
+
+---
+
 ## Best Practices
 
 ### Complete Analysis Workflow
@@ -1321,11 +1452,11 @@ print(f"Large dataset analysis completed: {large_diversity.shape}")
 
 This manual provides complete, verified examples for all major VegZ functionality:
 
-✅ **All method names are correct**
-✅ **All parameter names match the actual API**
-✅ **All imports are accurate**
-✅ **All examples have been tested and work**
-✅ **Complete workflow examples included**
+- All method names are correct
+- All parameter names match the actual API
+- All imports are accurate
+- All examples have been tested and work
+- Complete workflow examples included
 
 ### Key Classes and Their Main Methods:
 
@@ -1340,5 +1471,6 @@ This manual provides complete, verified examples for all major VegZ functionalit
 - **InteractiveVisualizer**: `create_diversity_dashboard()`, `create_ordination_dashboard()`
 - **SpatialValidator**: `validate_coordinates()`, `detect_geographic_outliers()`
 - **SpeciesNameStandardizer**: `validate_species_name()`, `batch_validate_names()`
+- **TaxonomicResolver**: `resolve_names()`, `resolve_from_file()`, `resolve_dataframe()`, `export_results()`
 
 All examples in this manual use the correct syntax and will run successfully with the VegZ package.

@@ -16,7 +16,7 @@ This package provides tools for:
 - Visualization and reporting
 """
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 __author__ = "Mohamed Z. Hatim"
 __email__ = "mhatim4040@gmail.com"
 __copyright__ = "Copyright (c) 2025 Mohamed Z. Hatim"
@@ -37,6 +37,7 @@ from .functional_traits import FunctionalTraitAnalyzer, TraitSyndromes
 from .nestedness import NestednessAnalyzer, NullModels, NestednessSignificance
 from .specialized_methods import PhylogeneticDiversityAnalyzer, MetacommunityAnalyzer, NetworkAnalyzer
 from .interactive_viz import InteractiveVisualizer, ReportGenerator
+from .data_management.taxonomic_resolver import TaxonomicResolver, resolve_species_names
 
 # Copyright (c) 2025 Mohamed Z. Hatim
 from . import data_management
@@ -79,7 +80,9 @@ __all__ = [
     'NetworkAnalyzer',
     'InteractiveVisualizer',
     'ReportGenerator',
-    
+    'TaxonomicResolver',
+    'resolve_species_names',
+
     # Copyright (c) 2025 Mohamed Z. Hatim
     'quick_diversity_analysis',
     'quick_ordination', 
@@ -114,7 +117,7 @@ environmental scientists, and researchers working with biodiversity and vegetati
 Key Features:
 =============
 
-📊 Data Management & Preprocessing
+[Data] Data Management & Preprocessing
 - Parse vegetation survey data from CSV, Excel, Turboveg exports
 - Integration with remote sensing APIs (Landsat, MODIS, Sentinel)
 - Darwin Core standards for biodiversity data
@@ -122,7 +125,7 @@ Key Features:
 - Coordinate system transformations
 - Data transformation methods (Hellinger, chord, Wisconsin, etc.)
 
-🔍 Data Quality & Validation  
+[Quality] Data Quality & Validation  
 - Comprehensive spatial coordinate validation
 - Temporal data validation and date parsing
 - Geographic outlier detection
@@ -130,21 +133,21 @@ Key Features:
 - Coordinate precision assessment
 - Duplicate record identification
 
-📈 Diversity & Community Analysis
+[Diversity] Diversity & Community Analysis
 - 15+ diversity indices (Shannon, Simpson, Hill numbers, etc.)
 - Species richness estimators (Chao1, ACE, Jackknife)
 - Beta diversity analysis (turnover vs nestedness)
 - Rarefaction and extrapolation curves
 - Species accumulation curves
 
-🎯 Multivariate Analysis & Ordination
+[Ordination] Multivariate Analysis & Ordination
 - Complete ordination suite: PCA, CA, DCA, CCA, RDA, NMDS, PCoA
 - Multiple ecological distance matrices
 - Procrustes analysis for ordination comparison
 - Environmental vector fitting
 - Goodness-of-fit diagnostics
 
-🌳 Advanced Clustering Methods
+[Clustering] Advanced Clustering Methods
 - TWINSPAN (Two-Way Indicator Species Analysis) 
 - Hierarchical clustering with ecological distances
 - Fuzzy C-means clustering
@@ -152,7 +155,7 @@ Key Features:
 - Gaussian Mixture Models
 - Clustering validation (silhouette, gap statistic)
 
-📊 Statistical Analysis
+[Statistics] Statistical Analysis
 - PERMANOVA (Permutational MANOVA)
 - ANOSIM (Analysis of Similarities) 
 - MRPP (Multi-Response Permutation Procedures)
@@ -160,7 +163,7 @@ Key Features:
 - Indicator Species Analysis (IndVal)
 - SIMPER (Similarity Percentages)
 
-🎨 Visualization & Reporting
+[Visualization] Visualization & Reporting
 - Specialized ecological plots
 - Ordination diagrams with environmental vectors
 - Diversity profiles and accumulation curves
@@ -240,7 +243,7 @@ Copyright (c) 2025 Mohamed Z. Hatim
 # Copyright (c) 2025 Mohamed Z. Hatim
 VERSION_INFO = {
     'major': 1,
-    'minor': 2,
+    'minor': 3,
     'patch': 0,
     'release': 'stable',
     'version': __version__
@@ -301,10 +304,9 @@ import warnings
 
 # Copyright (c) 2025 Mohamed Z. Hatim
 def configure_warnings():
-    """Configure warning filters for VegZ."""
-    warnings.filterwarnings('default', category=UserWarning, module='vegz')
+    """Configure warning filters for VegZ. Call explicitly to enable."""
+    warnings.filterwarnings('default', category=UserWarning, module='VegZ')
     warnings.filterwarnings('ignore', category=FutureWarning, module='sklearn')
     warnings.filterwarnings('ignore', category=DeprecationWarning, module='scipy')
 
 # Copyright (c) 2025 Mohamed Z. Hatim
-configure_warnings()

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "VegZ"
-version = "1.2.0"
+version = "1.3.0"
 authors = [
   {name="Mohamed Z. Hatim", email="mhatim4040@gmail.com"},
 ]
@@ -42,6 +42,7 @@ dependencies = [
     "matplotlib>=3.4.0",
     "scikit-learn>=1.0.0",
     "seaborn>=0.11.0",
+    "requests>=2.25.0",
 ]
 
 # Optional dependencies

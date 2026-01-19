@@ -38,14 +38,18 @@ class DiversityAnalyzer:
             Diversity indices for each sample
         """
         results = pd.DataFrame(index=data.index)
-        
+
         for index in self.available_indices:
             try:
-                results[index] = self.calculate_index(data, index)
+                value = self.calculate_index(data, index)
+                if isinstance(value, (int, float, np.number)):
+                    results[index] = value
+                else:
+                    results[index] = value
             except Exception as e:
                 warnings.warn(f"Could not calculate {index}: {e}")
                 results[index] = np.nan
-        
+
         return results
     
     def calculate_index(self, data: pd.DataFrame, index: str) -> pd.Series:
@@ -134,7 +138,9 @@ class DiversityAnalyzer:
         """Pielou's evenness (J')."""
         shannon = self.shannon_diversity(data)
         richness = self.species_richness(data)
-        return shannon / np.log(richness.replace(0, 1))
+        log_richness = np.log(richness.replace({0: np.nan, 1: np.nan}))
+        evenness = shannon / log_richness
+        return evenness.fillna(0)
     
     def fisher_alpha(self, data: pd.DataFrame) -> pd.Series:
         """Fisher's alpha diversity."""
@@ -215,7 +221,9 @@ class DiversityAnalyzer:
         """Margalef's richness index."""
         richness = self.species_richness(data)
         total_abundance = data.sum(axis=1)
-        return (richness - 1) / np.log(total_abundance.replace(0, 1))
+        log_abundance = np.log(total_abundance.replace({0: np.nan, 1: np.nan}))
+        margalef = (richness - 1) / log_abundance
+        return margalef.fillna(0)
     
     def chao1_estimator(self, data: pd.DataFrame) -> pd.Series:
         """Chao1 species richness estimator."""
@@ -263,43 +271,45 @@ class DiversityAnalyzer:
             
 # Copyright (c) 2025 Mohamed Z. Hatim
             sum_i_fi = np.sum([i * np.sum(rare == i) for i in range(1, rare_threshold + 1)])
-            gamma_ace = (S_rare / C_ace) * (sum_i_fi / (N_rare * (N_rare - 1))) - 1
-            gamma_ace = max(gamma_ace, 0)
-            
+            if N_rare <= 1:
+                gamma_ace = 0
+            else:
+                gamma_ace = (S_rare / C_ace) * (sum_i_fi / (N_rare * (N_rare - 1))) - 1
+                gamma_ace = max(gamma_ace, 0)
+
             return S_abund + (S_rare / C_ace) + ((f1 / C_ace) * gamma_ace)
         
         return data.apply(calculate_ace, axis=1)
     
-    def jackknife1_estimator(self, data: pd.DataFrame) -> pd.Series:
-        """First-order Jackknife estimator."""
-        richness = self.species_richness(data)
-        
-        def calculate_jack1(row):
-            abundances = row[row > 0]
-            if len(abundances) == 0:
-                return 0
-            
-            f1 = np.sum(abundances == 1)  # Singletons
-            S_obs = len(abundances)
-            
-            return S_obs + f1
-        
-        return data.apply(calculate_jack1, axis=1)
-    
-    def jackknife2_estimator(self, data: pd.DataFrame) -> pd.Series:
-        """Second-order Jackknife estimator."""
-        def calculate_jack2(row):
-            abundances = row[row > 0]
-            if len(abundances) == 0:
-                return 0
-            
-            f1 = np.sum(abundances == 1)  # Singletons
-            f2 = np.sum(abundances == 2)  # Doubletons
-            S_obs = len(abundances)
-            
-            return S_obs + f1 * (2 - 1) / 2 - f2 / 2
-        
-        return data.apply(calculate_jack2, axis=1)
+    def jackknife1_estimator(self, data: pd.DataFrame) -> float:
+        """First-order Jackknife richness estimator (incidence-based across samples)."""
+        incidence = (data > 0).astype(int)
+        n_samples = len(data)
+
+        if n_samples < 2:
+            return float((data > 0).any(axis=0).sum())
+
+        species_incidence = incidence.sum(axis=0)
+        S_obs = (species_incidence > 0).sum()
+        Q1 = (species_incidence == 1).sum()
+
+        return S_obs + Q1 * (n_samples - 1) / n_samples
+
+    def jackknife2_estimator(self, data: pd.DataFrame) -> float:
+        """Second-order Jackknife richness estimator (incidence-based across samples)."""
+        incidence = (data > 0).astype(int)
+        n_samples = len(data)
+
+        if n_samples < 3:
+            return self.jackknife1_estimator(data)
+
+        species_incidence = incidence.sum(axis=0)
+        S_obs = (species_incidence > 0).sum()
+        Q1 = (species_incidence == 1).sum()
+        Q2 = (species_incidence == 2).sum()
+
+        jack2 = S_obs + Q1 * (2 * n_samples - 3) / n_samples - Q2 * ((n_samples - 2) ** 2) / (n_samples * (n_samples - 1))
+        return jack2
     
     def beta_diversity(self, data: pd.DataFrame, 
                       method: str = 'whittaker') -> Union[float, pd.DataFrame]:
@@ -334,7 +344,7 @@ class DiversityAnalyzer:
         return gamma / alpha_mean
     
     def _sorensen_beta(self, data: pd.DataFrame) -> pd.DataFrame:
-        """Sørensen beta diversity matrix."""
+        """Sorensen beta diversity matrix."""
         n_samples = len(data)
         beta_matrix = np.zeros((n_samples, n_samples))
         

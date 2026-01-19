@@ -355,8 +355,8 @@ class DarwinCoreHandler:
                 invalid_count = numeric_series.isnull().sum() - df[column].isnull().sum()
                 if invalid_count > 0:
                     results['warnings'].append(f"Field '{column}' has {invalid_count} non-numeric values")
-            except:
-                pass
+            except (ValueError, TypeError):
+                warnings.warn(f"Could not validate numeric field '{column}'")
         
         return results
     
@@ -385,7 +385,8 @@ class DarwinCoreHandler:
             date_series = pd.to_datetime(df[date_col], errors='coerce')
             invalid_count = date_series.isnull().sum() - df[date_col].isnull().sum()
             return invalid_count
-        except:
+        except (ValueError, TypeError):
+            warnings.warn(f"Could not validate date field '{date_col}'")
             return 0
     
     def _add_metadata(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -418,23 +419,24 @@ class DarwinCoreHandler:
         df.to_csv(occurrence_file, index=False)
         
 # Copyright (c) 2025 Mohamed Z. Hatim
-        meta_content = self._generate_meta_xml(df.columns)
+        occurrence_filename = f"{output_path}_occurrence.csv".split('/')[-1].split('\\')[-1]
+        meta_content = self._generate_meta_xml(df.columns, occurrence_filename)
         with open(f"{output_path}_meta.xml", 'w') as f:
             f.write(meta_content)
         
         print(f"Darwin Core Archive exported to {output_path}_occurrence.csv and {output_path}_meta.xml")
     
-    def _generate_meta_xml(self, columns: List[str]) -> str:
+    def _generate_meta_xml(self, columns: List[str], occurrence_filename: str = "occurrence.csv") -> str:
         """Generate meta.xml for Darwin Core Archive."""
         meta_template = """<?xml version="1.0" encoding="UTF-8"?>
 <archive xmlns="http://rs.tdwg.org/dwc/text/" metadata="eml.xml">
   <core encoding="UTF-8" fieldsTerminatedBy="," linesTerminatedBy="\\n" fieldsEnclosedBy='"' ignoreHeaderLines="1" rowType="http://rs.tdwg.org/dwc/terms/Occurrence">
     <files>
-      <location>occurrence.csv</location>
+      <location>{filename}</location>
     </files>
-{fields}
+{{fields}}
   </core>
-</archive>"""
+</archive>""".format(filename=occurrence_filename)
         
         field_template = '    <field index="{}" term="http://rs.tdwg.org/dwc/terms/{}"/>'
         

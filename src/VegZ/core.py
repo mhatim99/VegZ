@@ -191,17 +191,24 @@ class VegZ:
     def _shannon_diversity(self) -> pd.Series:
         """Calculate Shannon diversity index."""
         def shannon(row):
-            proportions = row[row > 0] / row.sum()
+            total = row.sum()
+            if total == 0:
+                return 0.0
+            proportions = row[row > 0] / total
             return -np.sum(proportions * np.log(proportions))
-        
+
         return self.species_matrix.apply(shannon, axis=1)
     
     def _simpson_diversity(self) -> pd.Series:
-        """Calculate Simpson diversity index."""
+        """Calculate Simpson diversity index (D = sum of squared proportions)."""
         def simpson(row):
-            proportions = row[row > 0] / row.sum()
-            return 1 - np.sum(proportions ** 2)
-        
+            total = row.sum()
+            if total == 0:
+                return 0.0
+            proportions = row[row > 0] / total
+            # Copyright (c) 2025 Mohamed Z. Hatim
+            return np.sum(proportions ** 2)
+
         return self.species_matrix.apply(simpson, axis=1)
     
     def _species_richness(self) -> pd.Series:
@@ -212,7 +219,9 @@ class VegZ:
         """Calculate Pielou's evenness."""
         shannon = self._shannon_diversity()
         richness = self._species_richness()
-        return shannon / np.log(richness.replace(0, 1))
+        log_richness = np.log(richness.replace({0: np.nan, 1: np.nan}))
+        evenness = shannon / log_richness
+        return evenness.fillna(0)
     
     def rarefaction_curve(self, sample_sizes: Optional[List[int]] = None) -> pd.DataFrame:
         """
@@ -256,17 +265,20 @@ class VegZ:
         """Calculate expected number of species for rarefaction."""
         total = species_counts.sum()
         expected = 0
-        
+
         for count in species_counts:
             # Copyright (c) 2025 Mohamed Z. Hatim
-            prob_not_selected = 1
-            for i in range(sample_size):
-                prob_not_selected *= (total - count - i) / (total - i)
-            
+            if sample_size > total - count:
+                prob_not_selected = 0
+            else:
+                prob_not_selected = 1
+                for i in range(sample_size):
+                    prob_not_selected *= (total - count - i) / (total - i)
+
             # Copyright (c) 2025 Mohamed Z. Hatim
             prob_selected = 1 - prob_not_selected
             expected += prob_selected
-        
+
         return expected
     
     # Copyright (c) 2025 Mohamed Z. Hatim
@@ -336,11 +348,12 @@ class VegZ:
         """
         if self.species_matrix is None:
             raise ValueError("Species matrix not available")
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
+
+        if transform == 'standardize' and distance_metric == 'bray_curtis':
+            raise ValueError("Bray-Curtis distance requires non-negative data. Cannot use with 'standardize' transform. Use 'hellinger', 'log', or 'sqrt' instead.")
+
         transformed_data = self._transform_data(self.species_matrix, transform)
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
+
         if distance_metric == 'bray_curtis':
             distances = self._bray_curtis_distance(transformed_data)
         elif distance_metric == 'euclidean':
@@ -423,8 +436,11 @@ class VegZ:
         """
         if self.species_matrix is None:
             raise ValueError("Species matrix not available")
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
+
+        if linkage_method == 'ward' and distance_metric != 'euclidean':
+            warnings.warn("Ward linkage requires Euclidean distance. Switching to Euclidean.")
+            distance_metric = 'euclidean'
+
         if distance_metric == 'bray_curtis':
             distances = self._bray_curtis_distance(self.species_matrix.values)
         else:
