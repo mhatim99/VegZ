@@ -6,18 +6,15 @@ Copyright (c) 2025 Mohamed Z. Hatim
 
 import numpy as np
 import pandas as pd
-import requests
-from typing import Dict, List, Optional, Tuple, Union
-from datetime import datetime, timedelta
-import json
+from typing import Dict, List, Optional, Tuple
 import warnings
 
-try:
-    import ee
-    EE_AVAILABLE = True
-except ImportError:
-    EE_AVAILABLE = False
-    warnings.warn("Google Earth Engine not available. Install with: pip install earthengine-api")
+from .._compat import optional_import
+
+# Optional; resolved without warning at import time so that `import VegZ`
+# stays quiet for users who never touch Earth Engine.
+ee = optional_import('ee')
+EE_AVAILABLE = ee is not None
 
 
 class RemoteSensingAPI:
@@ -46,7 +43,7 @@ class RemoteSensingAPI:
     def get_vegetation_indices(self, 
                              coordinates: List[Tuple[float, float]],
                              date_range: Tuple[str, str],
-                             indices: List[str] = ['NDVI', 'EVI', 'SAVI'],
+                             indices: Optional[List[str]] = None,
                              platform: str = 'landsat') -> pd.DataFrame:
         """
         Extract vegetation indices for given coordinates and date range.
@@ -69,7 +66,10 @@ class RemoteSensingAPI:
         """
         if platform not in self.apis:
             raise ValueError(f"Unsupported platform: {platform}")
-        
+
+        if indices is None:
+            indices = ['NDVI', 'EVI', 'SAVI']
+
         api = self.apis[platform]
         return api.extract_indices(coordinates, date_range, indices)
 
@@ -196,7 +196,10 @@ class MODISAPI:
                 continue
             
 # Copyright (c) 2025 Mohamed Z. Hatim
-            def extract_values(image):
+            # `point` is bound as a default argument: a bare closure over the
+            # loop variable would make every mapped function use the *last*
+            # point once the loop finishes.
+            def extract_values(image, point=point):
                 date = ee.Date(image.get('system:time_start')).format('YYYY-MM-dd')
                 values = image.select(['NDVI', 'EVI']).reduceRegion(
                     reducer=ee.Reducer.mean(),
@@ -313,53 +316,200 @@ class SentinelAPI:
 
 
 class VegetationIndexCalculator:
-    """Calculate vegetation indices from band data."""
-    
+    """
+    Calculate vegetation indices from band reflectance values.
+
+    All methods accept scalars, lists or NumPy arrays of any matching shape and
+    return a float array (or a float scalar for scalar input). Bands must have
+    identical shapes: silently broadcasting a mismatched pair produces a
+    plausible-looking raster that is simply wrong.
+
+    Division by zero yields ``fill`` (NaN by default) rather than an infinity,
+    and the normalised-difference indices are clipped to their theoretical
+    ``[-1, 1]`` range.
+    """
+
+    #: Indices available through :meth:`compute`, with the bands each needs.
+    available_indices = {
+        'ndvi': ('red', 'nir'),
+        'evi': ('red', 'nir', 'blue'),
+        'evi2': ('red', 'nir'),
+        'savi': ('red', 'nir'),
+        'msavi': ('red', 'nir'),
+        'ndwi': ('green', 'nir'),
+        'nbr': ('nir', 'swir'),
+        'gndvi': ('green', 'nir'),
+        'ndre': ('red_edge', 'nir'),
+        'arvi': ('red', 'nir', 'blue'),
+    }
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
     @staticmethod
-    def ndvi(red: np.ndarray, nir: np.ndarray) -> np.ndarray:
-        """Calculate Normalized Difference Vegetation Index."""
-        with np.errstate(divide='ignore', invalid='ignore'):
-            ndvi = (nir - red) / (nir + red)
-            ndvi[np.isnan(ndvi)] = 0
-            return ndvi
-    
+    def _as_bands(**bands) -> Tuple[Dict[str, np.ndarray], bool]:
+        """Coerce inputs to float arrays and check their shapes agree."""
+        converted = {}
+        for name, value in bands.items():
+            array = np.asarray(value, dtype=float)
+            converted[name] = array
+
+        shapes = {name: array.shape for name, array in converted.items()}
+        distinct = set(shapes.values())
+        if len(distinct) > 1:
+            raise ValueError(
+                "All bands must have the same shape; got "
+                + ', '.join(f'{name}={shape}' for name, shape in shapes.items())
+            )
+
+        scalar = next(iter(distinct)) == ()
+        if scalar:
+            converted = {name: np.atleast_1d(array)
+                         for name, array in converted.items()}
+        return converted, scalar
+
     @staticmethod
-    def evi(red: np.ndarray, nir: np.ndarray, blue: np.ndarray, 
-            G: float = 2.5, C1: float = 6.0, C2: float = 7.5, L: float = 1.0) -> np.ndarray:
-        """Calculate Enhanced Vegetation Index."""
-        with np.errstate(divide='ignore', invalid='ignore'):
-            evi = G * ((nir - red) / (nir + C1 * red - C2 * blue + L))
-            evi[np.isnan(evi)] = 0
-            return evi
-    
+    def _finish(values: np.ndarray, scalar: bool, fill: float,
+                clip: Optional[Tuple[float, float]] = None):
+        """
+        Clip valid results, substitute the fill value, and unwrap scalars.
+
+        Clipping comes first so that a sentinel fill outside the index's own
+        range (-999, say) survives: filling first would clip the sentinel back
+        into range and make it indistinguishable from a real measurement. NaN
+        passes through np.clip untouched, so valid pixels are unaffected.
+        """
+        if clip is not None:
+            with np.errstate(invalid='ignore'):
+                values = np.clip(values, clip[0], clip[1])
+        values = np.where(np.isfinite(values), values, fill)
+        return float(values[0]) if scalar else values
+
     @staticmethod
-    def savi(red: np.ndarray, nir: np.ndarray, L: float = 0.5) -> np.ndarray:
-        """Calculate Soil Adjusted Vegetation Index."""
+    def _ratio(numerator: np.ndarray, denominator: np.ndarray) -> np.ndarray:
+        """Elementwise division with zero denominators mapped to NaN."""
         with np.errstate(divide='ignore', invalid='ignore'):
-            savi = ((nir - red) / (nir + red + L)) * (1 + L)
-            savi[np.isnan(savi)] = 0
-            return savi
-    
-    @staticmethod
-    def msavi(red: np.ndarray, nir: np.ndarray) -> np.ndarray:
-        """Calculate Modified Soil Adjusted Vegetation Index."""
-        with np.errstate(divide='ignore', invalid='ignore'):
-            msavi = (2 * nir + 1 - np.sqrt((2 * nir + 1)**2 - 8 * (nir - red))) / 2
-            msavi[np.isnan(msavi)] = 0
-            return msavi
-    
-    @staticmethod
-    def ndwi(green: np.ndarray, nir: np.ndarray) -> np.ndarray:
-        """Calculate Normalized Difference Water Index."""
-        with np.errstate(divide='ignore', invalid='ignore'):
-            ndwi = (green - nir) / (green + nir)
-            ndwi[np.isnan(ndwi)] = 0
-            return ndwi
-    
-    @staticmethod
-    def nbr(nir: np.ndarray, swir: np.ndarray) -> np.ndarray:
-        """Calculate Normalized Burn Ratio."""
-        with np.errstate(divide='ignore', invalid='ignore'):
-            nbr = (nir - swir) / (nir + swir)
-            nbr[np.isnan(nbr)] = 0
-            return nbr
+            return np.where(denominator != 0, numerator / denominator, np.nan)
+
+    @classmethod
+    def compute(cls, index_name: str, fill: float = np.nan, **bands):
+        """
+        Calculate an index by name.
+
+        Parameters
+        ----------
+        index_name : str
+            One of :attr:`available_indices`.
+        fill : float
+            Value substituted where the index is undefined.
+        **bands
+            The bands the index requires, e.g. ``red=..., nir=...``.
+        """
+        key = index_name.lower()
+        if key not in cls.available_indices:
+            raise ValueError(
+                f"Unknown index '{index_name}'. Available: "
+                f"{', '.join(sorted(cls.available_indices))}"
+            )
+
+        required = cls.available_indices[key]
+        missing = [band for band in required if band not in bands]
+        if missing:
+            raise ValueError(
+                f"Index '{key}' requires the band(s) {missing}; "
+                f"got {sorted(bands)}"
+            )
+
+        extras = {k: v for k, v in bands.items() if k not in required}
+        return getattr(cls, key)(**{band: bands[band] for band in required},
+                                 fill=fill, **extras)
+
+    # ------------------------------------------------------------------
+    # Indices
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def ndvi(cls, red, nir, fill: float = np.nan):
+        """Normalized Difference Vegetation Index: (NIR - Red) / (NIR + Red)."""
+        b, scalar = cls._as_bands(red=red, nir=nir)
+        value = cls._ratio(b['nir'] - b['red'], b['nir'] + b['red'])
+        return cls._finish(value, scalar, fill, clip=(-1.0, 1.0))
+
+    @classmethod
+    def evi(cls, red, nir, blue, G: float = 2.5, C1: float = 6.0,
+            C2: float = 7.5, L: float = 1.0, fill: float = np.nan):
+        """Enhanced Vegetation Index (Huete et al. 2002)."""
+        b, scalar = cls._as_bands(red=red, nir=nir, blue=blue)
+        denominator = b['nir'] + C1 * b['red'] - C2 * b['blue'] + L
+        value = G * cls._ratio(b['nir'] - b['red'], denominator)
+        return cls._finish(value, scalar, fill)
+
+    @classmethod
+    def evi2(cls, red, nir, G: float = 2.5, L: float = 1.0,
+             C: float = 2.4, fill: float = np.nan):
+        """Two-band EVI (Jiang et al. 2008), for sensors without a blue band."""
+        b, scalar = cls._as_bands(red=red, nir=nir)
+        value = G * cls._ratio(b['nir'] - b['red'], b['nir'] + C * b['red'] + L)
+        return cls._finish(value, scalar, fill)
+
+    @classmethod
+    def savi(cls, red, nir, L: float = 0.5, fill: float = np.nan):
+        """Soil Adjusted Vegetation Index (Huete 1988)."""
+        b, scalar = cls._as_bands(red=red, nir=nir)
+        value = cls._ratio(b['nir'] - b['red'], b['nir'] + b['red'] + L) * (1 + L)
+        return cls._finish(value, scalar, fill)
+
+    @classmethod
+    def msavi(cls, red, nir, fill: float = np.nan):
+        """
+        Modified Soil Adjusted Vegetation Index (Qi et al. 1994).
+
+        The discriminant can go negative for physically implausible band
+        combinations; those pixels return ``fill`` rather than a spurious value
+        from the square root of a negative number.
+        """
+        b, scalar = cls._as_bands(red=red, nir=nir)
+        term = 2 * b['nir'] + 1
+        discriminant = term ** 2 - 8 * (b['nir'] - b['red'])
+        with np.errstate(invalid='ignore'):
+            value = np.where(discriminant >= 0,
+                             (term - np.sqrt(np.maximum(discriminant, 0))) / 2,
+                             np.nan)
+        return cls._finish(value, scalar, fill)
+
+    @classmethod
+    def ndwi(cls, green, nir, fill: float = np.nan):
+        """Normalized Difference Water Index (McFeeters 1996)."""
+        b, scalar = cls._as_bands(green=green, nir=nir)
+        value = cls._ratio(b['green'] - b['nir'], b['green'] + b['nir'])
+        return cls._finish(value, scalar, fill, clip=(-1.0, 1.0))
+
+    @classmethod
+    def nbr(cls, nir, swir, fill: float = np.nan):
+        """Normalized Burn Ratio."""
+        b, scalar = cls._as_bands(nir=nir, swir=swir)
+        value = cls._ratio(b['nir'] - b['swir'], b['nir'] + b['swir'])
+        return cls._finish(value, scalar, fill, clip=(-1.0, 1.0))
+
+    @classmethod
+    def gndvi(cls, green, nir, fill: float = np.nan):
+        """Green NDVI - more sensitive to chlorophyll than NDVI."""
+        b, scalar = cls._as_bands(green=green, nir=nir)
+        value = cls._ratio(b['nir'] - b['green'], b['nir'] + b['green'])
+        return cls._finish(value, scalar, fill, clip=(-1.0, 1.0))
+
+    @classmethod
+    def ndre(cls, red_edge, nir, fill: float = np.nan):
+        """Normalized Difference Red Edge index."""
+        b, scalar = cls._as_bands(red_edge=red_edge, nir=nir)
+        value = cls._ratio(b['nir'] - b['red_edge'], b['nir'] + b['red_edge'])
+        return cls._finish(value, scalar, fill, clip=(-1.0, 1.0))
+
+    @classmethod
+    def arvi(cls, red, nir, blue, gamma: float = 1.0, fill: float = np.nan):
+        """Atmospherically Resistant Vegetation Index (Kaufman & Tanre 1992)."""
+        b, scalar = cls._as_bands(red=red, nir=nir, blue=blue)
+        corrected = b['red'] - gamma * (b['blue'] - b['red'])
+        value = cls._ratio(b['nir'] - corrected, b['nir'] + corrected)
+        return cls._finish(value, scalar, fill, clip=(-1.0, 1.0))

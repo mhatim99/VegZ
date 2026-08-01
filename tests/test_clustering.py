@@ -170,8 +170,6 @@ class TestVegetationClustering:
     
     def test_elbow_analysis_consensus(self, sample_data):
         """Test consensus mechanism in elbow analysis."""
-        clustering = VegetationClustering()
-        
 # Copyright (c) 2025 Mohamed Z. Hatim
         results = {
             'elbow_points': {

@@ -6,27 +6,21 @@ Copyright (c) 2025 Mohamed Z. Hatim
 
 import numpy as np
 import pandas as pd
-from typing import Union, List, Dict, Tuple, Optional, Any
+from typing import List, Dict, Optional, Any
 from scipy import stats, ndimage
-from scipy.spatial import distance_matrix, ConvexHull, Voronoi
 from scipy.spatial.distance import cdist
 from scipy.interpolate import griddata, RBFInterpolator
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import cross_val_score
-from sklearn.neighbors import KNeighborsRegressor
 import warnings
 
-try:
-    import geopandas as gpd
-    from shapely.geometry import Point, Polygon, MultiPolygon
-    from shapely.ops import unary_union
-    import rasterio
-    from rasterio.features import shapes, geometry_mask
-    from rasterio.transform import from_bounds
-    SPATIAL_LIBS_AVAILABLE = True
-except ImportError:
-    SPATIAL_LIBS_AVAILABLE = False
-    warnings.warn("Spatial libraries not available. Install geopandas, rasterio for full functionality.")
+from ._compat import optional_import
+
+# Optional geospatial stack. Imported lazily and *without* warning at import
+# time: a library should not emit warnings just for being imported.
+gpd = optional_import('geopandas')
+rasterio = optional_import('rasterio')
+SPATIAL_LIBS_AVAILABLE = gpd is not None and rasterio is not None
 
 
 class SpatialAnalyzer:
@@ -66,6 +60,7 @@ class SpatialAnalyzer:
                             z_col: str = 'response',
                             method: str = 'idw',
                             grid_resolution: float = 0.01,
+                            max_grid_cells: int = 1_000_000,
                             **kwargs) -> Dict[str, Any]:
         """
         Spatial interpolation of vegetation data.
@@ -84,6 +79,10 @@ class SpatialAnalyzer:
             Interpolation method
         grid_resolution : float
             Grid cell resolution
+        max_grid_cells : int
+            Safety limit on the number of interpolation grid cells. A default
+            resolution that suits degrees will silently allocate billions of
+            cells for projected coordinates, so this fails fast instead.
         **kwargs
             Additional parameters for interpolation methods
             
@@ -110,9 +109,22 @@ class SpatialAnalyzer:
         x_buffer = (x_max - x_min) * 0.1
         y_buffer = (y_max - y_min) * 0.1
         
+        if grid_resolution <= 0:
+            raise ValueError("grid_resolution must be positive")
+
         x_grid = np.arange(x_min - x_buffer, x_max + x_buffer, grid_resolution)
         y_grid = np.arange(y_min - y_buffer, y_max + y_buffer, grid_resolution)
-        
+
+        n_cells = x_grid.size * y_grid.size
+        if n_cells > max_grid_cells:
+            raise ValueError(
+                f"grid_resolution={grid_resolution} over this extent would "
+                f"produce {n_cells:,} grid cells (limit {max_grid_cells:,}). "
+                "Use a coarser resolution or raise max_grid_cells."
+            )
+        if n_cells == 0:
+            raise ValueError("The requested grid is empty; check grid_resolution")
+
         X_grid, Y_grid = np.meshgrid(x_grid, y_grid)
         grid_points = np.column_stack([X_grid.ravel(), Y_grid.ravel()])
         
@@ -283,7 +295,9 @@ class SpatialAnalyzer:
                     cv_errors.append((predicted - test_value)**2)
             
             cv_rmse = np.sqrt(np.mean(cv_errors)) if cv_errors else np.nan
-        except:
+        except (ValueError, np.linalg.LinAlgError, KeyError):
+            # Leave-one-out can fail for degenerate point configurations;
+            # report that rather than letting it abort the interpolation.
             cv_rmse = np.nan
         
 # Copyright (c) 2025 Mohamed Z. Hatim
@@ -571,16 +585,38 @@ class SpatialAnalyzer:
         landscape_area = binary_mask.size * (cell_size ** 2)
         return (n_patches / landscape_area) * 10000  # per hectare
     
+    @staticmethod
+    def _total_edge_length(binary_mask: np.ndarray, cell_size: float,
+                           count_boundary: bool = True) -> float:
+        """
+        Total edge length of a patch class, in linear units.
+
+        Counts the cell *interfaces* between the class and its surroundings
+        (each contributing one cell side). A gradient-magnitude proxy, which is
+        what a naive implementation uses, counts cells rather than sides and so
+        is neither a length nor correctly scaled.
+        """
+        mask = binary_mask.astype(bool)
+        n_interfaces = 0
+
+        # Vertical interfaces between horizontally adjacent cells.
+        n_interfaces += int(np.sum(mask[:, :-1] != mask[:, 1:]))
+        # Horizontal interfaces between vertically adjacent cells.
+        n_interfaces += int(np.sum(mask[:-1, :] != mask[1:, :]))
+
+        if count_boundary:
+            # Cells of the class touching the edge of the raster.
+            n_interfaces += int(mask[:, 0].sum() + mask[:, -1].sum()
+                                + mask[0, :].sum() + mask[-1, :].sum())
+
+        return n_interfaces * cell_size
+
     def _edge_density(self, binary_mask: np.ndarray, landscape: np.ndarray,
-                     cell_size: float) -> float:
-        """Calculate edge density (edge length per area)."""
-# Copyright (c) 2025 Mohamed Z. Hatim
-        edges = np.gradient(binary_mask.astype(float))
-        edge_magnitude = np.sqrt(edges[0]**2 + edges[1]**2)
-        total_edge = np.sum(edge_magnitude > 0) * cell_size
-        
+                      cell_size: float) -> float:
+        """Edge density: total edge length per unit landscape area."""
+        total_edge = self._total_edge_length(binary_mask, cell_size)
         landscape_area = binary_mask.size * (cell_size ** 2)
-        return total_edge / landscape_area
+        return total_edge / landscape_area if landscape_area > 0 else 0.0
     
     def _mean_patch_size(self, binary_mask: np.ndarray, landscape: np.ndarray,
                         cell_size: float) -> float:
@@ -631,54 +667,77 @@ class SpatialAnalyzer:
         return (largest_patch / total_landscape) * 100
     
     def _landscape_shape_index(self, binary_mask: np.ndarray, landscape: np.ndarray,
-                              cell_size: float) -> float:
-        """Calculate landscape shape index."""
-# Copyright (c) 2025 Mohamed Z. Hatim
-        total_edge = self._edge_density(binary_mask, landscape, cell_size)
-        total_area = np.sum(binary_mask) * (cell_size ** 2)
-        
-        if total_area == 0:
-            return 0
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        min_edge = 4 * np.sqrt(total_area)  # Square perimeter
-        return total_edge / min_edge if min_edge > 0 else 0
-    
+                               cell_size: float) -> float:
+        """
+        Landscape shape index: observed edge relative to the most compact shape
+        of the same area (LSI = 1 for a perfect square, larger when convoluted).
+        """
+        # Must compare a *length* with a *length*; the previous version divided
+        # an edge density by a perimeter, mixing units.
+        total_edge = self._total_edge_length(binary_mask, cell_size)
+        total_area = float(np.sum(binary_mask)) * (cell_size ** 2)
+
+        if total_area <= 0:
+            return 0.0
+
+        min_edge = 4 * np.sqrt(total_area)  # perimeter of an equal-area square
+        return total_edge / min_edge if min_edge > 0 else 0.0
+
     def _contagion_index(self, binary_mask: np.ndarray, landscape: np.ndarray,
-                        cell_size: float) -> float:
-        """Calculate contagion index."""
-# Copyright (c) 2025 Mohamed Z. Hatim
+                         cell_size: float) -> float:
+        """
+        Contagion index (O'Neill et al. 1988), as a percentage.
+
+        ``CONTAG = [1 + sum_ij (P_i * q_ij) ln(P_i * q_ij) / (2 ln m)] * 100``
+        where ``P_i`` is the proportion of the landscape in class i, ``q_ij``
+        the proportion of class i's cell adjacencies that are with class j, and
+        ``m`` the number of classes. Two details matter: the term is
+        ``P_i * q_ij`` (not the raw joint adjacency proportion, which only
+        coincides when all classes have equal area), and the denominator is
+        ``2 ln m`` (with ``ln m`` the index is not bounded by 100).
+
+        CONTAG is 100 for a landscape of a single class and approaches 0 when
+        classes are equally abundant and randomly interspersed.
+        """
         patch_types = np.unique(landscape)
         n_types = len(patch_types)
-        
+
         if n_types <= 1:
-            return 100
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        adjacencies = np.zeros((n_types, n_types))
-        
-        for i in range(landscape.shape[0] - 1):
-            for j in range(landscape.shape[1] - 1):
-                type1 = landscape[i, j]
-                type2 = landscape[i+1, j]
-                type3 = landscape[i, j+1]
-                
-                idx1 = np.where(patch_types == type1)[0][0]
-                idx2 = np.where(patch_types == type2)[0][0]
-                idx3 = np.where(patch_types == type3)[0][0]
-                
-                adjacencies[idx1, idx2] += 1
-                adjacencies[idx1, idx3] += 1
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        total_adjacencies = np.sum(adjacencies)
-        if total_adjacencies == 0:
-            return 0
-        
-        proportions = adjacencies / total_adjacencies
-        contagion = 1 + np.sum(proportions * np.log(proportions + 1e-10)) / np.log(n_types)
-        
-        return contagion * 100
+            return 100.0
+
+        # Map class values onto 0..m-1 so adjacencies can be tallied with bincount.
+        lookup = {value: idx for idx, value in enumerate(patch_types)}
+        coded = np.vectorize(lookup.get)(landscape).astype(int)
+
+        def tally(a, b):
+            flat = a.ravel() * n_types + b.ravel()
+            counts = np.bincount(flat, minlength=n_types * n_types)
+            return counts.reshape(n_types, n_types).astype(float)
+
+        # All horizontal and vertical neighbour pairs, counted in both
+        # directions so the adjacency matrix is symmetric.
+        horizontal = tally(coded[:, :-1], coded[:, 1:])
+        vertical = tally(coded[:-1, :], coded[1:, :])
+        adjacencies = horizontal + horizontal.T + vertical + vertical.T
+
+        if adjacencies.sum() == 0:
+            return 0.0
+
+        # P_i: proportion of the landscape in each class.
+        class_counts = np.array([np.sum(coded == i) for i in range(n_types)], dtype=float)
+        p_i = class_counts / class_counts.sum()
+
+        # q_ij: proportion of class i's adjacencies that are with class j.
+        row_totals = adjacencies.sum(axis=1)
+        row_totals_safe = np.where(row_totals > 0, row_totals, 1.0)
+        q_ij = adjacencies / row_totals_safe[:, None]
+
+        terms = p_i[:, None] * q_ij
+        nonzero = terms > 0
+        entropy_term = float(np.sum(terms[nonzero] * np.log(terms[nonzero])))
+
+        contagion = 1 + entropy_term / (2 * np.log(n_types))
+        return float(np.clip(contagion, 0.0, 1.0) * 100)
     
     def _landscape_shannon_diversity(self, binary_mask: np.ndarray, landscape: np.ndarray,
                                    cell_size: float) -> float:
@@ -719,25 +778,23 @@ class SpatialAnalyzer:
         }
         
         if n_patches > 0:
-# Copyright (c) 2025 Mohamed Z. Hatim
             compactness_values = []
-            
+
             for patch_id in range(1, n_patches + 1):
                 patch = (labeled_patches == patch_id)
-                patch_area = np.sum(patch)
-                
-# Copyright (c) 2025 Mohamed Z. Hatim
-                patch_float = patch.astype(float)
-                edges = np.gradient(patch_float)
-                perimeter = np.sum(np.sqrt(edges[0]**2 + edges[1]**2) > 0)
-                
+                patch_area = float(np.sum(patch)) * (cell_size ** 2)
+
+                # True perimeter from cell interfaces, in the same linear units
+                # as the area's square root, so the ratio is dimensionless.
+                perimeter = self._total_edge_length(patch, cell_size)
+
                 if perimeter > 0:
-# Copyright (c) 2025 Mohamed Z. Hatim
                     compactness = (4 * np.pi * patch_area) / (perimeter ** 2)
                     compactness_values.append(compactness)
-            
-            metrics['mean_compactness'] = np.mean(compactness_values) if compactness_values else 0
-        
+
+            metrics['mean_compactness'] = (float(np.mean(compactness_values))
+                                           if compactness_values else 0.0)
+
         return metrics
     
     def _calculate_landscape_level_metrics(self, landscape: np.ndarray,
@@ -798,105 +855,161 @@ class SpatialAnalyzer:
         else:
             raise ValueError(f"Unknown method: {method}")
     
-    def _morans_i(self, points: np.ndarray, values: np.ndarray,
-                 distance_threshold: Optional[float] = None) -> Dict[str, Any]:
-        """Calculate Moran's I spatial autocorrelation."""
-        n = len(points)
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        distances = distance_matrix(points, points)
-        
+    @staticmethod
+    def _spatial_weights(points: np.ndarray,
+                         distance_threshold: Optional[float],
+                         row_standardize: bool):
+        """Binary (optionally row-standardised) distance-band weights matrix."""
+        distances = cdist(points, points)
+        off_diagonal = distances > 0
+
         if distance_threshold is None:
-# Copyright (c) 2025 Mohamed Z. Hatim
-            distance_threshold = np.mean(distances[distances > 0])
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        W = (distances <= distance_threshold) & (distances > 0)
-        W = W.astype(float)
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        row_sums = np.sum(W, axis=1)
-        W[row_sums > 0] = W[row_sums > 0] / row_sums[row_sums > 0][:, np.newaxis]
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        mean_val = np.mean(values)
-        deviations = values - mean_val
-        
-        numerator = np.sum(W * np.outer(deviations, deviations))
-        denominator = np.sum(deviations ** 2)
-        
-        if denominator == 0:
-            morans_i = 0
-        else:
-            morans_i = numerator / denominator
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        expected_i = -1 / (n - 1)
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-# Copyright (c) 2025 Mohamed Z. Hatim
-        z_score = (morans_i - expected_i) / np.sqrt(1 / n)  # Simplified standard error
-        p_value = 2 * (1 - stats.norm.cdf(abs(z_score)))
-        
+            distance_threshold = float(np.mean(distances[off_diagonal])) \
+                if off_diagonal.any() else 0.0
+
+        W = ((distances <= distance_threshold) & off_diagonal).astype(float)
+
+        if row_standardize:
+            row_sums = W.sum(axis=1)
+            nonzero = row_sums > 0
+            W[nonzero] = W[nonzero] / row_sums[nonzero][:, np.newaxis]
+
+        return W, distance_threshold
+
+    def _morans_i(self, points: np.ndarray, values: np.ndarray,
+                  distance_threshold: Optional[float] = None) -> Dict[str, Any]:
+        """
+        Moran's I spatial autocorrelation with a randomisation-based z test.
+
+        ``I = (n / S0) * sum_ij w_ij z_i z_j / sum_i z_i^2`` where
+        ``S0 = sum_ij w_ij``. The ``n / S0`` factor is required whenever any
+        site has no neighbours within the distance band (row standardisation
+        alone does not make ``S0 = n``). The variance uses the standard
+        randomisation-assumption formula rather than a placeholder.
+        """
+        n = len(points)
+        W, distance_threshold = self._spatial_weights(points, distance_threshold, True)
+
+        s0 = float(W.sum())
+        deviations = np.asarray(values, dtype=float) - np.mean(values)
+        denominator = float(np.sum(deviations ** 2))
+
+        if denominator == 0 or s0 == 0 or n < 3:
+            return {
+                'morans_i': 0.0, 'expected_i': -1 / (n - 1) if n > 1 else np.nan,
+                'variance': np.nan, 'z_score': 0.0, 'p_value': 1.0,
+                'distance_threshold': distance_threshold, 's0': s0,
+                'interpretation': 'random',
+            }
+
+        numerator = float(np.sum(W * np.outer(deviations, deviations)))
+        morans_i = (n / s0) * (numerator / denominator)
+
+        expected_i = -1.0 / (n - 1)
+        variance = self._morans_variance(W, deviations, n, s0)
+
+        if variance > 0:
+            z_score = (morans_i - expected_i) / np.sqrt(variance)
+            p_value = float(2 * stats.norm.sf(abs(z_score)))
+        else:  # pragma: no cover - degenerate weights
+            z_score, p_value = 0.0, 1.0
+
         return {
-            'morans_i': morans_i,
+            'morans_i': float(morans_i),
             'expected_i': expected_i,
-            'z_score': z_score,
+            'variance': variance,
+            'z_score': float(z_score),
             'p_value': p_value,
             'distance_threshold': distance_threshold,
-            'interpretation': 'positive' if morans_i > expected_i else 'negative' if morans_i < expected_i else 'random'
+            's0': s0,
+            'interpretation': ('positive' if morans_i > expected_i
+                               else 'negative' if morans_i < expected_i else 'random')
         }
-    
+
+    @staticmethod
+    def _morans_variance(W: np.ndarray, deviations: np.ndarray,
+                         n: int, s0: float) -> float:
+        """Variance of Moran's I under the randomisation assumption."""
+        s1 = 0.5 * float(np.sum((W + W.T) ** 2))
+        s2 = float(np.sum((W.sum(axis=1) + W.sum(axis=0)) ** 2))
+
+        m2 = float(np.sum(deviations ** 2)) / n
+        m4 = float(np.sum(deviations ** 4)) / n
+        if m2 == 0:
+            return 0.0
+        b2 = m4 / (m2 ** 2)  # kurtosis
+
+        a = n * ((n ** 2 - 3 * n + 3) * s1 - n * s2 + 3 * s0 ** 2)
+        b = b2 * ((n ** 2 - n) * s1 - 2 * n * s2 + 6 * s0 ** 2)
+        denom = (n - 1) * (n - 2) * (n - 3) * s0 ** 2
+        if denom == 0:
+            return 0.0
+
+        e_i2 = (a - b) / denom
+        return float(e_i2 - (-1.0 / (n - 1)) ** 2)
+
     def _gearys_c(self, points: np.ndarray, values: np.ndarray,
-                 distance_threshold: Optional[float] = None) -> Dict[str, Any]:
-        """Calculate Geary's C spatial autocorrelation."""
+                  distance_threshold: Optional[float] = None) -> Dict[str, Any]:
+        """
+        Geary's C spatial autocorrelation.
+
+        ``C = ((n - 1) * sum_ij w_ij (x_i - x_j)^2) / (2 * S0 * sum_i z_i^2)``.
+        The ``n - 1`` numerator (not ``n``) is what makes the expected value
+        exactly 1 under no autocorrelation. Values below 1 indicate positive
+        autocorrelation.
+        """
         n = len(points)
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        distances = distance_matrix(points, points)
-        
-        if distance_threshold is None:
-            distance_threshold = np.mean(distances[distances > 0])
-        
-        W = (distances <= distance_threshold) & (distances > 0)
-        W = W.astype(float)
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        numerator = 0
-        denominator = 0
-        mean_val = np.mean(values)
-        
-        for i in range(n):
-            for j in range(n):
-                if W[i, j] > 0:
-                    numerator += W[i, j] * (values[i] - values[j]) ** 2
-                    denominator += W[i, j]
-        
-        variance = np.var(values)
-        
-        if denominator == 0 or variance == 0:
-            gearys_c = 1
-        else:
-            gearys_c = numerator / (2 * denominator * variance)
-        
+        W, distance_threshold = self._spatial_weights(points, distance_threshold, False)
+
+        values = np.asarray(values, dtype=float)
+        deviations = values - values.mean()
+        sum_sq_dev = float(np.sum(deviations ** 2))
+        s0 = float(W.sum())
+
+        if s0 == 0 or sum_sq_dev == 0 or n < 3:
+            return {
+                'gearys_c': 1.0, 'expected_c': 1.0, 'z_score': 0.0, 'p_value': 1.0,
+                'distance_threshold': distance_threshold, 's0': s0,
+                'interpretation': 'random',
+            }
+
+        squared_differences = (values[:, None] - values[None, :]) ** 2
+        numerator = float(np.sum(W * squared_differences))
+
+        gearys_c = ((n - 1) * numerator) / (2 * s0 * sum_sq_dev)
+
+        # Normality-assumption variance (Cliff & Ord 1981).
+        s1 = 0.5 * float(np.sum((W + W.T) ** 2))
+        s2 = float(np.sum((W.sum(axis=1) + W.sum(axis=0)) ** 2))
+        variance = ((2 * s1 + s2) * (n - 1) - 4 * s0 ** 2) / (2 * (n + 1) * s0 ** 2)
+
+        if variance > 0:
+            z_score = (gearys_c - 1.0) / np.sqrt(variance)
+            p_value = float(2 * stats.norm.sf(abs(z_score)))
+        else:  # pragma: no cover
+            z_score, p_value = 0.0, 1.0
+
         return {
-            'gearys_c': gearys_c,
+            'gearys_c': float(gearys_c),
+            'expected_c': 1.0,
+            'variance': float(variance),
+            'z_score': float(z_score),
+            'p_value': p_value,
             'distance_threshold': distance_threshold,
-            'interpretation': 'positive' if gearys_c < 1 else 'negative' if gearys_c > 1 else 'random'
+            's0': s0,
+            'interpretation': ('positive' if gearys_c < 1
+                               else 'negative' if gearys_c > 1 else 'random')
         }
     
     def _calculate_variogram(self, points: np.ndarray, values: np.ndarray,
                            n_lags: int = 20) -> Dict[str, Any]:
         """Calculate empirical variogram."""
-        distances = distance_matrix(points, points)
+        distances = cdist(points, points)
         
 # Copyright (c) 2025 Mohamed Z. Hatim
         triu_indices = np.triu_indices(len(points), k=1)
         dist_pairs = distances[triu_indices]
-        value_pairs = np.array([(values[i], values[j]) for i, j in zip(triu_indices[0], triu_indices[1])])
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        squared_diffs = (value_pairs[:, 0] - value_pairs[:, 1]) ** 2
+        squared_diffs = (values[triu_indices[0]] - values[triu_indices[1]]) ** 2
         
 # Copyright (c) 2025 Mohamed Z. Hatim
         max_dist = np.max(dist_pairs)

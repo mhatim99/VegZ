@@ -6,7 +6,7 @@ Copyright (c) 2025 Mohamed Z. Hatim
 
 import numpy as np
 import pandas as pd
-from typing import Union, Optional, Tuple, List
+from typing import Union, Optional
 from scipy import stats
 import warnings
 
@@ -94,30 +94,31 @@ class DataTransformer:
                        **kwargs) -> Union[pd.DataFrame, np.ndarray]:
         """
         Chord transformation normalizes samples to unit length.
-        
-        Formula: x_ij / sqrt(sum(x_ij^2))
+
+        Formula: x_ij / sqrt(sum_j(x_ij^2))
         """
         if isinstance(data, pd.DataFrame):
             numeric_data = data.select_dtypes(include=[np.number])
             transformed_data = data.copy()
+            columns = numeric_data.columns
+            values = numeric_data.values.astype(float)
         else:
-            numeric_data = data.copy()
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        numeric_data = np.maximum(numeric_data, 0)
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        norms = np.sqrt(np.sum(numeric_data**2, axis=1))
-        norms[norms == 0] = 1  # Avoid division by zero
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        chord_data = numeric_data / norms[:, np.newaxis]
-        
+            columns = None
+            values = np.asarray(data, dtype=float)
+
+        values = np.maximum(values, 0)
+
+        # Operate on the underlying array: `series[:, np.newaxis]` is invalid
+        # for a pandas Series and raises in pandas >= 2.
+        norms = np.sqrt(np.sum(values ** 2, axis=1))
+        norms[norms == 0] = 1.0
+
+        chord_data = values / norms[:, np.newaxis]
+
         if isinstance(data, pd.DataFrame):
-            transformed_data[numeric_data.columns] = chord_data
+            transformed_data[columns] = chord_data
             return transformed_data
-        else:
-            return chord_data
+        return chord_data
     
     def log_chord_transform(self, data: Union[pd.DataFrame, np.ndarray],
                            **kwargs) -> Union[pd.DataFrame, np.ndarray]:
@@ -167,41 +168,45 @@ class DataTransformer:
     def chi_square_transform(self, data: Union[pd.DataFrame, np.ndarray],
                             **kwargs) -> Union[pd.DataFrame, np.ndarray]:
         """
-        Chi-square transformation for correspondence analysis.
-        
-        Formula: sqrt(n * p_ij / (p_i+ * p_+j))
+        Chi-square transformation (Legendre & Gallagher 2001).
+
+        Formula: ``y_ij = sqrt(x_++) * x_ij / (x_i+ * sqrt(x_+j))``.
+
+        Euclidean distances computed on the transformed table equal chi-square
+        distances on the original table, which is what makes this the right
+        pre-transformation for correspondence-analysis-style work.
         """
         if isinstance(data, pd.DataFrame):
             numeric_data = data.select_dtypes(include=[np.number])
             transformed_data = data.copy()
+            columns = numeric_data.columns
+            values = numeric_data.values.astype(float)
         else:
-            numeric_data = data.copy()
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        numeric_data = np.maximum(numeric_data, 0)
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        total_sum = np.sum(numeric_data)
-        if total_sum == 0:
+            columns = None
+            values = np.asarray(data, dtype=float)
+
+        values = np.maximum(values, 0)
+
+        # np.sum on a DataFrame reduces column-wise and yields a Series, so a
+        # scalar `if total == 0` test raises "truth value is ambiguous".
+        grand_total = float(values.sum())
+        if grand_total == 0:
             warnings.warn("Total sum is zero, returning original data")
             return data
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        row_sums = np.sum(numeric_data, axis=1)
-        col_sums = np.sum(numeric_data, axis=0)
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        expected = np.outer(row_sums, col_sums) / total_sum
-        expected[expected == 0] = 1  # Avoid division by zero
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        chi_sq_data = np.sqrt(numeric_data * total_sum / expected)
-        
+
+        row_sums = values.sum(axis=1)
+        col_sums = values.sum(axis=0)
+
+        safe_rows = np.where(row_sums > 0, row_sums, 1.0)
+        safe_cols = np.where(col_sums > 0, col_sums, 1.0)
+
+        chi_sq_data = (np.sqrt(grand_total) * values
+                       / (safe_rows[:, np.newaxis] * np.sqrt(safe_cols)[np.newaxis, :]))
+
         if isinstance(data, pd.DataFrame):
-            transformed_data[numeric_data.columns] = chi_sq_data
+            transformed_data[columns] = chi_sq_data
             return transformed_data
-        else:
-            return chi_sq_data
+        return chi_sq_data
     
     def log_transform(self, data: Union[pd.DataFrame, np.ndarray],
                      base: str = 'natural',

@@ -5,8 +5,7 @@ Copyright (c) 2025 Mohamed Z. Hatim
 """
 
 import pandas as pd
-import numpy as np
-from typing import Dict, List, Optional, Union, Any
+from typing import Dict, List, Optional, Any
 from datetime import datetime
 import warnings
 import uuid

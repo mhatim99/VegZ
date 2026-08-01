@@ -5,13 +5,15 @@ Copyright (c) 2025 Mohamed Z. Hatim
 """
 
 import pandas as pd
-import numpy as np
-import os
-from typing import Dict, List, Optional, Union, Any
-import xlrd
-import openpyxl
+from typing import Dict, List, Optional, Union
 from pathlib import Path
 import warnings
+
+from .._compat import require
+
+# openpyxl / xlrd are imported lazily inside _parse_excel. Importing them at
+# module scope made them hard requirements of `import VegZ`, even for users who
+# only ever read CSV files.
 
 
 class VegetationDataParser:
@@ -64,28 +66,19 @@ class VegetationDataParser:
         return parser_func(filepath, **kwargs)
     
     def _parse_csv(self, filepath: Path, **kwargs) -> pd.DataFrame:
-        """Parse CSV files."""
-        encoding = kwargs.get('encoding', 'utf-8')
-        separator = kwargs.get('sep', None)
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+        """Parse CSV files, sniffing the delimiter when it is not supplied."""
+        # Pop rather than get: leaving these in kwargs and also passing them
+        # explicitly to read_csv raises "got multiple values for keyword".
+        encoding = kwargs.pop('encoding', 'utf-8')
+        separator = kwargs.pop('sep', None)
+
         if separator is None:
-            with open(filepath, 'r', encoding=encoding) as f:
-                first_line = f.readline()
-                if '\t' in first_line:
-                    separator = '\t'
-                elif ';' in first_line:
-                    separator = ';'
-                elif ',' in first_line:
-                    separator = ','
-                else:
-                    separator = ','
-        
+            separator = self._sniff_separator(filepath, encoding)
+
         try:
             df = pd.read_csv(filepath, sep=separator, encoding=encoding, **kwargs)
         except UnicodeDecodeError:
-# Copyright (c) 2025 Mohamed Z. Hatim
-            for enc in ['latin-1', 'iso-8859-1', 'cp1252']:
+            for enc in ['utf-8-sig', 'latin-1', 'iso-8859-1', 'cp1252']:
                 try:
                     df = pd.read_csv(filepath, sep=separator, encoding=enc, **kwargs)
                     warnings.warn(f"Used encoding {enc} instead of {encoding}")
@@ -94,24 +87,51 @@ class VegetationDataParser:
                     continue
             else:
                 raise ValueError("Could not decode file with any common encoding")
-        
+
         return self._standardize_columns(df)
-    
+
+    @staticmethod
+    def _sniff_separator(filepath: Path, encoding: str) -> str:
+        """Guess the delimiter from the header line."""
+        try:
+            with open(filepath, 'r', encoding=encoding, errors='replace') as f:
+                first_line = f.readline()
+        except OSError:  # pragma: no cover - re-raised by the caller anyway
+            return ','
+
+        # Pick whichever candidate appears most often, not merely first.
+        candidates = ['\t', ';', ',', '|']
+        counts = {sep: first_line.count(sep) for sep in candidates}
+        best = max(counts, key=counts.get)
+        return best if counts[best] > 0 else ','
+
     def _parse_excel(self, filepath: Path, **kwargs) -> pd.DataFrame:
-        """Parse Excel files."""
-        sheet_name = kwargs.get('sheet_name', 0)
-        
+        """Parse Excel files (requires openpyxl for .xlsx, xlrd for legacy .xls)."""
+        sheet_name = kwargs.pop('sheet_name', 0)
+
+        suffix = filepath.suffix.lower()
+        if suffix == '.xls':
+            require('xlrd', 'Reading legacy .xls files', extra='excel')
+        else:
+            require('openpyxl', 'Reading .xlsx files', extra='excel')
+
         try:
             df = pd.read_excel(filepath, sheet_name=sheet_name, **kwargs)
         except Exception as e:
-            raise ValueError(f"Error reading Excel file: {e}")
-        
+            raise ValueError(f"Error reading Excel file: {e}") from e
+
+        if isinstance(df, dict):
+            raise ValueError(
+                "sheet_name selected multiple sheets; pass a single sheet name "
+                "or index to parse()."
+            )
+
         return self._standardize_columns(df)
-    
+
     def _parse_text(self, filepath: Path, **kwargs) -> pd.DataFrame:
         """Parse text/tab-delimited files."""
-        separator = kwargs.get('sep', '\t' if filepath.suffix == '.tab' else None)
-        return self._parse_csv(filepath, sep=separator, **kwargs)
+        kwargs.setdefault('sep', '\t' if filepath.suffix.lower() == '.tab' else None)
+        return self._parse_csv(filepath, **kwargs)
     
     def _standardize_columns(self, df: pd.DataFrame) -> pd.DataFrame:
         """Standardize column names and common data issues."""
@@ -196,41 +216,43 @@ class TurbovegParser(VegetationDataParser):
         
         return results
     
+    @staticmethod
+    def _rename_positional(df: pd.DataFrame, expected_cols: List[str]) -> pd.DataFrame:
+        """
+        Rename the leading columns by position.
+
+        Assigning into ``df.columns.values`` mutates the Index's backing array
+        in place, which pandas treats as undefined behaviour (an Index is meant
+        to be immutable, and the write may not propagate).
+        """
+        columns = list(df.columns)
+        for i, name in enumerate(expected_cols):
+            if i < len(columns):
+                columns[i] = name
+        df = df.copy()
+        df.columns = columns
+        return df
+
     def _parse_species_list(self, filepath: Path) -> pd.DataFrame:
         """Parse Turboveg species list file."""
         df = self._parse_text(filepath, sep='\t')
         
-# Copyright (c) 2025 Mohamed Z. Hatim
-        expected_cols = ['species_nr', 'species_name', 'author', 'family']
-        for i, col in enumerate(expected_cols):
-            if i < len(df.columns):
-                df.columns.values[i] = col
-        
-        return df
+        return self._rename_positional(
+            df, ['species_nr', 'species_name', 'author', 'family'])
     
     def _parse_releves(self, filepath: Path) -> pd.DataFrame:
         """Parse Turboveg releves/vegetation data."""
         df = self._parse_text(filepath, sep='\t')
         
-# Copyright (c) 2025 Mohamed Z. Hatim
-        expected_cols = ['releve_nr', 'species_nr', 'layer', 'cover_code', 'abundance']
-        for i, col in enumerate(expected_cols):
-            if i < len(df.columns):
-                df.columns.values[i] = col
-        
-        return df
+        return self._rename_positional(
+            df, ['releve_nr', 'species_nr', 'layer', 'cover_code', 'abundance'])
     
     def _parse_header_data(self, filepath: Path) -> pd.DataFrame:
         """Parse Turboveg header/site data."""
         df = self._parse_text(filepath, sep='\t')
         
-# Copyright (c) 2025 Mohamed Z. Hatim
-        expected_cols = ['releve_nr', 'date', 'author', 'latitude', 'longitude', 'altitude']
-        for i, col in enumerate(expected_cols):
-            if i < len(df.columns):
-                df.columns.values[i] = col
-        
-        return df
+        return self._rename_positional(
+            df, ['releve_nr', 'date', 'author', 'latitude', 'longitude', 'altitude'])
 
 
 class AgencyDataParser(VegetationDataParser):

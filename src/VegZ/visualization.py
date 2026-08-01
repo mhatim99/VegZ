@@ -11,15 +11,14 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from typing import Dict, List, Optional, Tuple, Union, Any
+from typing import Dict, List, Tuple, Union, Any
 import warnings
 from scipy.cluster.hierarchy import dendrogram
-from matplotlib.patches import Ellipse
-from matplotlib.collections import LineCollection
 
-# Copyright (c) 2025 Mohamed Z. Hatim
-plt.style.use('default')
-sns.set_palette('husl')
+# NOTE: VegZ deliberately does NOT call plt.style.use() or sns.set_palette()
+# at import time. Doing so mutates global matplotlib/seaborn state for the
+# whole interpreter, silently restyling plots the user makes elsewhere.
+# Styling is applied per-figure inside VegetationPlotter instead.
 
 
 class VegetationPlotter:
@@ -27,52 +26,94 @@ class VegetationPlotter:
     Main plotting class for vegetation analysis visualizations.
     """
     
-    def __init__(self, style: str = 'seaborn-v0_8', figsize: Tuple[int, int] = (10, 8)):
+    def __init__(self, style: str = 'seaborn-v0_8', figsize: Tuple[int, int] = (10, 8),
+                 apply_style_globally: bool = False):
         """
         Initialize the VegetationPlotter.
-        
+
         Parameters
         ----------
         style : str, optional
-            Matplotlib style to use, by default 'seaborn-v0_8'
+            Matplotlib style name, by default 'seaborn-v0_8'
         figsize : Tuple[int, int], optional
             Default figure size, by default (10, 8)
+        apply_style_globally : bool, optional
+            Call :func:`matplotlib.pyplot.style.use` for the whole session.
+            Off by default: constructing a plotter should not restyle figures
+            the caller creates elsewhere. When off, the style is applied only
+            to figures VegZ creates, via a context manager.
         """
-        try:
+        if style not in plt.style.available and style != 'default':
+            warnings.warn(f"Style '{style}' not available, using matplotlib defaults")
+            style = 'default'
+
+        self.style = style
+        if apply_style_globally:
             plt.style.use(style)
-        except:
-            plt.style.use('default')
-            warnings.warn(f"Style '{style}' not available, using default")
-        
+
         self.figsize = figsize
         self.colors = plt.cm.Set1.colors
+
+    def _styled(self):
+        """Context manager applying the plotter's style to one figure only."""
+        return plt.style.context(self.style)
     
-    def plot_diversity_indices(self, 
-                             diversity_data: Dict[str, Any],
+    @staticmethod
+    def _as_diversity_frame(diversity_data: Union[pd.DataFrame, Dict[str, Any]]) -> pd.DataFrame:
+        """
+        Coerce diversity results into a sites x indices DataFrame.
+
+        ``DiversityAnalyzer.calculate_all_indices`` returns a DataFrame
+        directly, so accepting only a ``{'diversity_indices': ...}`` dict made
+        the plotting layer unusable with the analysis layer's own output.
+        """
+        if isinstance(diversity_data, pd.DataFrame):
+            return diversity_data
+
+        if isinstance(diversity_data, dict):
+            if 'diversity_indices' in diversity_data:
+                payload = diversity_data['diversity_indices']
+                if isinstance(payload, pd.DataFrame):
+                    return payload
+                return pd.DataFrame(payload).T
+            # A plain {index_name: {site: value}} mapping.
+            if diversity_data:
+                return pd.DataFrame(diversity_data)
+
+        raise ValueError(
+            "Could not interpret diversity data: pass the DataFrame returned by "
+            "DiversityAnalyzer.calculate_all_indices(), or a dict with a "
+            "'diversity_indices' key."
+        )
+
+    def plot_diversity_indices(self,
+                             diversity_data: Union[pd.DataFrame, Dict[str, Any]],
                              indices: List[str] = None,
                              site_labels: bool = True) -> plt.Figure:
         """
         Plot diversity indices for multiple sites.
-        
+
         Parameters
         ----------
-        diversity_data : Dict[str, Any]
-            Diversity analysis results
+        diversity_data : pd.DataFrame or Dict[str, Any]
+            Either the sites x indices DataFrame returned by
+            :meth:`DiversityAnalyzer.calculate_all_indices`, or a dict with a
+            ``'diversity_indices'`` key.
         indices : List[str], optional
             Specific indices to plot
         site_labels : bool, optional
             Whether to show site labels on x-axis
-            
+
         Returns
         -------
         plt.Figure
             Figure object
         """
-        if 'diversity_indices' not in diversity_data:
+        diversity_df = self._as_diversity_frame(diversity_data)
+
+        if diversity_df.empty:
             raise ValueError("No diversity indices found in data")
-        
-        diversity_df = pd.DataFrame(diversity_data['diversity_indices']).T
-        
+
         if indices is not None:
             available_indices = [idx for idx in indices if idx in diversity_df.columns]
             if not available_indices:
@@ -98,7 +139,7 @@ class VegetationPlotter:
             bars = axes[i].bar(range(len(values)), values, alpha=0.7, color=self.colors[i % len(self.colors)])
             
 # Copyright (c) 2025 Mohamed Z. Hatim
-            for j, (bar, value) in enumerate(zip(bars, values)):
+            for bar, value in zip(bars, values):
                 height = bar.get_height()
                 axes[i].text(bar.get_x() + bar.get_width()/2., height + height*0.01,
                            f'{value:.2f}', ha='center', va='bottom', fontsize=8)
@@ -253,14 +294,42 @@ class VegetationPlotter:
         y = site_scores.iloc[:, axis2]
         
         if color_by is not None:
-            if isinstance(color_by, str):
 # Copyright (c) 2025 Mohamed Z. Hatim
-                colors = np.arange(len(x))  # Fallback coloring
+            if isinstance(color_by, str):
+                # Colouring by row order was the old fallback here, which is
+                # meaningless and silently wrong. There is no data frame in
+                # scope to resolve a column name against, so say so.
+                raise ValueError(
+                    f"color_by='{color_by}' cannot be resolved: plot_ordination "
+                    "has no environmental data to look a column name up in. "
+                    "Pass the values themselves as a pandas Series or array "
+                    "aligned to the sites."
+                )
+
+            values = pd.Series(color_by)
+            if len(values) != len(x):
+                raise ValueError(
+                    f"color_by has {len(values)} values but there are "
+                    f"{len(x)} sites"
+                )
+
+            if pd.api.types.is_numeric_dtype(values):
+                scatter = ax.scatter(x, y, c=values.values, s=80, alpha=0.7,
+                                     cmap='viridis')
+                plt.colorbar(scatter, ax=ax,
+                             label=getattr(color_by, 'name', None) or 'Value')
             else:
-                colors = color_by
-            
-            scatter = ax.scatter(x, y, c=colors, s=80, alpha=0.7, cmap='viridis')
-            plt.colorbar(scatter, ax=ax, label='Color Variable')
+                # Categorical grouping: one colour and one legend entry per
+                # level, which a continuous colour bar cannot represent.
+                categories = pd.Categorical(values)
+                palette = plt.cm.tab10(
+                    np.linspace(0, 1, max(len(categories.categories), 2)))
+                for code, level in enumerate(categories.categories):
+                    mask = (categories.codes == code)
+                    ax.scatter(x[mask], y[mask], s=80, alpha=0.7,
+                               color=palette[code % len(palette)],
+                               label=str(level))
+                ax.legend(title=getattr(color_by, 'name', None) or 'Group')
         else:
             ax.scatter(x, y, s=80, alpha=0.7, color='blue')
         
@@ -425,32 +494,43 @@ class VegetationPlotter:
             Figure object
         """
         site_scores = ordination_results['site_scores']
-        
+
+        # Accept either the whole envfit result dict or just its 'vectors' entry.
+        if isinstance(env_vectors, dict) and 'vectors' in env_vectors:
+            env_vectors = env_vectors['vectors']
+
         fig, ax = plt.subplots(figsize=self.figsize)
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        ax.scatter(site_scores.iloc[:, 0], site_scores.iloc[:, 1], 
+
+        ax.scatter(site_scores.iloc[:, 0], site_scores.iloc[:, 1],
                   alpha=0.7, s=80, color='lightblue', edgecolors='black')
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
         for var, data in env_vectors.items():
-            if data['p_value'] < significance_threshold:
-                arrow = data['arrow_coords']
-                r2 = data['r_squared']
-                
-# Copyright (c) 2025 Mohamed Z. Hatim
-                scale = 2.0
-                ax.arrow(0, 0, arrow[0] * scale, arrow[1] * scale,
-                        head_width=0.05, head_length=0.05,
-                        fc='red', ec='red', linewidth=2)
-                
-# Copyright (c) 2025 Mohamed Z. Hatim
-                label_pos = np.array(arrow) * scale * 1.2
-                ax.text(label_pos[0], label_pos[1], f'{var}\n(R²={r2:.3f})',
-                       fontsize=10, fontweight='bold', color='red',
-                       ha='center', va='center',
-                       bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
-        
+            p_value = data.get('p_value', np.nan)
+            # Plot the vector when it is significant, or when significance was
+            # not assessed at all (permutations=0) rather than silently dropping it.
+            if not (np.isnan(p_value) or p_value < significance_threshold):
+                continue
+
+            arrow = np.asarray(data['arrow_coords'], dtype=float)
+            r2 = data['r_squared']
+
+            # Scale arrows to the spread of the site scores so they stay
+            # visible whatever units the ordination axes happen to be in.
+            span = max(float(np.ptp(site_scores.iloc[:, 0])),
+                       float(np.ptp(site_scores.iloc[:, 1])))
+            scale = 0.4 * span if span > 0 else 1.0
+            head = 0.02 * span if span > 0 else 0.05
+
+            ax.arrow(0, 0, arrow[0] * scale, arrow[1] * scale,
+                     head_width=head, head_length=head,
+                     fc='red', ec='red', linewidth=2)
+
+            label_pos = arrow * scale * 1.15
+            ax.text(label_pos[0], label_pos[1], f'{var}\n(R²={r2:.3f})',
+                    fontsize=10, fontweight='bold', color='red',
+                    ha='center', va='center',
+                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+
 # Copyright (c) 2025 Mohamed Z. Hatim
         explained_var = ordination_results.get('explained_variance_ratio', [])
         if len(explained_var) >= 2:
@@ -706,7 +786,6 @@ def create_summary_plot(diversity_results: Dict[str, Any] = None,
     if n_plots == 1:
         axes = [axes]
     
-    plotter = VegetationPlotter()
     plot_idx = 0
     
 # Copyright (c) 2025 Mohamed Z. Hatim

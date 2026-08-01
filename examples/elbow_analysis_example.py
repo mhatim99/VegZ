@@ -9,7 +9,6 @@ Author: Mohamed Z. Hatim
 
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from VegZ import VegZ, quick_elbow_analysis, VegetationClustering
 
 def demonstrate_elbow_analysis():
@@ -97,9 +96,9 @@ def demonstrate_elbow_analysis():
     print("\nDetailed method information:")
     for method, details in detailed_results['method_details'].items():
         print(f"\n{method}:")
-        print(f"  Description: {details['description']}")
+        print(f"Description: {details['description']}")
         if 'reference' in details:
-            print(f"  Reference: {details['reference']}")
+            print(f"Reference: {details['reference']}")
     
     print("\n" + "="*60)
     print("METHOD 3: Quick Convenience Function")
@@ -140,31 +139,31 @@ def demonstrate_elbow_analysis():
         cluster_indicators = indicators[indicators['cluster'] == cluster].nlargest(3, 'indicator_value')
         print(f"\nCluster {cluster} top indicators:")
         for _, row in cluster_indicators.iterrows():
-            print(f"  {row['species']}: {row['indicator_value']:.1f}")
+            print(f"{row['species']}: {row['indicator_value']:.1f}")
     
     print("\n" + "="*60)
     print("SUMMARY")
     print("="*60)
     
     print("\nElbow Analysis Methods Available:")
-    print("• knee_locator: Kneedle algorithm (Satopaa et al., 2011)")
-    print("• derivative: Second derivative maximum")
-    print("• variance_explained: <10% additional variance threshold")
-    print("• distortion_jump: Jump method (Sugar & James, 2003)")
-    print("• l_method: L-method (Salvador & Chan, 2004)")
+    print("- knee_locator: Kneedle algorithm (Satopaa et al., 2011)")
+    print("- derivative: Second derivative maximum")
+    print("- variance_explained: <10% additional variance threshold")
+    print("- distortion_jump: Jump method (Sugar & James, 2003)")
+    print("- l_method: L-method (Salvador & Chan, 2004)")
     
     print("\nUsage Recommendations:")
-    print("• For quick analysis: use quick_elbow_analysis() or veg.quick_elbow_analysis()")
-    print("• For detailed analysis: use veg.elbow_analysis() with multiple methods")
-    print("• For research: use VegetationClustering.comprehensive_elbow_analysis()")
-    print("• Always validate results with ecological knowledge")
+    print("- For quick analysis: use quick_elbow_analysis() or veg.quick_elbow_analysis()")
+    print("- For detailed analysis: use veg.elbow_analysis() with multiple methods")
+    print("- For research: use VegetationClustering.comprehensive_elbow_analysis()")
+    print("- Always validate results with ecological knowledge")
     
     print("\nOutput includes:")
-    print("• Optimal k recommendations from each method")
-    print("• Consensus recommendation with confidence score")
-    print("• Comprehensive metrics (inertia, silhouette, Calinski-Harabasz)")
-    print("• Visualization plots (optional)")
-    print("• Method details and references")
+    print("- Optimal k recommendations from each method")
+    print("- Consensus recommendation with confidence score")
+    print("- Comprehensive metrics (inertia, silhouette, Calinski-Harabasz)")
+    print("- Visualization plots (optional)")
+    print("- Method details and references")
 
 if __name__ == "__main__":
     demonstrate_elbow_analysis()

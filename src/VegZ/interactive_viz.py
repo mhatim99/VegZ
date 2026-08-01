@@ -10,43 +10,44 @@ Copyright (c) 2025 Mohamed Z. Hatim
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
-from typing import Dict, List, Optional, Tuple, Union, Any
+from scipy.cluster.hierarchy import dendrogram
+from typing import Dict, List, Any
 import warnings
 
-try:
+
+from ._compat import optional_import
+
+# Interactive back-ends are optional. They are resolved quietly here and the
+# individual methods warn (or fall back to matplotlib) only when a feature that
+# actually needs them is called.
+_plotly = optional_import('plotly')
+PLOTLY_AVAILABLE = _plotly is not None
+if PLOTLY_AVAILABLE:
     import plotly.graph_objects as go
     import plotly.express as px
     from plotly.subplots import make_subplots
     import plotly.offline as pyo
-    PLOTLY_AVAILABLE = True
-except ImportError:
-    PLOTLY_AVAILABLE = False
-    warnings.warn("Plotly not available, interactive plots will be limited")
+else:  # pragma: no cover - exercised only without plotly installed
+    go = px = make_subplots = pyo = None
 
-try:
+_bokeh = optional_import('bokeh')
+BOKEH_AVAILABLE = _bokeh is not None
+if BOKEH_AVAILABLE:
     import bokeh.plotting as bk
     from bokeh.layouts import column, row
     from bokeh.models import HoverTool, ColorBar, LinearColorMapper
     from bokeh.palettes import Viridis256
-    BOKEH_AVAILABLE = True
-except ImportError:
-    BOKEH_AVAILABLE = False
-    warnings.warn("Bokeh not available, some interactive features will be limited")
+else:  # pragma: no cover
+    bk = column = row = HoverTool = ColorBar = LinearColorMapper = Viridis256 = None
 
-try:
+_jinja2 = optional_import('jinja2')
+JINJA2_AVAILABLE = _jinja2 is not None
+if JINJA2_AVAILABLE:
     from jinja2 import Template
-    JINJA2_AVAILABLE = True
-except ImportError:
-    JINJA2_AVAILABLE = False
-    warnings.warn("Jinja2 not available, report generation will be limited")
+else:  # pragma: no cover
+    Template = None
 
-try:
-    import base64
-    from io import BytesIO
-    REPORT_FEATURES_AVAILABLE = True
-except ImportError:
-    REPORT_FEATURES_AVAILABLE = False
+REPORT_FEATURES_AVAILABLE = True
 
 
 class InteractiveVisualizer:
@@ -58,8 +59,27 @@ class InteractiveVisualizer:
         """Initialize the InteractiveVisualizer."""
         self.plots = {}
         self.dashboard_components = []
-        
-    def create_diversity_dashboard(self, 
+
+    @staticmethod
+    def _check_dashboard(dashboard: Dict[str, Any], what: str,
+                         expected_keys: List[str]) -> Dict[str, Any]:
+        """
+        Warn when a dashboard came out empty.
+
+        Every panel is built behind an ``if key in results`` guard, so a
+        results dict that uses different key names produces an empty dict and
+        no explanation at all. Say which keys were looked for instead.
+        """
+        if not dashboard:
+            warnings.warn(
+                f"No plottable content found for the {what} dashboard: none of "
+                f"{expected_keys} are present in the results. "
+                "The dashboard is empty.",
+                UserWarning, stacklevel=3
+            )
+        return dashboard
+
+    def create_diversity_dashboard(self,
                                  diversity_results: Dict[str, Any],
                                  data: pd.DataFrame = None) -> Dict[str, Any]:
         """
@@ -163,10 +183,12 @@ class InteractiveVisualizer:
                 height=500
             )
             dashboard['rank_abundance'] = fig
-        
-        return dashboard
-    
-    def create_ordination_dashboard(self, 
+
+        return self._check_dashboard(
+            dashboard, 'diversity',
+            ['diversity_indices', 'species_abundance', 'rank_abundance'])
+
+    def create_ordination_dashboard(self,
                                   ordination_results: Dict[str, Any],
                                   environmental_data: pd.DataFrame = None,
                                   group_column: str = None) -> Dict[str, Any]:
@@ -298,10 +320,12 @@ class InteractiveVisualizer:
                 height=400
             )
             dashboard['scree_plot'] = fig
-        
-        return dashboard
-    
-    def create_clustering_dashboard(self, 
+
+        return self._check_dashboard(
+            dashboard, 'ordination',
+            ['site_scores', 'species_scores', 'explained_variance_ratio'])
+
+    def create_clustering_dashboard(self,
                                   clustering_results: Dict[str, Any],
                                   ordination_results: Dict[str, Any] = None) -> Dict[str, Any]:
         """
@@ -417,10 +441,12 @@ class InteractiveVisualizer:
                 height=600
             )
             dashboard['cluster_ordination'] = fig
-        
-        return dashboard
-    
-    def create_trait_dashboard(self, 
+
+        return self._check_dashboard(
+            dashboard, 'clustering',
+            ['dendrogram_data', 'validation_metrics', 'cluster_labels'])
+
+    def create_trait_dashboard(self,
                              trait_results: Dict[str, Any],
                              trait_data: pd.DataFrame = None) -> Dict[str, Any]:
         """
@@ -439,10 +465,10 @@ class InteractiveVisualizer:
             Dashboard components and plots
         """
         dashboard = {}
-        
+
         if not PLOTLY_AVAILABLE:
-            return {}
-        
+            return self._create_static_trait_plots(trait_results, trait_data)
+
 # Copyright (c) 2025 Mohamed Z. Hatim
         if 'site_diversity' in trait_results:
             site_fd = trait_results['site_diversity']
@@ -527,9 +553,10 @@ class InteractiveVisualizer:
                     )
                 
                 dashboard['trait_space'] = fig
-        
-        return dashboard
-    
+
+        return self._check_dashboard(
+            dashboard, 'trait', ['site_diversity', 'functional_groups'])
+
     def _create_static_diversity_plots(self, diversity_results: Dict[str, Any], 
                                      data: pd.DataFrame = None) -> Dict[str, plt.Figure]:
         """Create static diversity plots when Plotly is not available."""
@@ -546,9 +573,52 @@ class InteractiveVisualizer:
             plt.xticks(rotation=45)
             plt.tight_layout()
             plots['diversity_comparison'] = fig
-        
-        return plots
-    
+
+        return self._check_dashboard(plots, 'diversity', ['diversity_indices'])
+
+
+    def _create_static_trait_plots(self, trait_results: Dict[str, Any],
+                                   trait_data: pd.DataFrame = None) -> Dict[str, plt.Figure]:
+        """Create static trait plots when Plotly is not available."""
+        plots = {}
+
+        if 'site_diversity' in trait_results:
+            site_fd = pd.DataFrame(trait_results['site_diversity'])
+            metrics = [m for m in ('FRic', 'FEve', 'FDiv', 'FDis')
+                       if m in site_fd.columns]
+            if metrics:
+                fig, axes = plt.subplots(len(metrics), 1, sharex=True,
+                                         figsize=(10, 2.5 * len(metrics)))
+                for ax, metric in zip(np.atleast_1d(axes), metrics):
+                    ax.bar(range(len(site_fd)), site_fd[metric])
+                    ax.set_ylabel(metric)
+                axes_list = np.atleast_1d(axes)
+                axes_list[-1].set_xticks(range(len(site_fd)))
+                axes_list[-1].set_xticklabels(site_fd.index, rotation=45,
+                                              ha='right')
+                axes_list[0].set_title('Functional Diversity Indices by Site')
+                plt.tight_layout()
+                plots['functional_diversity'] = fig
+
+        if trait_data is not None and 'functional_groups' in trait_results:
+            groups = trait_results['functional_groups']['functional_groups']
+            numeric = trait_data.select_dtypes(include=[np.number]).columns[:2]
+            if len(numeric) >= 2:
+                subset = trait_data[numeric].fillna(trait_data[numeric].mean())
+                fig, ax = plt.subplots(figsize=(8, 7))
+                scatter = ax.scatter(subset.iloc[:, 0], subset.iloc[:, 1],
+                                     c=pd.factorize(pd.Series(groups))[0],
+                                     cmap='viridis', s=60)
+                ax.set_xlabel(numeric[0])
+                ax.set_ylabel(numeric[1])
+                ax.set_title('Functional Trait Space')
+                fig.colorbar(scatter, ax=ax, label='Functional Group')
+                plt.tight_layout()
+                plots['trait_space'] = fig
+
+        return self._check_dashboard(
+            plots, 'trait', ['site_diversity', 'functional_groups'])
+
     def _create_static_ordination_plots(self, ordination_results: Dict[str, Any]) -> Dict[str, plt.Figure]:
         """Create static ordination plots when Plotly is not available."""
         plots = {}
@@ -568,22 +638,71 @@ class InteractiveVisualizer:
             ax.set_title('Ordination Plot')
             plt.tight_layout()
             plots['ordination_plot'] = fig
-        
-        return plots
+
+        return self._check_dashboard(plots, 'ordination', ['site_scores'])
     
     def _create_static_clustering_plots(self, clustering_results: Dict[str, Any]) -> Dict[str, plt.Figure]:
-        """Create static clustering plots when Plotly is not available."""
-        plots = {}
-        
-        if 'validation_metrics' in clustering_results and 'silhouette_scores' in clustering_results['validation_metrics']:
-            fig, ax = plt.subplots(figsize=(10, 6))
-            ax.hist(clustering_results['validation_metrics']['silhouette_scores'], bins=20)
-            ax.set_title('Silhouette Score Distribution')
-            ax.set_xlabel('Silhouette Score')
-            ax.set_ylabel('Frequency')
+        """
+        Create static clustering plots when Plotly is not available.
+
+        Handles the result keys that VegZ's clustering functions actually
+        return. Returning an empty dict because none of the expected keys were
+        present is worse than an error - the caller gets silence and no
+        indication of why.
+        """
+        plots: Dict[str, plt.Figure] = {}
+
+        # Silhouette scores live at the top level of VegZ clustering results,
+        # and sometimes under 'validation_metrics'.
+        silhouette = clustering_results.get('silhouette_scores')
+        if silhouette is None:
+            silhouette = clustering_results.get(
+                'validation_metrics', {}).get('silhouette_scores')
+
+        if silhouette is not None:
+            values = np.asarray(pd.Series(silhouette).dropna(), dtype=float)
+            if values.size:
+                fig, ax = plt.subplots(figsize=(10, 6))
+                ax.hist(values, bins=min(20, max(5, values.size // 2)),
+                        edgecolor='black', alpha=0.75)
+                ax.axvline(values.mean(), color='red', linestyle='--',
+                           label=f'Mean: {values.mean():.3f}')
+                ax.set_title('Silhouette Score Distribution')
+                ax.set_xlabel('Silhouette Score')
+                ax.set_ylabel('Frequency')
+                ax.legend()
+                plt.tight_layout()
+                plots['silhouette_hist'] = fig
+
+        if 'linkage_matrix' in clustering_results:
+            fig, ax = plt.subplots(figsize=(12, 6))
+            dendrogram(clustering_results['linkage_matrix'], ax=ax,
+                       labels=clustering_results.get('site_labels'),
+                       leaf_rotation=90, leaf_font_size=8)
+            ax.set_title('Hierarchical Clustering Dendrogram')
+            ax.set_ylabel('Distance')
             plt.tight_layout()
-            plots['silhouette_hist'] = fig
-        
+            plots['dendrogram'] = fig
+
+        if 'cluster_labels' in clustering_results:
+            labels = pd.Series(clustering_results['cluster_labels'])
+            fig, ax = plt.subplots(figsize=(8, 5))
+            counts = labels.value_counts().sort_index()
+            ax.bar(counts.index.astype(str), counts.values, alpha=0.8,
+                   edgecolor='black')
+            ax.set_title('Cluster Sizes')
+            ax.set_xlabel('Cluster')
+            ax.set_ylabel('Number of sites')
+            plt.tight_layout()
+            plots['cluster_sizes'] = fig
+
+        if not plots:
+            warnings.warn(
+                "No clustering plots could be produced: the results contain "
+                "none of 'cluster_labels', 'linkage_matrix' or "
+                "'silhouette_scores'."
+            )
+
         return plots
     
     def save_dashboard(self, dashboard: Dict[str, Any], 
@@ -723,7 +842,8 @@ class ReportGenerator:
     {% for analysis_type, analysis_results in results.items() %}
     <h2>{{ analysis_type.replace('_', ' ').title() }}</h2>
     
-    {% if analysis_results %}
+    {# `is not none` rather than a truthiness test: a DataFrame raises on bool(). #}
+    {% if analysis_results is not none %}
         <p>Analysis completed successfully.</p>
         {% if analysis_results is mapping %}
             <ul>
@@ -777,7 +897,8 @@ class ReportGenerator:
 
 {% if analysis_type == 'diversity' %}
 # Copyright (c) 2025 Mohamed Z. Hatim
-- Analysis completed with {{ analysis_results.diversity_indices|length if analysis_results.diversity_indices else 0 }} sites
+{# `is not none` rather than a truthiness test: a DataFrame raises on bool(). #}
+- Analysis completed with {{ analysis_results.diversity_indices|length if analysis_results.diversity_indices is not none else 0 }} sites
 {% endif %}
 
 {% endfor %}

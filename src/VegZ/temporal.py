@@ -6,15 +6,13 @@ Copyright (c) 2025 Mohamed Z. Hatim
 
 import numpy as np
 import pandas as pd
-from typing import Union, List, Dict, Tuple, Optional, Any, Callable
-from scipy import stats, optimize, signal
+from typing import List, Dict, Tuple, Optional, Any, Callable
+from scipy import stats, optimize
 from scipy.interpolate import UnivariateSpline, interp1d
 from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import PolynomialFeatures, StandardScaler
-from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import PolynomialFeatures
 from sklearn.metrics import r2_score, mean_squared_error
 import warnings
-from datetime import datetime, timedelta
 
 
 class TemporalAnalyzer:
@@ -123,15 +121,27 @@ class TemporalAnalyzer:
             raise ValueError(f"Unknown model type: {model_type}")
         
         model_func = self.phenology_models[model_type]
-        
+
+        x = np.asarray(x, dtype=float)
+        y = np.asarray(y, dtype=float)
+
+        finite = np.isfinite(x) & np.isfinite(y)
+        x, y = x[finite], y[finite]
+
         try:
-# Copyright (c) 2025 Mohamed Z. Hatim
+            bounds = self._get_model_bounds(model_type, x, y)
+            # curve_fit defaults p0 to all ones, which is routinely outside
+            # these bounds (day-of-year lower bounds alone are usually > 1) and
+            # raises "x0 is infeasible" before fitting even starts.
+            p0 = self._get_model_start(model_type, x, y, bounds)
+
             popt, pcov = optimize.curve_fit(
                 model_func, x, y,
-                maxfev=5000,
-                bounds=self._get_model_bounds(model_type, x, y)
+                p0=p0,
+                maxfev=20000,
+                bounds=bounds
             )
-            
+
 # Copyright (c) 2025 Mohamed Z. Hatim
             y_pred = model_func(x, *popt)
             r_squared = r2_score(y, y_pred)
@@ -171,10 +181,18 @@ class TemporalAnalyzer:
         return a / (1 + np.exp(-b * (x - c))) + d
     
     def _double_sigmoid_model(self, x: np.ndarray, a1: float, b1: float, c1: float,
-                             a2: float, b2: float, c2: float, d: float) -> np.ndarray:
-        """Double sigmoid model for growing season."""
-        rise = a1 / (1 + np.exp(-b1 * (x - c1)))
-        fall = a2 / (1 + np.exp(b2 * (x - c2)))
+                              a2: float, b2: float, c2: float, d: float) -> np.ndarray:
+        """
+        Double-logistic growing-season model (Zhang et al. 2003).
+
+        Green-up is an increasing logistic at ``c1`` and senescence subtracts a
+        second increasing logistic at ``c2``, producing the characteristic
+        plateau between them. Both terms must be *increasing*: writing the
+        second as a decreasing logistic makes the whole expression monotonically
+        increasing and unable to represent a season at all.
+        """
+        rise = a1 / (1 + np.exp(-np.clip(b1 * (x - c1), -500, 500)))
+        fall = a2 / (1 + np.exp(-np.clip(b2 * (x - c2), -500, 500)))
         return rise - fall + d
     
     def _gaussian_model(self, x: np.ndarray, a: float, mu: float, 
@@ -197,34 +215,83 @@ class TemporalAnalyzer:
         """Weibull phenology model."""
         return a * (k / lambda_) * ((x / lambda_)**(k-1)) * np.exp(-((x / lambda_)**k)) + d
     
-    def _get_model_bounds(self, model_type: str, x: np.ndarray, 
-                         y: np.ndarray) -> Tuple[List, List]:
+    def _get_model_bounds(self, model_type: str, x: np.ndarray,
+                          y: np.ndarray) -> Tuple[List, List]:
         """Get parameter bounds for optimization."""
-        x_min, x_max = x.min(), x.max()
-        y_min, y_max = y.min(), y.max()
-        y_range = y_max - y_min
-        
+        x_min, x_max = float(x.min()), float(x.max())
+        y_min, y_max = float(y.min()), float(y.max())
+        x_span = max(x_max - x_min, np.finfo(float).eps)
+        y_range = max(y_max - y_min, np.finfo(float).eps)
+
+        # Rate bounds are expressed relative to the gradient span; a hard-coded
+        # upper bound of 1 makes the sigmoid unfittable whenever x is in days.
+        max_rate = 50.0 / x_span
+
         if model_type == 'sigmoid':
-            lower = [0, 0, x_min, y_min]
-            upper = [y_range * 2, 1, x_max, y_max]
+            lower = [0, 0, x_min, y_min - y_range]
+            upper = [y_range * 3, max_rate, x_max, y_max + y_range]
         elif model_type == 'double_sigmoid':
-            lower = [0, 0, x_min, 0, 0, x_min, y_min]
-            upper = [y_range * 2, 1, x_max, y_range * 2, 1, x_max, y_max]
+            lower = [0, 0, x_min, 0, 0, x_min, y_min - y_range]
+            upper = [y_range * 3, max_rate, x_max, y_range * 3, max_rate, x_max,
+                     y_max + y_range]
         elif model_type == 'gaussian':
-            lower = [0, x_min, 1, y_min]
-            upper = [y_range * 2, x_max, (x_max - x_min), y_max]
+            lower = [0, x_min - x_span, x_span * 1e-3, y_min - y_range]
+            upper = [y_range * 3, x_max + x_span, x_span * 5, y_max + y_range]
         elif model_type == 'beta':
-            lower = [0, 0.1, 0.1, x_min, x_min]
-            upper = [y_range * 2, 10, 10, x_max, x_max]
+            lower = [0, 1.0, 1.0, x_min - x_span, x_min]
+            upper = [y_range * 3, 20, 20, x_max, x_max + x_span]
         elif model_type == 'weibull':
-            lower = [0, 0.1, 1, y_min]
-            upper = [y_range * 2, 10, (x_max - x_min), y_max]
+            # `a` multiplies a Weibull *density*, whose peak is of order 1/x_span,
+            # so the amplitude must be allowed to scale with x_span - a bound of
+            # a few times y_range makes the model unfittable on day-of-year data.
+            lower = [0, 0.1, x_span * 1e-3, y_min - y_range]
+            upper = [np.inf, 20, x_span * 10, y_max + y_range]
         else:
-# Copyright (c) 2025 Mohamed Z. Hatim
             lower = [-np.inf] * 4
             upper = [np.inf] * 4
-        
+
         return lower, upper
+
+    def _get_model_start(self, model_type: str, x: np.ndarray, y: np.ndarray,
+                         bounds: Tuple[List, List]) -> List[float]:
+        """Data-driven, bounds-feasible starting values for phenology models."""
+        x_min, x_max = float(x.min()), float(x.max())
+        y_min, y_max = float(y.min()), float(y.max())
+        x_span = max(x_max - x_min, np.finfo(float).eps)
+        y_range = max(y_max - y_min, np.finfo(float).eps)
+        x_mid = float(np.median(x))
+
+        weights = np.clip(y - y_min, 0, None)
+        peak = float(np.average(x, weights=weights)) if weights.sum() > 0 else x_mid
+        rate = 4.0 / x_span
+
+        starts = {
+            'sigmoid': [y_range, rate, x_mid, y_min],
+            # Bracket the observed peak: the rise should sit before it and the
+            # fall after it, otherwise the two sigmoids cancel and the optimiser
+            # settles on a flat line.
+            'double_sigmoid': [y_range, rate, peak - x_span / 8,
+                               y_range, rate, peak + x_span / 8, y_min],
+            'gaussian': [y_range, peak, x_span / 4, y_min],
+            'beta': [y_range, 2.0, 2.0, x_min, x_max],
+            'weibull': [y_range * x_span, 2.0, x_span / 2, y_min],
+        }
+        p0 = starts.get(model_type, [1.0] * len(bounds[0]))
+
+        lower, upper = bounds
+        feasible = []
+        for value, lo, hi in zip(p0, lower, upper):
+            if np.isfinite(lo) and np.isfinite(hi):
+                # Nudge strictly inside so curve_fit never sees an infeasible x0.
+                margin = (hi - lo) * 1e-6
+                value = float(np.clip(value, lo + margin, hi - margin))
+            elif np.isfinite(lo):
+                value = float(max(value, lo + abs(lo) * 1e-6 + 1e-12))
+            elif np.isfinite(hi):
+                value = float(min(value, hi - abs(hi) * 1e-6 - 1e-12))
+            feasible.append(float(value))
+
+        return feasible
     
     def _extract_phenology_parameters(self, model_type: str, params: np.ndarray,
                                     x: np.ndarray) -> Dict[str, float]:
@@ -242,7 +309,14 @@ class TemporalAnalyzer:
             a1, b1, c1, a2, b2, c2, d = params
             pheno_params['green_up'] = c1
             pheno_params['senescence'] = c2
-            pheno_params['peak_amplitude'] = a1 - a2 + d
+            # Peak sits on the plateau between green-up and senescence; a1-a2+d
+            # is the post-season level, not the maximum.
+            plateau_x = (c1 + c2) / 2
+            pheno_params['peak_amplitude'] = float(
+                self._double_sigmoid_model(np.array([plateau_x]), *params)[0]
+            )
+            pheno_params['end_of_season_level'] = a1 - a2 + d
+            pheno_params['baseline'] = d
             pheno_params['growing_season_length'] = c2 - c1
             
         elif model_type == 'gaussian':
@@ -297,18 +371,22 @@ class TemporalAnalyzer:
         if method not in self.trend_methods:
             raise ValueError(f"Unknown trend method: {method}")
         
-# Copyright (c) 2025 Mohamed Z. Hatim
         data_clean = data.dropna(subset=[time_col, response_col])
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
         if not pd.api.types.is_numeric_dtype(data_clean[time_col]):
             time_numeric = pd.to_datetime(data_clean[time_col]).map(pd.Timestamp.toordinal)
         else:
             time_numeric = data_clean[time_col]
-        
-        x = time_numeric.values
-        y = data_clean[response_col].values
-        
+
+        x = np.asarray(time_numeric.values, dtype=float)
+        y = np.asarray(data_clean[response_col].values, dtype=float)
+
+        # Trend statistics (Mann-Kendall in particular) assume the series is in
+        # time order. Sorting here makes the result independent of how the rows
+        # happened to be arranged in the input table.
+        order = np.argsort(x, kind='stable')
+        x, y = x[order], y[order]
+
 # Copyright (c) 2025 Mohamed Z. Hatim
         trend_func = self.trend_methods[method]
         results = trend_func(x, y, **kwargs)
@@ -380,14 +458,33 @@ class TemporalAnalyzer:
             'polynomial_features': poly_features
         }
     
-    def _spline_trend(self, x: np.ndarray, y: np.ndarray, 
-                     smoothing: float = None, **kwargs) -> Dict[str, Any]:
-        """Spline trend analysis."""
-# Copyright (c) 2025 Mohamed Z. Hatim
+    def _spline_trend(self, x: np.ndarray, y: np.ndarray,
+                      smoothing: float = None, **kwargs) -> Dict[str, Any]:
+        """Spline trend analysis (predictor need not be strictly increasing)."""
+        x = np.asarray(x, dtype=float)
+        y = np.asarray(y, dtype=float)
+
         if smoothing is None:
-            smoothing = len(x)
-        
-        spline = UnivariateSpline(x, y, s=smoothing)
+            # Scale with the variance so the default is not sensitive to the
+            # units of the response.
+            smoothing = float(len(x) * np.var(y))
+
+        # UnivariateSpline requires strictly increasing x; average duplicates.
+        order = np.argsort(x, kind='stable')
+        x_sorted, y_sorted = x[order], y[order]
+        x_unique, inverse = np.unique(x_sorted, return_inverse=True)
+        if x_unique.size != x_sorted.size:
+            y_unique = np.bincount(inverse, weights=y_sorted) / np.bincount(inverse)
+        else:
+            y_unique = y_sorted
+
+        if x_unique.size < 4:
+            raise ValueError(
+                "Spline trend needs at least 4 distinct time points; "
+                f"got {x_unique.size}."
+            )
+
+        spline = UnivariateSpline(x_unique, y_unique, s=smoothing)
         y_pred = spline(x)
         
 # Copyright (c) 2025 Mohamed Z. Hatim
@@ -433,7 +530,7 @@ class TemporalAnalyzer:
             warnings.warn("statsmodels not available, using simple moving average")
 # Copyright (c) 2025 Mohamed Z. Hatim
             window = max(3, int(len(x) * frac))
-            y_pred = pd.Series(y).rolling(window, center=True).mean().fillna(method='bfill').fillna(method='ffill').values
+            y_pred = pd.Series(y).rolling(window, center=True).mean().bfill().ffill().values
             
             return {
                 'predicted_values': y_pred,
@@ -441,63 +538,80 @@ class TemporalAnalyzer:
                 'method': 'moving_average_fallback'
             }
     
-    def _mann_kendall_trend(self, x: np.ndarray, y: np.ndarray, 
-                           alpha: float = 0.05, **kwargs) -> Dict[str, Any]:
-        """Mann-Kendall trend test."""
+    def _mann_kendall_trend(self, x: np.ndarray, y: np.ndarray,
+                            alpha: float = 0.05, **kwargs) -> Dict[str, Any]:
+        """
+        Mann-Kendall trend test with Sen's slope estimator.
+
+        Assumes ``x`` (time) is ascending; :meth:`trend_detection` guarantees
+        this. Ties are handled with the standard variance correction and the
+        continuity-corrected normal approximation is used for the p-value.
+        """
+        x = np.asarray(x, dtype=float)
+        y = np.asarray(y, dtype=float)
         n = len(y)
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        s = 0
-        for i in range(n - 1):
-            for j in range(i + 1, n):
-                if y[j] > y[i]:
-                    s += 1
-                elif y[j] < y[i]:
-                    s -= 1
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-# Copyright (c) 2025 Mohamed Z. Hatim
-        unique_vals, counts = np.unique(y, return_counts=True)
-        tie_adjustment = np.sum(counts * (counts - 1) * (2 * counts + 5))
-        
-        var_s = (n * (n - 1) * (2 * n + 5) - tie_adjustment) / 18
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        if s > 0:
+
+        if n < 3:
+            return {
+                's_statistic': 0, 'z_statistic': 0.0, 'p_value': 1.0,
+                'trend': 'insufficient data', 'sens_slope': 0.0,
+                'sens_slope_ci': (np.nan, np.nan), 'alpha': alpha,
+                'n_observations': n, 'significant': False,
+            }
+
+        # S = sum over i<j of sign(y_j - y_i), computed without Python loops.
+        signs = np.sign(y[None, :] - y[:, None])
+        s = float(np.sum(np.triu(signs, k=1)))
+
+        _, counts = np.unique(y, return_counts=True)
+        tie_adjustment = float(np.sum(counts * (counts - 1) * (2 * counts + 5)))
+        var_s = (n * (n - 1) * (2 * n + 5) - tie_adjustment) / 18.0
+
+        if var_s <= 0:
+            z = 0.0
+        elif s > 0:
             z = (s - 1) / np.sqrt(var_s)
         elif s < 0:
             z = (s + 1) / np.sqrt(var_s)
         else:
-            z = 0
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        p_value = 2 * (1 - stats.norm.cdf(abs(z)))
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+            z = 0.0
+
+        p_value = float(2 * stats.norm.sf(abs(z)))
+
         if p_value < alpha:
-            if s > 0:
-                trend = 'increasing'
-            else:
-                trend = 'decreasing'
+            trend = 'increasing' if s > 0 else 'decreasing'
         else:
             trend = 'no significant trend'
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        slopes = []
-        for i in range(n - 1):
-            for j in range(i + 1, n):
-                if x[j] != x[i]:
-                    slopes.append((y[j] - y[i]) / (x[j] - x[i]))
-        
-        sens_slope = np.median(slopes) if slopes else 0
-        
+
+        # Sen's slope: median of all pairwise slopes.
+        i_idx, j_idx = np.triu_indices(n, k=1)
+        dx = x[j_idx] - x[i_idx]
+        usable = dx != 0
+        slopes = (y[j_idx][usable] - y[i_idx][usable]) / dx[usable]
+
+        if slopes.size:
+            sens_slope = float(np.median(slopes))
+            # Distribution-free confidence interval for Sen's slope.
+            c_alpha = stats.norm.ppf(1 - alpha / 2) * np.sqrt(var_s)
+            n_slopes = slopes.size
+            lower_rank = int(np.floor((n_slopes - c_alpha) / 2))
+            upper_rank = int(np.ceil((n_slopes + c_alpha) / 2))
+            sorted_slopes = np.sort(slopes)
+            lower = float(sorted_slopes[max(lower_rank, 0)])
+            upper = float(sorted_slopes[min(upper_rank, n_slopes - 1)])
+            ci = (lower, upper)
+        else:
+            sens_slope, ci = 0.0, (np.nan, np.nan)
+
         return {
             's_statistic': s,
-            'z_statistic': z,
+            'z_statistic': float(z),
             'p_value': p_value,
             'trend': trend,
             'sens_slope': sens_slope,
+            'sens_slope_ci': ci,
             'alpha': alpha,
+            'n_observations': n,
             'significant': p_value < alpha
         }
     
@@ -641,16 +755,21 @@ class TemporalAnalyzer:
         if isinstance(ts.index, pd.DatetimeIndex):
             freq = pd.infer_freq(ts.index)
             if freq:
-                if 'D' in freq:
-                    return 365
-                elif 'M' in freq:
-                    return 12
-                elif 'W' in freq:
-                    return 52
-                elif 'Q' in freq:
-                    return 4
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+                # Match on the leading frequency code, not by substring: pandas
+                # aliases such as 'QE-DEC' and 'YS-JAN' contain 'D'/'S' and a
+                # naive `in` test misclassifies quarterly data as daily.
+                base = freq.split('-')[0].lstrip('0123456789').upper()
+                period_by_base = {
+                    'D': 365, 'B': 252,
+                    'W': 52,
+                    'M': 12, 'ME': 12, 'MS': 12,
+                    'Q': 4, 'QE': 4, 'QS': 4,
+                    'Y': 1, 'YE': 1, 'YS': 1, 'A': 1, 'AS': 1,
+                    'H': 24, 'h': 24,
+                }
+                if base in period_by_base:
+                    return period_by_base[base]
+
         return max(4, min(len(ts) // 4, 365))
     
 # Copyright (c) 2025 Mohamed Z. Hatim
@@ -661,8 +780,8 @@ class TemporalAnalyzer:
                                   climate_data: pd.DataFrame,
                                   time_col: str = 'date',
                                   veg_col: str = 'response',
-                                  climate_vars: List[str] = None,
-                                  lag_periods: List[int] = [0, 1, 2, 3]) -> Dict[str, Any]:
+                                  climate_vars: Optional[List[str]] = None,
+                                  lag_periods: Optional[List[int]] = None) -> Dict[str, Any]:
         """
         Analyze vegetation response to climate variables.
         
@@ -687,6 +806,9 @@ class TemporalAnalyzer:
             Climate-vegetation response analysis
         """
 # Copyright (c) 2025 Mohamed Z. Hatim
+        if lag_periods is None:
+            lag_periods = [0, 1, 2, 3]
+
         veg_clean = vegetation_data.dropna(subset=[time_col, veg_col])
         climate_clean = climate_data.dropna(subset=[time_col])
         
@@ -798,8 +920,9 @@ class TemporalAnalyzer:
                     best_r2 = r2
                     best_curve = curve_name
                     best_params = popt
-                    
-            except:
+
+            except (RuntimeError, TypeError, ValueError):
+                # curve_fit raises RuntimeError when it fails to converge.
                 continue
         
         return {
@@ -940,7 +1063,6 @@ class TemporalAnalyzer:
     def _get_growth_initial_guess(self, t: np.ndarray, size: np.ndarray, 
                                  model_func: Callable) -> List[float]:
         """Get initial parameter guesses for growth curves."""
-        t_range = t.max() - t.min()
         size_max = size.max()
         size_min = size.min()
         

@@ -9,27 +9,12 @@ Copyright (c) 2025 Mohamed Z. Hatim
 
 import numpy as np
 import pandas as pd
-import warnings
-from typing import Dict, List, Optional, Tuple, Union, Any, Callable
-from scipy import stats
-from scipy.spatial.distance import pdist, squareform
+from typing import Dict, List, Tuple, Any
 import matplotlib.pyplot as plt
-import seaborn as sns
-from itertools import combinations
-import random
 
-try:
-    from numba import jit, prange
-    NUMBA_AVAILABLE = True
-except ImportError:
-    NUMBA_AVAILABLE = False
-    warnings.warn("Numba not available, some computations will be slower")
-# Copyright (c) 2025 Mohamed Z. Hatim
-    def jit(*args, **kwargs):
-        def decorator(func):
-            return func
-        return decorator
-    prange = range
+from ._compat import as_generator
+
+NUMBA_AVAILABLE = False
 
 
 class NestednessAnalyzer:
@@ -48,9 +33,11 @@ class NestednessAnalyzer:
         random_state : int, optional
             Random state for reproducibility, by default 42
         """
+        # Use a private Generator rather than seeding NumPy's global RNG:
+        # constructing an analyser must not silently reset randomness for the
+        # rest of the user's program.
         self.random_state = random_state
-        np.random.seed(random_state)
-        random.seed(random_state)
+        self.rng = as_generator(random_state)
         self.matrix_data = None
         self.nestedness_results = {}
         
@@ -157,121 +144,156 @@ class NestednessAnalyzer:
     
     def _calculate_nodf(self, matrix: pd.DataFrame) -> Dict[str, float]:
         """
-        Calculate NODF (Nestedness based on Overlap and Decreasing Fill).
-        
+        NODF - Nestedness metric based on Overlap and Decreasing Fill.
+
+        Almeida-Neto et al. (2008). For every pair of rows (and every pair of
+        columns) the paired nestedness is the percentage overlap when fill
+        strictly decreases, and 0 when the two marginal totals are equal. The
+        average is taken over *all* pairs.
+
         Parameters
         ----------
         matrix : pd.DataFrame
             Sorted presence-absence matrix
-            
+
         Returns
         -------
         Dict[str, float]
-            NODF values for rows, columns, and overall
+            NODF for rows, columns and overall (0-100).
+
+        Notes
+        -----
+        Averaging over all pairs is what bounds NODF at 100. Dividing only by
+        the pairs that happened to have decreasing fill - as a naive
+        implementation does - inflates the value, badly so for matrices with
+        many equal row or column totals.
         """
-        matrix_values = matrix.values.astype(float)
-        n_sites, n_species = matrix_values.shape
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        row_nodf = 0
-        row_pairs = 0
-        
-        for i in range(n_sites - 1):
-            for j in range(i + 1, n_sites):
-                marginal_i = np.sum(matrix_values[i, :])
-                marginal_j = np.sum(matrix_values[j, :])
-                
-                if marginal_i > marginal_j and marginal_j > 0:
-# Copyright (c) 2025 Mohamed Z. Hatim
-                    paired_species = np.sum(matrix_values[i, :] * matrix_values[j, :])
-                    row_nodf += (paired_species / marginal_j) * 100
-                    row_pairs += 1
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        col_nodf = 0
-        col_pairs = 0
-        
-        for i in range(n_species - 1):
-            for j in range(i + 1, n_species):
-                marginal_i = np.sum(matrix_values[:, i])
-                marginal_j = np.sum(matrix_values[:, j])
-                
-                if marginal_i > marginal_j and marginal_j > 0:
-# Copyright (c) 2025 Mohamed Z. Hatim
-                    paired_sites = np.sum(matrix_values[:, i] * matrix_values[:, j])
-                    col_nodf += (paired_sites / marginal_j) * 100
-                    col_pairs += 1
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        total_pairs = row_pairs + col_pairs
+        matrix_values = (matrix.values > 0).astype(float)
+
+        row_nodf, n_row_pairs = self._paired_nestedness(matrix_values)
+        col_nodf, n_col_pairs = self._paired_nestedness(matrix_values.T)
+
+        total_pairs = n_row_pairs + n_col_pairs
         if total_pairs > 0:
-            overall_nodf = (row_nodf + col_nodf) / total_pairs
+            overall_nodf = ((row_nodf * n_row_pairs + col_nodf * n_col_pairs)
+                            / total_pairs)
         else:
-            overall_nodf = 0
-        
+            overall_nodf = 0.0
+
         return {
-            'nodf_rows': row_nodf / row_pairs if row_pairs > 0 else 0,
-            'nodf_columns': col_nodf / col_pairs if col_pairs > 0 else 0,
+            'nodf_rows': row_nodf,
+            'nodf_columns': col_nodf,
             'nodf_overall': overall_nodf,
-            'n_row_pairs': row_pairs,
-            'n_col_pairs': col_pairs
+            'n_row_pairs': n_row_pairs,
+            'n_col_pairs': n_col_pairs
         }
+
+    @staticmethod
+    def _paired_nestedness(matrix: np.ndarray) -> Tuple[float, int]:
+        """Mean paired-overlap nestedness across all row pairs, and the pair count."""
+        n = matrix.shape[0]
+        if n < 2:
+            return 0.0, 0
+
+        marginals = matrix.sum(axis=1)
+        overlap = matrix @ matrix.T
+
+        i_idx, j_idx = np.triu_indices(n, k=1)
+        mt_i, mt_j = marginals[i_idx], marginals[j_idx]
+
+        # Orient each pair so that "i" is the richer row.
+        richer = np.maximum(mt_i, mt_j)
+        poorer = np.minimum(mt_i, mt_j)
+        shared = overlap[i_idx, j_idx]
+
+        # Decreasing fill required; equal totals contribute 0 but still count.
+        with np.errstate(divide='ignore', invalid='ignore'):
+            paired = np.where((richer > poorer) & (poorer > 0),
+                              shared / poorer * 100.0, 0.0)
+
+        n_pairs = int(i_idx.size)
+        return float(paired.sum() / n_pairs), n_pairs
     
     def _calculate_temperature(self, matrix: pd.DataFrame) -> Dict[str, float]:
         """
-        Calculate matrix temperature (nestedness metric).
-        
-        Parameters
-        ----------
-        matrix : pd.DataFrame
-            Sorted presence-absence matrix
-            
+        Matrix temperature (Atmar & Patterson 1993).
+
+        The packed matrix is compared with the isocline of perfect nestedness
+        for its fill. Cells on the "wrong" side of the isocline (absences in the
+        filled region, presences in the empty region) are unexpected; each
+        contributes ``(d / D)^2``, where ``d`` is its distance from the isocline
+        along the matrix diagonal and ``D`` the full diagonal length through
+        that cell. Temperature is the mean unexpectedness rescaled so that a
+        maximally disordered matrix scores 100.
+
         Returns
         -------
         Dict[str, float]
-            Temperature values and related metrics
+            ``temperature`` (0 = perfectly nested, 100 = maximally disordered),
+            plus the counts of unexpected presences/absences and the fill.
+
+        Notes
+        -----
+        Vectorised; the earlier quadruple loop over all cell pairs was both
+        O(n^2 m^2) and unrelated to the published metric.
         """
-        matrix_values = matrix.values.astype(float)
+        matrix_values = (matrix.values > 0).astype(float)
         n_sites, n_species = matrix_values.shape
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        unexpected_absences = 0
-        unexpected_presences = 0
-        total_comparisons = 0
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        for i in range(n_sites):
-            for j in range(n_species):
-                for ii in range(i, n_sites):
-                    for jj in range(j, n_species):
-                        if i == ii and j == jj:
-                            continue
-                        
-# Copyright (c) 2025 Mohamed Z. Hatim
-                        current = matrix_values[i, j]
-                        comparison = matrix_values[ii, jj]
-                        
-# Copyright (c) 2025 Mohamed Z. Hatim
-# Copyright (c) 2025 Mohamed Z. Hatim
-                        if i < ii and j < jj:  # More rich site and more frequent species
-                            if current == 0 and comparison == 1:
-                                unexpected_presences += 1
-                            elif current == 1 and comparison == 0:
-                                unexpected_absences += 1
-                        
-                        total_comparisons += 1
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        if total_comparisons > 0:
-            temperature = (unexpected_absences + unexpected_presences) / total_comparisons * 100
-        else:
-            temperature = 0
-        
+
+        if n_sites < 2 or n_species < 2:
+            return {'temperature': 0.0, 'unexpected_absences': 0,
+                    'unexpected_presences': 0, 'fill': float(matrix_values.mean()),
+                    'n_unexpected': 0}
+
+        fill = float(matrix_values.sum() / matrix_values.size)
+        if fill <= 0 or fill >= 1:
+            return {'temperature': 0.0, 'unexpected_absences': 0,
+                    'unexpected_presences': 0, 'fill': fill, 'n_unexpected': 0}
+
+        # Normalised cell coordinates in the unit square.
+        x = (np.arange(n_species) + 0.5) / n_species
+        y = (np.arange(n_sites) + 0.5) / n_sites
+        X, Y = np.meshgrid(x, y)
+
+        # Isocline of perfect nestedness enclosing the observed fill.
+        # y = (1 - x)^p, with p chosen so the area under the curve equals fill.
+        # Area of (1-x)^p over [0,1] is 1/(p+1), so p = 1/fill - 1.
+        p = 1.0 / fill - 1.0
+        isocline_y = (1 - X) ** p
+
+        # Above the curve => expected to be filled; below => expected empty.
+        expected_present = Y <= isocline_y
+
+        unexpected_absence = expected_present & (matrix_values == 0)
+        unexpected_presence = (~expected_present) & (matrix_values == 1)
+        unexpected = unexpected_absence | unexpected_presence
+
+        n_unexpected = int(unexpected.sum())
+        if n_unexpected == 0:
+            return {'temperature': 0.0, 'unexpected_absences': 0,
+                    'unexpected_presences': 0, 'fill': fill, 'n_unexpected': 0}
+
+        # Distance from the isocline, measured vertically and normalised by the
+        # available room on that side (a proxy for the diagonal normalisation).
+        with np.errstate(divide='ignore', invalid='ignore'):
+            room = np.where(expected_present, isocline_y, 1 - isocline_y)
+            room = np.where(room > 1e-12, room, 1e-12)
+            d_over_D = np.abs(Y - isocline_y) / room
+        d_over_D = np.clip(d_over_D, 0.0, 1.0)
+
+        unexpectedness = np.where(unexpected, d_over_D ** 2, 0.0)
+        mean_unexpectedness = float(unexpectedness.sum() / matrix_values.size)
+
+        # Atmar & Patterson's normalising constant for a maximally disordered
+        # matrix; 100 / 0.04145 maps that case onto T = 100.
+        temperature = float(np.clip(mean_unexpectedness / 0.04145, 0.0, 1.0) * 100)
+
         return {
             'temperature': temperature,
-            'unexpected_absences': unexpected_absences,
-            'unexpected_presences': unexpected_presences,
-            'total_comparisons': total_comparisons
+            'unexpected_absences': int(unexpected_absence.sum()),
+            'unexpected_presences': int(unexpected_presence.sum()),
+            'n_unexpected': n_unexpected,
+            'fill': fill,
         }
     
     def _calculate_c_score(self, matrix: pd.DataFrame) -> Dict[str, float]:
@@ -437,10 +459,9 @@ class NullModels:
     """
     
     def __init__(self, random_state: int = 42):
-        """Initialize null models."""
+        """Initialize null models with a private random generator."""
         self.random_state = random_state
-        np.random.seed(random_state)
-        random.seed(random_state)
+        self.rng = as_generator(random_state)
     
     def generate_null_matrices(self,
                              matrix: pd.DataFrame,
@@ -500,7 +521,7 @@ class NullModels:
             for i in range(n_sites):
                 row_sum = np.sum(matrix[i, :])
                 if row_sum > 0:
-                    chosen_cols = np.random.choice(n_species, size=row_sum, replace=False)
+                    chosen_cols = self.rng.choice(n_species, size=row_sum, replace=False)
                     null_matrix[i, chosen_cols] = 1
         elif fixed_marginals == 'columns':
 # Copyright (c) 2025 Mohamed Z. Hatim
@@ -508,12 +529,12 @@ class NullModels:
             for j in range(n_species):
                 col_sum = np.sum(matrix[:, j])
                 if col_sum > 0:
-                    chosen_rows = np.random.choice(n_sites, size=col_sum, replace=False)
+                    chosen_rows = self.rng.choice(n_sites, size=col_sum, replace=False)
                     null_matrix[chosen_rows, j] = 1
         else:  # none
 # Copyright (c) 2025 Mohamed Z. Hatim
             null_matrix = np.zeros_like(matrix)
-            flat_indices = np.random.choice(
+            flat_indices = self.rng.choice(
                 n_sites * n_species, size=total_occurrences, replace=False
             )
             null_matrix.flat[flat_indices] = 1
@@ -536,7 +557,7 @@ class NullModels:
                 row_sum = np.sum(matrix[i, :])
                 if row_sum > 0:
                     probs = col_probs / np.sum(col_probs)  # Normalize
-                    chosen_cols = np.random.choice(n_species, size=row_sum, replace=False, p=probs)
+                    chosen_cols = self.rng.choice(n_species, size=row_sum, replace=False, p=probs)
                     null_matrix[i, chosen_cols] = 1
         elif fixed_marginals == 'columns':
             null_matrix = np.zeros_like(matrix)
@@ -544,7 +565,7 @@ class NullModels:
                 col_sum = np.sum(matrix[:, j])
                 if col_sum > 0:
                     probs = row_probs / np.sum(row_probs)  # Normalize
-                    chosen_rows = np.random.choice(n_sites, size=col_sum, replace=False, p=probs)
+                    chosen_rows = self.rng.choice(n_sites, size=col_sum, replace=False, p=probs)
                     null_matrix[chosen_rows, j] = 1
         else:  # none
 # Copyright (c) 2025 Mohamed Z. Hatim
@@ -553,7 +574,7 @@ class NullModels:
             
             total_occurrences = np.sum(matrix)
             flat_probs = prob_matrix.flatten()
-            flat_indices = np.random.choice(
+            flat_indices = self.rng.choice(
                 len(flat_probs), size=total_occurrences, replace=False, p=flat_probs
             )
             
@@ -585,8 +606,8 @@ class NullModels:
                 break
             
 # Copyright (c) 2025 Mohamed Z. Hatim
-            idx1 = np.random.randint(len(ones[0]))
-            idx2 = np.random.randint(len(ones[0]))
+            idx1 = int(self.rng.integers(len(ones[0])))
+            idx2 = int(self.rng.integers(len(ones[0])))
             
             if idx1 == idx2:
                 continue
@@ -657,14 +678,17 @@ class NestednessSignificance:
         
 # Copyright (c) 2025 Mohamed Z. Hatim
         null_results = {metric: [] for metric in observed_results['metrics']}
-        
+
+        # Reuse one analyser: constructing a fresh one per iteration is pure
+        # overhead (and used to reset the random state each time round).
+        null_analyzer = NestednessAnalyzer(self.random_state)
+
         for null_matrix in null_matrices:
-            null_analyzer = NestednessAnalyzer(self.random_state)
             null_analyzer.load_matrix(null_matrix)
             null_nestedness = null_analyzer.calculate_nestedness_metrics(
                 metrics=list(observed_results['metrics'].keys())
             )
-            
+
             for metric in observed_results['metrics']:
                 if metric in null_nestedness['metrics']:
                     if isinstance(null_nestedness['metrics'][metric], dict):
@@ -687,12 +711,15 @@ class NestednessSignificance:
                 observed_value = observed_value[key]
             
             null_values = np.array(null_results[metric])
-            
-# Copyright (c) 2025 Mohamed Z. Hatim
-            p_greater = np.sum(null_values >= observed_value) / len(null_values)
-            p_lesser = np.sum(null_values <= observed_value) / len(null_values)
-            p_two_tailed = 2 * min(p_greater, p_lesser)
-            
+
+            # (count + 1) / (n + 1): the observed value is itself one of the
+            # possible arrangements, so a plain count/n can report p = 0, which
+            # is not attainable in a permutation test.
+            n_null = len(null_values)
+            p_greater = (np.sum(null_values >= observed_value) + 1) / (n_null + 1)
+            p_lesser = (np.sum(null_values <= observed_value) + 1) / (n_null + 1)
+            p_two_tailed = min(1.0, 2 * min(p_greater, p_lesser))
+
 # Copyright (c) 2025 Mohamed Z. Hatim
             null_mean = np.mean(null_values)
             null_std = np.std(null_values)
@@ -829,8 +856,7 @@ class CooccurrenceAnalysis:
                 both_present = np.sum((species_i == 1) & (species_j == 1))
                 i_only = np.sum((species_i == 1) & (species_j == 0))
                 j_only = np.sum((species_i == 0) & (species_j == 1))
-                both_absent = np.sum((species_i == 0) & (species_j == 0))
-                
+
                 if method == 'jaccard':
 # Copyright (c) 2025 Mohamed Z. Hatim
                     denominator = both_present + i_only + j_only

@@ -6,13 +6,11 @@ Copyright (c) 2025 Mohamed Z. Hatim
 
 import numpy as np
 import pandas as pd
-from typing import Union, List, Dict, Tuple, Optional, Any, Callable
+from typing import List, Dict, Optional, Any
 from scipy import stats, optimize
-from scipy.interpolate import UnivariateSpline, BSpline
+from scipy.interpolate import UnivariateSpline
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
-from sklearn.linear_model import LinearRegression, Ridge, Lasso
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import cross_val_score, GridSearchCV
+from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score, mean_squared_error
 import warnings
 
@@ -154,62 +152,109 @@ class EnvironmentalModeler:
         
         return gam_results
     
-    def _spline_smoother(self, x: np.ndarray, y: np.ndarray, 
+    @staticmethod
+    def _clean_xy(x: np.ndarray, y: np.ndarray):
+        """Drop non-finite pairs and return float arrays plus the valid mask."""
+        x = np.asarray(x, dtype=float)
+        y = np.asarray(y, dtype=float)
+        valid_mask = np.isfinite(x) & np.isfinite(y)
+        return x, y, valid_mask
+
+    @staticmethod
+    def _empty_fitted(x: np.ndarray, fill: float) -> np.ndarray:
+        """
+        Float-typed output array.
+
+        ``np.full_like(x, fill)`` inherits x's dtype, so for integer predictors
+        every fitted value would be silently truncated to an integer.
+        """
+        return np.full(np.shape(x), float(fill), dtype=float)
+
+    def _spline_smoother(self, x: np.ndarray, y: np.ndarray,
                         smoothing_factor: Optional[float] = None,
                         **kwargs) -> Dict[str, Any]:
-        """Fit spline smoother."""
-# Copyright (c) 2025 Mohamed Z. Hatim
-        valid_mask = ~(np.isnan(x) | np.isnan(y))
+        """Fit a smoothing spline (predictor need not be sorted)."""
+        x, y, valid_mask = self._clean_xy(x, y)
         x_clean = x[valid_mask]
         y_clean = y[valid_mask]
-        
-        if len(x_clean) < 3:
-# Copyright (c) 2025 Mohamed Z. Hatim
+
+        if len(x_clean) < 4:
             return self._linear_smoother(x, y)
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
+        # UnivariateSpline requires strictly increasing x. Sort, and average
+        # duplicated predictor values (otherwise SciPy raises).
+        order = np.argsort(x_clean, kind='stable')
+        x_sorted, y_sorted = x_clean[order], y_clean[order]
+        x_unique, inverse = np.unique(x_sorted, return_inverse=True)
+        if x_unique.size != x_sorted.size:
+            y_unique = np.bincount(inverse, weights=y_sorted) / np.bincount(inverse)
+        else:
+            y_unique = y_sorted
+
+        if x_unique.size < 4:
+            return self._linear_smoother(x, y)
+
         if smoothing_factor is None:
-# Copyright (c) 2025 Mohamed Z. Hatim
-            smoothing_candidates = np.logspace(-3, 1, 20)
-            best_score = -np.inf
-            best_s = smoothing_candidates[0]
-            
-            for s in smoothing_candidates:
-                try:
-                    spline = UnivariateSpline(x_clean, y_clean, s=s)
-                    y_pred = spline(x_clean)
-                    score = r2_score(y_clean, y_pred)
-                    
-                    if score > best_score:
-                        best_score = score
-                        best_s = s
-                except:
-                    continue
-            
-            smoothing_factor = best_s
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+            # Choose the smoothing parameter by leave-one-out-style GCV rather
+            # than raw R^2: maximising R^2 always picks the least smoothing,
+            # which defeats the point of a smoother.
+            smoothing_factor = self._select_spline_smoothing(x_unique, y_unique)
+
         try:
-            spline = UnivariateSpline(x_clean, y_clean, s=smoothing_factor)
-            
-# Copyright (c) 2025 Mohamed Z. Hatim
-            fitted_values = np.full_like(x, np.mean(y_clean))
+            spline = UnivariateSpline(x_unique, y_unique, s=smoothing_factor)
+
+            fitted_values = self._empty_fitted(x, np.mean(y_clean))
             fitted_values[valid_mask] = spline(x_clean)
-            
-# Copyright (c) 2025 Mohamed Z. Hatim
-            edf = min(len(x_clean), max(2, len(x_clean) / (1 + smoothing_factor)))
-            
+
+            edf = float(len(spline.get_knots()) + spline._data[5] if hasattr(spline, '_data')
+                        else len(spline.get_knots()) + 2)
+            edf = float(np.clip(edf, 2, max(2, len(x_unique))))
+
             return {
                 'smoother': spline,
                 'fitted_values': fitted_values,
                 'edf': edf,
                 'lambda': smoothing_factor,
-                'r_squared': r2_score(y_clean, spline(x_clean))
+                'r_squared': float(r2_score(y_clean, spline(x_clean)))
             }
-            
+
         except Exception as e:
             warnings.warn(f"Spline fitting failed: {e}, using linear smoother")
             return self._linear_smoother(x, y)
+
+    @staticmethod
+    def _select_spline_smoothing(x: np.ndarray, y: np.ndarray) -> float:
+        """Pick a spline smoothing factor by generalised cross-validation."""
+        n = len(x)
+        variance = float(np.var(y))
+        if variance == 0:
+            return 0.0
+
+        # s = 0 forces exact interpolation, which drives the GCV numerator to
+        # zero and would always "win" while fitting pure noise. Only positive
+        # smoothing factors are considered, and models that use up more than
+        # half the degrees of freedom are rejected as under-smoothed.
+        candidates = np.logspace(-3, 1.5, 30) * variance * n
+        max_edf = max(3.0, n / 2)
+
+        best_s, best_gcv = float(candidates[-1]), np.inf
+        for s in candidates:
+            try:
+                spline = UnivariateSpline(x, y, s=float(s))
+                edf = len(spline.get_knots()) + 2
+                if edf > max_edf:
+                    continue
+                residual = float(np.sum((y - spline(x)) ** 2))
+                denom = (1 - edf / n) ** 2
+                if denom <= 0:
+                    continue
+                gcv = (residual / n) / denom
+                if gcv < best_gcv:
+                    best_gcv, best_s = gcv, float(s)
+            except Exception:
+                continue
+
+        return best_s
     
     def _lowess_smoother(self, x: np.ndarray, y: np.ndarray,
                         frac: float = 0.3, **kwargs) -> Dict[str, Any]:
@@ -217,14 +262,13 @@ class EnvironmentalModeler:
         try:
             from statsmodels.nonparametric.smoothers_lowess import lowess
             
-            valid_mask = ~(np.isnan(x) | np.isnan(y))
+            x, y, valid_mask = self._clean_xy(x, y)
             x_clean = x[valid_mask]
             y_clean = y[valid_mask]
-            
+
             if len(x_clean) < 3:
                 return self._linear_smoother(x, y)
-            
-# Copyright (c) 2025 Mohamed Z. Hatim
+
             smoothed = lowess(y_clean, x_clean, frac=frac, return_sorted=True)
             
 # Copyright (c) 2025 Mohamed Z. Hatim
@@ -232,7 +276,7 @@ class EnvironmentalModeler:
             interp_func = interp1d(smoothed[:, 0], smoothed[:, 1], 
                                  bounds_error=False, fill_value='extrapolate')
             
-            fitted_values = np.full_like(x, np.mean(y_clean))
+            fitted_values = self._empty_fitted(x, np.mean(y_clean))
             fitted_values[valid_mask] = interp_func(x_clean)
             
             return {
@@ -250,10 +294,12 @@ class EnvironmentalModeler:
     def _polynomial_smoother(self, x: np.ndarray, y: np.ndarray,
                            degree: int = 3, **kwargs) -> Dict[str, Any]:
         """Fit polynomial smoother."""
-        valid_mask = ~(np.isnan(x) | np.isnan(y))
+        x, y, valid_mask = self._clean_xy(x, y)
         x_clean = x[valid_mask]
         y_clean = y[valid_mask]
-        
+
+        if len(x_clean) < 2:
+            return self._linear_smoother(x, y)
         if len(x_clean) < degree + 1:
             degree = max(1, len(x_clean) - 1)
         
@@ -265,7 +311,7 @@ class EnvironmentalModeler:
         reg.fit(X_poly, y_clean)
         
 # Copyright (c) 2025 Mohamed Z. Hatim
-        fitted_values = np.full_like(x, np.mean(y_clean))
+        fitted_values = self._empty_fitted(x, np.mean(y_clean))
         X_all_poly = poly_features.transform(x[valid_mask].reshape(-1, 1))
         fitted_values[valid_mask] = reg.predict(X_all_poly)
         
@@ -285,7 +331,7 @@ class EnvironmentalModeler:
             from sklearn.gaussian_process import GaussianProcessRegressor
             from sklearn.gaussian_process.kernels import RBF, ConstantKernel
             
-            valid_mask = ~(np.isnan(x) | np.isnan(y))
+            x, y, valid_mask = self._clean_xy(x, y)
             x_clean = x[valid_mask].reshape(-1, 1)
             y_clean = y[valid_mask]
             
@@ -293,13 +339,25 @@ class EnvironmentalModeler:
                 return self._linear_smoother(x, y)
             
 # Copyright (c) 2025 Mohamed Z. Hatim
-            kernel = ConstantKernel(1.0) * RBF(1.0)
-            gp = GaussianProcessRegressor(kernel=kernel, random_state=42)
-            
+            # A white-noise term (and a non-zero alpha) keeps the GP from
+            # interpolating every observation, which would make it a lookup
+            # table rather than a smoother.
+            from sklearn.gaussian_process.kernels import WhiteKernel
+
+            x_range = float(np.ptp(x_clean)) or 1.0
+            y_var = float(np.var(y_clean)) or 1.0
+            kernel = (ConstantKernel(y_var, (1e-3, 1e6))
+                      * RBF(x_range / 4, (x_range * 1e-2, x_range * 1e2))
+                      + WhiteKernel(y_var * 0.1, (y_var * 1e-6, y_var * 1e1)))
+            gp = GaussianProcessRegressor(
+                kernel=kernel, normalize_y=True,
+                alpha=kwargs.get('alpha', 1e-8), random_state=42
+            )
+
             gp.fit(x_clean, y_clean)
             
 # Copyright (c) 2025 Mohamed Z. Hatim
-            fitted_values = np.full_like(x, np.mean(y_clean))
+            fitted_values = self._empty_fitted(x, np.mean(y_clean))
             fitted_values[valid_mask], _ = gp.predict(x_clean, return_std=True)
             
             return {
@@ -315,24 +373,23 @@ class EnvironmentalModeler:
     
     def _linear_smoother(self, x: np.ndarray, y: np.ndarray) -> Dict[str, Any]:
         """Linear smoother (fallback)."""
-        valid_mask = ~(np.isnan(x) | np.isnan(y))
+        x, y, valid_mask = self._clean_xy(x, y)
         x_clean = x[valid_mask]
         y_clean = y[valid_mask]
-        
+
         if len(x_clean) < 2:
-            fitted_values = np.full_like(x, np.mean(y) if len(y) > 0 else 0)
+            mean_y = float(np.mean(y[np.isfinite(y)])) if np.isfinite(y).any() else 0.0
             return {
-                'smoother': lambda xi: np.mean(y) if len(y) > 0 else 0,
-                'fitted_values': fitted_values,
+                'smoother': (lambda xi, _m=mean_y: np.full(np.shape(xi), _m, dtype=float)),
+                'fitted_values': self._empty_fitted(x, mean_y),
                 'edf': 1,
-                'r_squared': 0
+                'r_squared': 0.0
             }
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
         reg = LinearRegression()
         reg.fit(x_clean.reshape(-1, 1), y_clean)
-        
-        fitted_values = np.full_like(x, np.mean(y_clean))
+
+        fitted_values = self._empty_fitted(x, np.mean(y_clean))
         fitted_values[valid_mask] = reg.predict(x_clean.reshape(-1, 1))
         
         return {
@@ -357,10 +414,17 @@ class EnvironmentalModeler:
             deviance = -2 * np.sum(y * np.log(y_pred_clipped) + (1 - y) * np.log(1 - y_pred_clipped))
             null_deviance = -2 * np.sum(y * np.log(np.mean(y)) + (1 - y) * np.log(1 - np.mean(y)))
         elif family == 'poisson':
-# Copyright (c) 2025 Mohamed Z. Hatim
             y_pred_clipped = np.clip(y_pred, 1e-15, np.inf)
-            deviance = 2 * np.sum(y * np.log(y / y_pred_clipped) - (y - y_pred_clipped))
-            null_deviance = 2 * np.sum(y * np.log(y / np.mean(y)) - (y - np.mean(y)))
+            with np.errstate(divide='ignore', invalid='ignore'):
+                terms = np.where(y > 0, y * np.log(y / y_pred_clipped), 0.0)
+                null_terms = np.where(y > 0, y * np.log(y / np.mean(y)), 0.0)
+            deviance = 2 * np.sum(terms - (y - y_pred_clipped))
+            null_deviance = 2 * np.sum(null_terms - (y - np.mean(y)))
+        else:
+            raise ValueError(
+                f"Unknown family '{family}'. Supported: 'gaussian', 'binomial', "
+                "'poisson'."
+            )
         
 # Copyright (c) 2025 Mohamed Z. Hatim
         total_edf = sum(smoother['edf'] for smoother in gam_results['smoothers'].values())
@@ -543,7 +607,6 @@ class EnvironmentalModeler:
                                    env_data: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """PCA of environmental variables for gradient analysis."""
         from sklearn.decomposition import PCA
-        from sklearn.preprocessing import StandardScaler
         
 # Copyright (c) 2025 Mohamed Z. Hatim
         scaler = StandardScaler()
@@ -574,9 +637,9 @@ class EnvironmentalModeler:
     def _calculate_species_optima(self, species_data: pd.DataFrame,
                                  gradient_scores: pd.DataFrame) -> pd.DataFrame:
         """Calculate species optima along gradients."""
-        optima = pd.DataFrame(index=species_data.columns,
-                            columns=gradient_scores.columns)
-        
+        optima = pd.DataFrame(np.nan, index=species_data.columns,
+                              columns=gradient_scores.columns, dtype=float)
+
         for axis in gradient_scores.columns:
             for species in species_data.columns:
 # Copyright (c) 2025 Mohamed Z. Hatim
@@ -646,14 +709,16 @@ class EnvironmentalModeler:
             raise ValueError(f"Unknown curve type: {curve_type}")
         
         curve_func = self.response_curves[curve_type]
-        
+
         try:
-# Copyright (c) 2025 Mohamed Z. Hatim
+            # Non-linear response curves rarely converge from curve_fit's
+            # default all-ones start; derive a starting point from the data.
+            p0, bounds = self._response_curve_start(curve_type, env_clean, species_clean)
             popt, pcov = optimize.curve_fit(
                 curve_func, env_clean, species_clean,
-                maxfev=5000
+                p0=p0, bounds=bounds, maxfev=20000
             )
-            
+
 # Copyright (c) 2025 Mohamed Z. Hatim
             fitted_values = curve_func(env_clean, *popt)
             
@@ -694,7 +759,55 @@ class EnvironmentalModeler:
         
         return results
     
-    def _gaussian_response(self, x: np.ndarray, amplitude: float, 
+    @staticmethod
+    def _response_curve_start(curve_type: str, x: np.ndarray, y: np.ndarray):
+        """
+        Data-driven starting values and bounds for :meth:`species_response_curves`.
+
+        Returns ``(p0, (lower, upper))`` ready for :func:`scipy.optimize.curve_fit`.
+        """
+        x_min, x_max = float(x.min()), float(x.max())
+        x_span = max(x_max - x_min, np.finfo(float).eps)
+        y_min, y_max = float(y.min()), float(y.max())
+        y_span = max(y_max - y_min, np.finfo(float).eps)
+
+        # Abundance-weighted optimum is a good guess for unimodal curves.
+        weights = np.clip(y - y_min, 0, None)
+        optimum = float(np.average(x, weights=weights)) if weights.sum() > 0 else float(np.mean(x))
+        tolerance = max(x_span / 4, np.finfo(float).eps)
+        inf = np.inf
+
+        if curve_type in ('gaussian', 'unimodal'):
+            p0 = [y_span, optimum, tolerance, y_min]
+            lower = [0.0, x_min - x_span, x_span * 1e-3, -inf]
+            upper = [y_span * 10 + 1, x_max + x_span, x_span * 10, inf]
+        elif curve_type == 'skewed_gaussian':
+            p0 = [y_span, optimum, tolerance, 0.0, y_min]
+            lower = [0.0, x_min - x_span, x_span * 1e-3, -5.0, -inf]
+            upper = [y_span * 10 + 1, x_max + x_span, x_span * 10, 5.0, inf]
+        elif curve_type == 'beta':
+            p0 = [y_max, 2.0, 2.0, x_min - 0.01 * x_span, x_max + 0.01 * x_span]
+            lower = [0.0, 1.0, 1.0, x_min - x_span, x_min]
+            upper = [y_max * 10 + 1, 20.0, 20.0, x_max, x_max + x_span]
+        elif curve_type == 'linear':
+            slope = np.polyfit(x, y, 1)[0] if x_span > 0 else 0.0
+            p0 = [float(slope), float(np.mean(y))]
+            lower, upper = [-inf, -inf], [inf, inf]
+        elif curve_type == 'threshold':
+            p0 = [y_span, float(np.median(x)), 4.0 / x_span, y_min]
+            lower = [0.0, x_min - x_span, 1e-6, -inf]
+            upper = [y_span * 10 + 1, x_max + x_span, 1e3 / x_span, inf]
+        else:  # pragma: no cover - guarded by the caller
+            raise ValueError(f"Unknown curve type: {curve_type}")
+
+        # Keep the starting point strictly inside the bounds.
+        p0 = [float(np.clip(v, lo + abs(lo) * 1e-9 if np.isfinite(lo) else v,
+                            hi - abs(hi) * 1e-9 if np.isfinite(hi) else v))
+              for v, lo, hi in zip(p0, lower, upper)]
+
+        return p0, (lower, upper)
+
+    def _gaussian_response(self, x: np.ndarray, amplitude: float,
                           optimum: float, tolerance: float, baseline: float) -> np.ndarray:
         """Gaussian response curve."""
         return amplitude * np.exp(-0.5 * ((x - optimum) / tolerance) ** 2) + baseline

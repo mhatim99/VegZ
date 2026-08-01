@@ -16,12 +16,13 @@ This package provides tools for:
 - Visualization and reporting
 """
 
-__version__ = "1.3.0"
+__version__ = "1.5.0"
 __author__ = "Mohamed Z. Hatim"
 __email__ = "mhatim4040@gmail.com"
 __copyright__ = "Copyright (c) 2025 Mohamed Z. Hatim"
 
 # Copyright (c) 2025 Mohamed Z. Hatim
+from .dataset import VegData
 from .core import VegZ, quick_diversity_analysis, quick_ordination, quick_clustering, quick_elbow_analysis
 from .diversity import DiversityAnalyzer
 from .multivariate import MultivariateAnalyzer
@@ -38,8 +39,14 @@ from .nestedness import NestednessAnalyzer, NullModels, NestednessSignificance
 from .specialized_methods import PhylogeneticDiversityAnalyzer, MetacommunityAnalyzer, NetworkAnalyzer
 from .interactive_viz import InteractiveVisualizer, ReportGenerator
 from .data_management.taxonomic_resolver import TaxonomicResolver, resolve_species_names
+from .data_management.transformations import DataTransformer
+from .data_management.standardization import DataStandardizer, SpeciesNameStandardizer
+from .data_quality.spatial_validation import SpatialValidator
+from .data_quality.temporal_validation import TemporalValidator
+from .visualization import VegetationPlotter
 
 # Copyright (c) 2025 Mohamed Z. Hatim
+from . import dataset
 from . import data_management
 from . import data_quality
 from . import diversity
@@ -59,6 +66,7 @@ from . import visualization
 __all__ = [
     # Copyright (c) 2025 Mohamed Z. Hatim
     'VegZ',
+    'VegData',
     'DiversityAnalyzer', 
     'MultivariateAnalyzer',
     'VegetationClustering',
@@ -82,6 +90,12 @@ __all__ = [
     'ReportGenerator',
     'TaxonomicResolver',
     'resolve_species_names',
+    'DataTransformer',
+    'DataStandardizer',
+    'SpeciesNameStandardizer',
+    'SpatialValidator',
+    'TemporalValidator',
+    'VegetationPlotter',
 
     # Copyright (c) 2025 Mohamed Z. Hatim
     'quick_diversity_analysis',
@@ -90,6 +104,7 @@ __all__ = [
     'quick_elbow_analysis',
     
     # Copyright (c) 2025 Mohamed Z. Hatim
+    'dataset',
     'data_management',
     'data_quality',
     'diversity',
@@ -243,7 +258,7 @@ Copyright (c) 2025 Mohamed Z. Hatim
 # Copyright (c) 2025 Mohamed Z. Hatim
 VERSION_INFO = {
     'major': 1,
-    'minor': 3,
+    'minor': 5,
     'patch': 0,
     'release': 'stable',
     'version': __version__
@@ -258,11 +273,11 @@ def show_versions():
     print(f"VegZ version: {__version__}")
     print(f"Copyright: {__copyright__}")
     print()
-    
-# Copyright (c) 2025 Mohamed Z. Hatim
+
     dependencies = [
         'numpy', 'pandas', 'scipy', 'matplotlib', 'sklearn', 
-        'geopandas', 'pyproj', 'fuzzywuzzy'
+        'geopandas', 'pyproj', 'fuzzywuzzy', 'openpyxl', 'statsmodels',
+        'networkx', 'plotly'
     ]
     
     print("Dependencies:")

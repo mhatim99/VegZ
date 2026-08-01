@@ -11,11 +11,13 @@ import numpy as np
 import pandas as pd
 import warnings
 from typing import Dict, List, Optional, Tuple, Union, Any
-from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingRegressor
-from sklearn.linear_model import LogisticRegression, LinearRegression, Ridge, Lasso
-from sklearn.svm import SVC, SVR
-from sklearn.neural_network import MLPClassifier, MLPRegressor
+from sklearn.model_selection import (train_test_split, cross_val_score, GridSearchCV,
+                                     StratifiedKFold, KFold)
+from sklearn.ensemble import (RandomForestClassifier, RandomForestRegressor,
+                              GradientBoostingRegressor, GradientBoostingClassifier)
+from sklearn.linear_model import LogisticRegression, Ridge
+from sklearn.svm import SVC
+from sklearn.neural_network import MLPClassifier
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import accuracy_score, classification_report, mean_squared_error, r2_score
@@ -24,27 +26,28 @@ from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+from ._compat import optional_import
+
+# Optional dependencies, resolved without warning at import time. A library
+# should not emit warnings merely because an optional package is absent; the
+# warning belongs at the point the feature is actually requested.
 try:
     from sklearn.ensemble import IsolationForest
     ISOLATION_FOREST_AVAILABLE = True
-except ImportError:
+except ImportError:  # pragma: no cover - IsolationForest ships with sklearn
+    IsolationForest = None
     ISOLATION_FOREST_AVAILABLE = False
-    warnings.warn("IsolationForest not available, some anomaly detection methods will be limited")
+
+lgb = optional_import('lightgbm')
+LIGHTGBM_AVAILABLE = lgb is not None
 
 try:
-    import lightgbm as lgb
-    LIGHTGBM_AVAILABLE = True
-except ImportError:
-    LIGHTGBM_AVAILABLE = False
-    warnings.warn("LightGBM not available, using alternative gradient boosting methods")
-
-try:
-    from sklearn.experimental import enable_iterative_imputer
+    from sklearn.experimental import enable_iterative_imputer  # noqa: F401
     from sklearn.impute import IterativeImputer
     ITERATIVE_IMPUTER_AVAILABLE = True
-except ImportError:
+except ImportError:  # pragma: no cover
+    IterativeImputer = None
     ITERATIVE_IMPUTER_AVAILABLE = False
-    warnings.warn("IterativeImputer not available, using SimpleImputer for missing data")
 
 
 class MachineLearningAnalyzer:
@@ -71,12 +74,58 @@ class MachineLearningAnalyzer:
         self.feature_importance = {}
         self.model_performance = {}
         
-    def prepare_data(self, 
-                    data: pd.DataFrame, 
+    @staticmethod
+    def _is_classification_target(y) -> bool:
+        """Heuristic: treat non-numeric or few-valued integer targets as classes."""
+        y = np.asarray(y)
+        if y.dtype.kind in 'OUSb':
+            return True
+        unique = np.unique(y)
+        return y.dtype.kind in 'iu' and unique.size <= max(2, len(y) // 10)
+
+    @staticmethod
+    def _min_class_count(y) -> int:
+        """Size of the smallest class, floored at 2 so CV splitters stay valid."""
+        _, counts = np.unique(np.asarray(y), return_counts=True)
+        return int(max(2, counts.min()))
+
+    @staticmethod
+    def _estimate_n_clusters(X: np.ndarray, random_state: int) -> int:
+        """
+        Pick a cluster count from the inertia curve's largest second difference.
+
+        Indexing matters here: entry ``i`` of the double difference corresponds
+        to ``k_values[i + 1]``, so the offset is +1. Using +2 (as a naive
+        implementation does) runs off the end of the list for small ranges and
+        raises ``IndexError``.
+        """
+        max_k = min(10, max(2, X.shape[0] // 2))
+        k_values = list(range(2, max_k + 1))
+
+        if len(k_values) < 3:
+            return k_values[0] if k_values else 1
+
+        inertias = []
+        for k in k_values:
+            kmeans = KMeans(n_clusters=k, random_state=random_state, n_init=10)
+            kmeans.fit(X)
+            inertias.append(kmeans.inertia_)
+
+        second_diff = np.diff(np.diff(inertias))
+        if second_diff.size == 0:
+            return k_values[0]
+
+        index = int(np.argmax(second_diff)) + 1
+        index = min(index, len(k_values) - 1)
+        return k_values[index]
+
+    def prepare_data(self,
+                    data: pd.DataFrame,
                     target_column: str,
                     feature_columns: Optional[List[str]] = None,
                     handle_missing: str = 'impute',
-                    scale_features: bool = True) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+                    scale_features: bool = True,
+                    encode_categorical: bool = True) -> Tuple[np.ndarray, np.ndarray, List[str]]:
         """
         Prepare data for machine learning analysis.
         
@@ -92,11 +141,14 @@ class MachineLearningAnalyzer:
             How to handle missing data ('drop', 'impute'), by default 'impute'
         scale_features : bool, optional
             Whether to scale features, by default True
-            
+        encode_categorical : bool, optional
+            One-hot encode non-numeric predictors, by default True. Set False
+            to get an explicit error instead of silent encoding.
+
         Returns
         -------
         Tuple[np.ndarray, np.ndarray, List[str]]
-            Features, target, and feature names
+            Features, target, and feature names (expanded for one-hot columns)
         """
 # Copyright (c) 2025 Mohamed Z. Hatim
         if feature_columns is None:
@@ -104,8 +156,23 @@ class MachineLearningAnalyzer:
         
         X = data[feature_columns].copy()
         y = data[target_column].copy()
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
+        # One-hot encode categorical predictors. Passing raw strings through
+        # made the imputer/scaler fail with an opaque
+        # "could not convert string to float".
+        categorical = [c for c in X.columns
+                       if not pd.api.types.is_numeric_dtype(X[c])]
+        if categorical:
+            if encode_categorical:
+                X = pd.get_dummies(X, columns=categorical, drop_first=True,
+                                   dtype=float)
+            else:
+                raise ValueError(
+                    f"Non-numeric feature column(s) {categorical}. Pass "
+                    "encode_categorical=True to one-hot encode them, or "
+                    "convert them yourself."
+                )
+
         if handle_missing == 'drop':
             complete_cases = ~(X.isnull().any(axis=1) | y.isnull())
             X = X[complete_cases]
@@ -170,8 +237,19 @@ class MachineLearningAnalyzer:
         self.encoders['species'] = le
         
 # Copyright (c) 2025 Mohamed Z. Hatim
+        # Stratifying needs at least two members per class; say so plainly
+        # instead of surfacing scikit-learn's "least populated classes" message.
+        _, class_counts = np.unique(y_encoded, return_counts=True)
+        if class_counts.min() < 2:
+            rare = [le.classes_[i] for i, c in enumerate(class_counts) if c < 2]
+            raise ValueError(
+                f"Cannot train a classifier: class(es) {rare} have a single "
+                "record. Remove them, or merge them into a broader class."
+            )
+
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y_encoded, test_size=test_size, random_state=self.random_state, stratify=y_encoded
+            X, y_encoded, test_size=test_size, random_state=self.random_state,
+            stratify=y_encoded
         )
         
         results = {
@@ -240,7 +318,8 @@ class MachineLearningAnalyzer:
                                    species_column: str,
                                    environmental_features: List[str],
                                    model_type: str = 'rf',
-                                   cross_validation: bool = True) -> Dict[str, Any]:
+                                   cross_validation: bool = True,
+                                   class_weight: Optional[Union[str, dict]] = None) -> Dict[str, Any]:
         """
         Model habitat suitability for species.
         
@@ -256,7 +335,11 @@ class MachineLearningAnalyzer:
             Model type ('rf', 'gbm', 'logistic'), by default 'rf'
         cross_validation : bool, optional
             Whether to perform cross-validation, by default True
-            
+        class_weight : str or dict, optional
+            Passed to the classifier. Use ``'balanced'`` for the common case of
+            far more absences than presences, where an unweighted model can
+            score high accuracy by predicting "absent" everywhere.
+
         Returns
         -------
         Dict[str, Any]
@@ -266,12 +349,30 @@ class MachineLearningAnalyzer:
         X, y, feature_names = self.prepare_data(data, species_column, environmental_features)
         
 # Copyright (c) 2025 Mohamed Z. Hatim
+        # Choose classifier vs regressor from the data rather than from the
+        # model name: presence/absence fitted with a regressor yields
+        # "probabilities" that are not bounded by 0 and 1.
+        is_classification = self._is_classification_target(y)
+
         if model_type == 'rf':
-            model = RandomForestClassifier(n_estimators=100, random_state=self.random_state)
+            model = (RandomForestClassifier(n_estimators=100,
+                                            random_state=self.random_state,
+                                            class_weight=class_weight)
+                     if is_classification else
+                     RandomForestRegressor(n_estimators=100,
+                                           random_state=self.random_state))
         elif model_type == 'gbm':
-            model = GradientBoostingRegressor(random_state=self.random_state)
+            model = (GradientBoostingClassifier(random_state=self.random_state)
+                     if is_classification else
+                     GradientBoostingRegressor(random_state=self.random_state))
         elif model_type == 'logistic':
-            model = LogisticRegression(random_state=self.random_state)
+            if not is_classification:
+                raise ValueError(
+                    "model_type='logistic' needs a binary presence/absence "
+                    "target; this one looks continuous."
+                )
+            model = LogisticRegression(random_state=self.random_state,
+                                       max_iter=1000, class_weight=class_weight)
         else:
             raise ValueError(f"Unknown model type: {model_type}")
         
@@ -291,18 +392,35 @@ class MachineLearningAnalyzer:
             suitability_proba = model.predict(X_test)
         
 # Copyright (c) 2025 Mohamed Z. Hatim
-        if model_type in ['rf', 'logistic']:
-            accuracy = accuracy_score(y_test, y_pred)
-            performance = {'accuracy': accuracy}
+        if is_classification:
+            performance = {'accuracy': accuracy_score(y_test, y_pred)}
+            if hasattr(model, 'predict_proba') and len(np.unique(y_test)) == 2:
+                from sklearn.metrics import roc_auc_score
+                try:
+                    performance['auc'] = roc_auc_score(y_test, suitability_proba)
+                except ValueError:  # pragma: no cover - single-class split
+                    pass
         else:
-            mse = mean_squared_error(y_test, y_pred)
-            r2 = r2_score(y_test, y_pred)
-            performance = {'mse': mse, 'r2': r2}
+            performance = {'mse': mean_squared_error(y_test, y_pred),
+                           'r2': r2_score(y_test, y_pred)}
         
 # Copyright (c) 2025 Mohamed Z. Hatim
         cv_scores = None
         if cross_validation:
-            cv_scores = cross_val_score(model, X, y, cv=5, random_state=self.random_state)
+            # cross_val_score has no random_state parameter; reproducibility
+            # comes from the estimator's own seed and a seeded CV splitter.
+            n_splits = int(min(5, max(2, len(y) // 2)))
+            if self._is_classification_target(y):
+                splitter = StratifiedKFold(n_splits=min(n_splits, self._min_class_count(y)),
+                                           shuffle=True, random_state=self.random_state)
+            else:
+                splitter = KFold(n_splits=n_splits, shuffle=True,
+                                 random_state=self.random_state)
+            try:
+                cv_scores = cross_val_score(model, X, y, cv=splitter)
+            except ValueError as exc:
+                warnings.warn(f"Cross-validation skipped: {exc}")
+                cv_scores = None
         
 # Copyright (c) 2025 Mohamed Z. Hatim
         if hasattr(model, 'feature_importances_'):
@@ -540,17 +658,7 @@ class MachineLearningAnalyzer:
         
 # Copyright (c) 2025 Mohamed Z. Hatim
         if n_communities is None and method == 'kmeans':
-            inertias = []
-            K_range = range(2, min(11, len(X) // 2))
-            for k in K_range:
-                kmeans = KMeans(n_clusters=k, random_state=self.random_state)
-                kmeans.fit(X_scaled)
-                inertias.append(kmeans.inertia_)
-            
-# Copyright (c) 2025 Mohamed Z. Hatim
-            deltas = np.diff(inertias)
-            delta_deltas = np.diff(deltas)
-            n_communities = K_range[np.argmax(delta_deltas) + 2] if len(delta_deltas) > 0 else 3
+            n_communities = self._estimate_n_clusters(X_scaled, self.random_state)
         
 # Copyright (c) 2025 Mohamed Z. Hatim
         if method == 'kmeans':
@@ -605,7 +713,8 @@ class MachineLearningAnalyzer:
                                data: pd.DataFrame,
                                feature_columns: List[str],
                                method: str = 'pca',
-                               n_components: int = 2) -> Dict[str, Any]:
+                               n_components: int = 2,
+                               **kwargs) -> Dict[str, Any]:
         """
         Perform dimensionality reduction for visualization and analysis.
         
@@ -619,7 +728,9 @@ class MachineLearningAnalyzer:
             Reduction method ('pca', 'tsne'), by default 'pca'
         n_components : int, optional
             Number of components, by default 2
-            
+        **kwargs
+            Passed to the underlying reducer (e.g. ``perplexity`` for t-SNE).
+
         Returns
         -------
         Dict[str, Any]
@@ -644,7 +755,12 @@ class MachineLearningAnalyzer:
                 index=feature_columns
             )
         elif method == 'tsne':
-            reducer = TSNE(n_components=n_components, random_state=self.random_state)
+            # perplexity must be < n_samples, and sklearn's default of 30 fails
+            # outright on the small site counts typical of vegetation surveys.
+            perplexity = kwargs.pop('perplexity',
+                                    max(2.0, min(30.0, (len(X_scaled) - 1) / 3)))
+            reducer = TSNE(n_components=n_components, perplexity=perplexity,
+                           random_state=self.random_state, **kwargs)
             X_reduced = reducer.fit_transform(X_scaled)
             explained_variance = None
             loadings = None
@@ -768,9 +884,8 @@ class MachineLearningAnalyzer:
             axes[0, 1].set_ylabel('Predicted')
             axes[0, 1].set_title('Actual vs Predicted')
         
-# Copyright (c) 2025 Mohamed Z. Hatim
         if 'predictions' in results:
-            residuals = y_true - y_pred
+            residuals = np.asarray(y_true) - np.asarray(y_pred)
             axes[1, 0].scatter(y_pred, residuals, alpha=0.6)
             axes[1, 0].axhline(y=0, color='r', linestyle='--')
             axes[1, 0].set_xlabel('Predicted')

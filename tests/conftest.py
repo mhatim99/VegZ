@@ -7,10 +7,16 @@ import numpy as np
 import pandas as pd
 import warnings
 
-# Copyright (c) 2025 Mohamed Z. Hatim
-warnings.filterwarnings("ignore", category=UserWarning)
-warnings.filterwarnings("ignore", category=FutureWarning)
-warnings.filterwarnings("ignore", category=DeprecationWarning)
+import matplotlib
+
+# Headless backend so plotting tests never try to open a window.
+matplotlib.use('Agg')
+
+# Quieten third-party chatter only; VegZ's own warnings stay visible so that
+# regressions in its guidance messages are caught.
+warnings.filterwarnings("ignore", category=UserWarning, module=r"sklearn.*")
+warnings.filterwarnings("ignore", category=FutureWarning, module=r"sklearn.*")
+warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"(scipy|sklearn).*")
 
 
 @pytest.fixture(scope="session")
@@ -85,7 +91,8 @@ def traits_data():
 def temporal_data():
     """Create sample temporal vegetation data."""
     np.random.seed(42)
-    dates = pd.date_range('2020-01-01', '2023-12-31', freq='M')
+    # 'ME' (month end) - the bare 'M' alias was removed in pandas 3.
+    dates = pd.date_range('2020-01-01', '2023-12-31', freq='ME')
     sites = [f'SITE_{i+1:02d}' for i in range(10)]
     species = [f'Species_{i+1:02d}' for i in range(15)]
     

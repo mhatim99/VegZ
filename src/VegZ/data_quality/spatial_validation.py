@@ -6,26 +6,21 @@ Copyright (c) 2025 Mohamed Z. Hatim
 
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Union, Any
+from typing import Dict, List, Optional, Any
 import warnings
-import requests
-import json
-from pathlib import Path
 
-try:
-    import geopandas as gpd
-    from shapely.geometry import Point, Polygon
-    from shapely.ops import transform
-    GEOPANDAS_AVAILABLE = True
-except ImportError:
-    GEOPANDAS_AVAILABLE = False
-    warnings.warn("GeoPandas not available. Install with: pip install geopandas")
+# `stats` is used by the z-score outlier method; without this import that
+# branch raised NameError instead of returning outliers.
+from scipy import stats
 
-try:
-    import pyproj
-    PYPROJ_AVAILABLE = True
-except ImportError:
-    PYPROJ_AVAILABLE = False
+from .._compat import optional_import
+
+# Optional geospatial stack, resolved without warning at import time.
+gpd = optional_import('geopandas')
+GEOPANDAS_AVAILABLE = gpd is not None
+
+pyproj = optional_import('pyproj')
+PYPROJ_AVAILABLE = pyproj is not None
 
 
 class SpatialValidator:
@@ -192,8 +187,8 @@ class SpatialValidator:
         """Detect coordinates that match known geographic centroids."""
         centroid_flags = pd.Series(False, index=df.index)
         
-        for category, centroids in self.known_centroids.items():
-            for name, (cent_lat, cent_lon) in centroids.items():
+        for centroids in self.known_centroids.values():
+            for cent_lat, cent_lon in centroids.values():
 # Copyright (c) 2025 Mohamed Z. Hatim
                 distance = np.sqrt(
                     (df[lat_col] - cent_lat)**2 + (df[lon_col] - cent_lon)**2
@@ -221,7 +216,7 @@ class SpatialValidator:
             'Los_Angeles': (34.0522, -118.2437, 0.5)
         }
         
-        for city, (city_lat, city_lon, radius) in major_cities.items():
+        for city_lat, city_lon, radius in major_cities.values():
             distance = np.sqrt(
                 (df[lat_col] - city_lat)**2 + (df[lon_col] - city_lon)**2
             )
@@ -237,7 +232,7 @@ class SpatialValidator:
         institution_flags = pd.Series(False, index=df.index)
         
         if 'institution_coordinates' in self.known_centroids:
-            for inst_name, (inst_lat, inst_lon) in self.known_centroids['institution_coordinates'].items():
+            for inst_lat, inst_lon in self.known_centroids['institution_coordinates'].values():
                 distance = np.sqrt(
                     (df[lat_col] - inst_lat)**2 + (df[lon_col] - inst_lon)**2
                 )
@@ -314,15 +309,22 @@ class SpatialValidator:
             Dataset with derived country column
         """
         result_df = df.copy()
-        result_df[country_col] = np.nan
-        
-        if not GEOPANDAS_AVAILABLE:
-            warnings.warn("GeoPandas not available. Cannot derive countries from coordinates.")
+        # Create the column as object dtype: initialising it with np.nan
+        # makes it float64, and assigning country names into a float column
+        # raises in pandas >= 2.2 (previously a silent all-NaN result).
+        result_df[country_col] = pd.Series(
+            [None] * len(result_df), index=result_df.index, dtype=object)
+
+        if lat_col not in df.columns or lon_col not in df.columns:
+            warnings.warn(
+                f"Coordinate columns '{lat_col}'/'{lon_col}' not found; "
+                "cannot derive countries."
+            )
             return result_df
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-# Copyright (c) 2025 Mohamed Z. Hatim
-        
+
+        # The bounding-box approximation below is pure NumPy, so this does not
+        # require GeoPandas; gating it on GeoPandas disabled the feature for no
+        # reason.
         try:
 # Copyright (c) 2025 Mohamed Z. Hatim
             valid_coords = (~df[lat_col].isna()) & (~df[lon_col].isna())
@@ -440,7 +442,13 @@ class SpatialValidator:
             except ImportError:
                 warnings.warn("scikit-learn not available for isolation forest method")
                 return self.detect_geographic_outliers(df, lat_col, lon_col, method='iqr', threshold=threshold)
-        
+
+        else:
+            raise ValueError(
+                f"Unknown method: {method}. Choose 'iqr', 'zscore' or "
+                "'isolation_forest'."
+            )
+
         return outlier_flags
     
     def validate_coordinate_consistency(self, df: pd.DataFrame,
@@ -517,44 +525,52 @@ class SpatialValidator:
         dict
             Comprehensive spatial quality report
         """
+        has_coords = lat_col in df.columns and lon_col in df.columns
+
         report = {
             'dataset_summary': {
                 'total_records': len(df),
-                'records_with_coordinates': (~df[lat_col].isna() & ~df[lon_col].isna()).sum()
+                'records_with_coordinates': (
+                    int((~df[lat_col].isna() & ~df[lon_col].isna()).sum())
+                    if has_coords else 0
+                )
             }
         }
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
         coord_validation = self.validate_coordinates(df, lat_col, lon_col)
         report['coordinate_validation'] = coord_validation
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
+        if not has_coords:
+            # Report the problem rather than raising KeyError deeper down.
+            report['geographic_outliers'] = {'count': 0, 'percentage': 0.0}
+            report['recommendations'] = [
+                f"Add coordinate columns '{lat_col}' and '{lon_col}' to enable "
+                "spatial validation"
+            ]
+            return report
+
         outliers = self.detect_geographic_outliers(df, lat_col, lon_col)
+        n_outliers = int(outliers.sum())
         report['geographic_outliers'] = {
-            'count': outliers.sum(),
-            'percentage': (outliers.sum() / len(df)) * 100
+            'count': n_outliers,
+            'percentage': (n_outliers / len(df) * 100) if len(df) else 0.0
         }
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
         if country_col:
             consistency = self.validate_coordinate_consistency(df, lat_col, lon_col, country_col)
             report['coordinate_consistency'] = consistency
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        recommendations = []
-        
-        if coord_validation['flags']['missing_coordinates'] > 0:
-            recommendations.append(f"Fill {coord_validation['flags']['missing_coordinates']} missing coordinates")
-        
-        if coord_validation['flags']['invalid_ranges'] > 0:
-            recommendations.append(f"Fix {coord_validation['flags']['invalid_ranges']} coordinates outside valid ranges")
-        
-        if coord_validation['flags']['potentially_transposed'] > 0:
-            recommendations.append(f"Check {coord_validation['flags']['potentially_transposed']} potentially transposed coordinates")
-        
-        if coord_validation['flags']['low_precision'] > 0:
-            recommendations.append(f"Improve precision for {coord_validation['flags']['low_precision']} low-precision coordinates")
-        
-        report['recommendations'] = recommendations
-        
+
+        flags = coord_validation.get('flags', {})
+        messages = {
+            'missing_coordinates': "Fill {n} missing coordinates",
+            'invalid_ranges': "Fix {n} coordinates outside valid ranges",
+            'potentially_transposed': "Check {n} potentially transposed coordinates",
+            'low_precision': "Improve precision for {n} low-precision coordinates",
+        }
+        report['recommendations'] = [
+            template.format(n=int(flags[key]))
+            for key, template in messages.items()
+            if int(flags.get(key, 0)) > 0
+        ]
+
         return report

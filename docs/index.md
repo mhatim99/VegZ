@@ -6,26 +6,61 @@
 2. [Installation](#installation)
 3. [Quick Start](#quick-start)
 4. [Core VegZ Class](#core-vegz-class)
-5. [Diversity Analysis](#diversity-analysis)
-6. [Multivariate Analysis](#multivariate-analysis)
-7. [Clustering Methods](#clustering-methods)
-8. [Statistical Analysis](#statistical-analysis)
-9. [Temporal Analysis](#temporal-analysis)
-10. [Spatial Analysis](#spatial-analysis)
-11. [Environmental Modeling](#environmental-modeling)
-12. [Functional Trait Analysis](#functional-trait-analysis)
-13. [Machine Learning](#machine-learning)
-14. [Data Quality and Validation](#data-quality-and-validation)
-15. [Interactive Visualization](#interactive-visualization)
-16. [Species Name Standardization](#species-name-standardization)
-17. [Taxonomic Name Resolution](#taxonomic-name-resolution)
-18. [Best Practices](#best-practices)
+5. [Keeping Tables Aligned with VegData](#keeping-tables-aligned-with-vegdata)
+6. [Diversity Analysis](#diversity-analysis)
+7. [Multivariate Analysis](#multivariate-analysis)
+8. [Clustering Methods](#clustering-methods)
+9. [Statistical Analysis](#statistical-analysis)
+10. [Temporal Analysis](#temporal-analysis)
+11. [Spatial Analysis](#spatial-analysis)
+12. [Environmental Modeling](#environmental-modeling)
+13. [Functional Trait Analysis](#functional-trait-analysis)
+14. [Machine Learning](#machine-learning)
+15. [Data Quality and Validation](#data-quality-and-validation)
+16. [Interactive Visualization](#interactive-visualization)
+17. [Species Name Standardization](#species-name-standardization)
+18. [Taxonomic Name Resolution](#taxonomic-name-resolution)
+19. [Best Practices](#best-practices)
 
 ---
 
 ## Introduction
 
 VegZ is a comprehensive Python package for vegetation data analysis and environmental modeling. This manual provides complete, working examples using the correct API syntax.
+
+### What is new in 1.5.0
+
+1.5.0 adds the methods most often reached for after an ordination, and a
+container that keeps your tables aligned. Nothing in it changes an existing
+result.
+
+| Method | Class | What it does |
+|---|---|---|
+| `permdisp()` / `betadisper()` | `EcologicalStatistics` | Tests homogeneity of multivariate dispersions - the assumption PERMANOVA rests on |
+| `adonis()` | `EcologicalStatistics` | Multi-factor PERMANOVA from a model formula, sequential or marginal SS, with `strata` |
+| `anova_cca()` / `anova_rda()` | `MultivariateAnalyzer` | Permutation significance for constrained ordinations: overall, by axis, by term, by margin |
+| `varpart()` | `MultivariateAnalyzer` | Variance partitioning across two or three explanatory tables |
+| `forward_selection()` | `MultivariateAnalyzer` | Permutation forward selection with double stopping criterion |
+| `beta_partition()` | `DiversityAnalyzer` | Baselga turnover / nestedness partitioning of beta diversity |
+| `hill_rarefaction()` | `DiversityAnalyzer` | Chao rarefaction and extrapolation of Hill numbers |
+| `coverage_standardized_diversity()` | `DiversityAnalyzer` | Compares assemblages at equal completeness, not equal effort |
+| `VegData` | top level | Keeps species, environment, trait and phylogeny tables aligned |
+
+1.5.0 also lands a full scientific audit of the existing code base. Methods that
+ran without error but returned wrong numbers - NMDS (which had been running
+metric MDS), PERMANOVA, ANOSIM, TWINSPAN, NODF, FEve, FDiv, Moran's I, Geary's C
+and the ACE estimator among them - are corrected, each pinned by a test against
+an analytically known answer. See the
+[CHANGELOG](https://github.com/mhatim99/VegZ/blob/main/CHANGELOG.md) for the full
+list.
+
+Two conventions worth knowing:
+
+- Every stochastic routine accepts `random_state`, and VegZ never touches
+  NumPy's global random state.
+- `import VegZ` is silent. Optional dependencies (Excel, geospatial, fuzzy
+  matching, statsmodels, networkx, plotly) are resolved quietly and only raise
+  or warn when you call a feature that needs them.
 
 ## Installation
 
@@ -107,7 +142,10 @@ pca_results = veg.pca_analysis(transform='hellinger')
 print(f"PCA explained variance: {pca_results['explained_variance_ratio'][:2]}")
 
 # NMDS analysis
-nmds_results = veg.nmds_analysis(distance_metric='bray_curtis', n_dimensions=2)
+# Genuine non-metric MDS.
+# transform defaults to 'none' because Bray-Curtis already relativises.
+nmds_results = veg.nmds_analysis(distance_metric='bray_curtis', n_dimensions=2,
+                                 random_state=42)
 print(f"NMDS stress: {nmds_results['stress']:.3f}")
 
 # K-means clustering
@@ -118,9 +156,14 @@ print(f"K-means inertia: {kmeans_results['inertia']:.3f}")
 hier_results = veg.hierarchical_clustering(distance_metric='bray_curtis', linkage_method='average')
 print("Hierarchical clustering completed")
 
-# Rarefaction analysis
+# Rarefaction analysis (exact Hurlbert expectation, with variance)
 rarefaction = veg.rarefaction_curve()
 print(f"Rarefaction curve shape: {rarefaction.shape}")
+print(rarefaction.columns.tolist())
+# ['sample_id', 'sample_size', 'expected_species', 'variance']
+
+# Sample-based accumulation curve with permutation confidence bands
+accumulation = veg.species_accumulation_curve(n_permutations=100, random_state=42)
 
 # Summary statistics
 summary = veg.summary_statistics()
@@ -155,6 +198,61 @@ plt.show()
 
 ---
 
+## Keeping Tables Aligned with VegData
+
+*New in v1.5.0.*
+
+Most vegetation analyses need more than one table: a species matrix, an
+environmental table, sometimes traits or a phylogeny. Silently misaligned tables
+- a site dropped from one but not the others, species in a different order - are
+the most common way a community analysis produces a confident, wrong answer.
+
+`VegData` intersects the tables once, in a stable order, and tells you exactly
+what each one lost.
+
+```python
+from VegZ import VegData
+
+data = VegData(
+    species=species_matrix,      # sites x species
+    environment=env_table,       # sites x variables
+    traits=trait_table,          # species x traits
+)
+
+# What survived, and what did each table lose?
+print(data.summary())
+print(data.alignment_report)
+
+# Every component is now guaranteed to share the same sites and species,
+# in the same order.
+assert data.species.index.equals(data.environment.index)
+assert data.species.columns.equals(data.traits.index)
+```
+
+Alignment is on by default; pass `align=False` to keep the tables as supplied.
+
+```python
+# Work with a subset - sites, species, or both
+uplands = data.subset(sites=data.environment.index[data.environment['Elevation'] > 1000])
+common = data.subset(species=data.species.columns[(data.species > 0).sum() >= 5])
+
+# Drop sites with no species and species found nowhere
+cleaned = data.drop_empty()
+
+# Transform the species matrix, keeping everything else aligned
+hellinger = data.transform('hellinger')
+
+# Load straight from CSV or Excel files
+data = VegData.from_files(
+    'species.csv',
+    environment_path='environment.csv',
+    traits_path='traits.csv',
+)
+
+# Hand the aligned species matrix to the main analysis class
+veg = data.to_vegz()
+```
+
 ## Diversity Analysis
 
 ### DiversityAnalyzer Class
@@ -164,7 +262,9 @@ from VegZ import DiversityAnalyzer
 
 diversity = DiversityAnalyzer()
 
-# Calculate all diversity indices at once
+# Calculate all per-sample diversity indices at once.
+# Pass include_dataset_level=True to also append jack1/jack2, which are
+# dataset-level incidence estimators (one number for the whole matrix).
 all_indices = diversity.calculate_all_indices(data)
 print("All diversity indices:")
 print(f"Available indices: {list(all_indices.columns)}")
@@ -177,7 +277,14 @@ richness = diversity.calculate_index(data, 'richness')
 evenness = diversity.calculate_index(data, 'evenness')
 
 print(f"Shannon diversity range: {shannon.min():.3f} - {shannon.max():.3f}")
-print(f"Simpson diversity range: {simpson.min():.3f} - {simpson.max():.3f}")
+print(f"Simpson concentration range: {simpson.min():.3f} - {simpson.max():.3f}")
+
+# Index conventions:
+#   'simpson'      = Simpson's concentration D = sum(p^2)  (LOW = diverse)
+#   'gini_simpson' = 1 - D                                 (HIGH = diverse)
+#   'simpson_inv'  = 1 / D                                 (HIGH = diverse)
+gini_simpson = diversity.calculate_index(data, 'gini_simpson')
+print(f"Gini-Simpson range: {gini_simpson.min():.3f} - {gini_simpson.max():.3f}")
 
 # Advanced diversity indices
 fisher_alpha = diversity.calculate_index(data, 'fisher_alpha')
@@ -204,19 +311,85 @@ print(hill_numbers.head())
 
 ### Beta Diversity
 
+`beta_diversity()` returns a pairwise dissimilarity matrix for **every**
+method. Use `whittaker_beta()` for the whole-dataset scalar.
+
 ```python
-# Whittaker's beta diversity (returns single value)
+# All three methods return a sites x sites dissimilarity matrix
 beta_whittaker = diversity.beta_diversity(data, method='whittaker')
-print(f"Whittaker's beta diversity: {beta_whittaker:.3f}")
-
-# Sørensen dissimilarity (returns distance matrix)
 beta_sorensen = diversity.beta_diversity(data, method='sorensen')
-print(f"Sørensen dissimilarity matrix shape: {beta_sorensen.shape}")
-
-# Jaccard dissimilarity (returns distance matrix)
 beta_jaccard = diversity.beta_diversity(data, method='jaccard')
+
+print(f"Whittaker dissimilarity matrix shape: {beta_whittaker.shape}")
+print(f"Sørensen dissimilarity matrix shape: {beta_sorensen.shape}")
 print(f"Jaccard dissimilarity matrix shape: {beta_jaccard.shape}")
+
+# Whole-dataset multiplicative beta: gamma / mean(alpha)
+overall_beta = diversity.whittaker_beta(data)
+print(f"Whittaker's beta diversity: {overall_beta:.3f}")
 ```
+
+Note: for a pair of samples, Whittaker's beta and Sørensen dissimilarity are
+algebraically identical - both names are provided because users reach for them
+in different contexts.
+
+### Turnover vs Nestedness (new in v1.5.0)
+
+Two site pairs can have identical total beta diversity for opposite ecological
+reasons: species *replacing* one another along a gradient, or one site simply
+being a depleted subset of the other. `beta_partition()` separates the two
+(Baselga 2010, 2012).
+
+```python
+# Sørensen family: total = turnover (beta_sim) + nestedness (beta_sne)
+parts = diversity.beta_partition(data, family='sorensen')
+print(parts['turnover'].shape)     # sites x sites
+print(parts['nestedness'].shape)
+print(parts['total'].shape)
+
+# The two components sum to the total exactly
+import numpy as np
+assert np.allclose(parts['turnover'] + parts['nestedness'], parts['total'])
+
+# Jaccard family gives beta_jtu / beta_jne instead
+jaccard_parts = diversity.beta_partition(data, family='jaccard')
+
+# Whole-dataset (multi-site) partition returns three scalars
+overall = diversity.beta_partition_multisite(data, family='sorensen')
+print(f"Turnover:   {overall['turnover']:.3f}")
+print(f"Nestedness: {overall['nestedness']:.3f}")
+print(f"Total:      {overall['total']:.3f}")
+```
+
+If turnover dominates, sites differ by *which* species they hold; if nestedness
+dominates, they differ by *how many*.
+
+### Coverage-Based Standardization (new in v1.5.0)
+
+Comparing diversity at equal *sampling effort* penalises the richer assemblage,
+because a fixed number of individuals covers less of a diverse community.
+Chao & Jost (2012) argue for comparing at equal *coverage* instead.
+
+```python
+# How complete is each sample? (Good-Turing coverage estimator)
+coverage = diversity.sample_coverage(data)
+print(coverage.describe())
+
+# Diversity standardised to a common coverage. With coverage=None VegZ picks
+# the largest level all sites can reach without over-extrapolating.
+standardized = diversity.coverage_standardized_diversity(
+    data, coverage=0.9, q_values=[0, 1, 2]
+)
+print(standardized.head())
+
+# Rarefaction AND extrapolation of Hill numbers (Chao et al. 2014)
+curves = diversity.hill_rarefaction(data, q_values=[0, 1, 2], n_points=15)
+print(curves.columns.tolist())
+```
+
+At `q=0` the interpolated curve equals Hurlbert rarefaction exactly;
+extrapolation is continuous with the observed value at the reference sample
+size.
 
 ### Richness Estimators
 
@@ -298,6 +471,87 @@ print(f"Species-environment correlations: {cca_results['species_env_correlation'
 # Alternative abbreviated method name (same function)
 cca_results2 = multivar.cca_analysis(species_data=data, env_data=env_data)
 print("CCA using abbreviated method completed")
+```
+
+### Testing a Constrained Ordination (new in v1.5.0)
+
+A constrained ordination on its own tells you nothing about significance -
+constrained inertia is always positive. `anova_cca()` and `anova_rda()` supply
+the permutation tests, following `vegan`'s `anova.cca` idiom.
+
+```python
+# Overall test: is the constrained variation more than chance?
+# Every call returns an ANOVA-style `table`; the overall test has one Model row.
+overall = multivar.anova_rda(data, env_data, permutations=999, random_state=0)
+print(overall['table'])
+print(f"Constrained: {overall['proportion_constrained']:.1%} of total variance")
+
+model_row = overall['table'].loc['Model']
+print(f"F = {model_row['F']:.3f}, p = {model_row['Pr(>F)']:.3f}")
+
+# Which axes are worth interpreting?
+by_axis = multivar.anova_rda(data, env_data, by='axis', random_state=0)
+print(by_axis['table'])
+
+# Which variables carry the signal? 'terms' is sequential (order matters),
+# 'margin' tests each variable against all the others (order does not).
+by_term = multivar.anova_rda(data, env_data, by='terms', random_state=0)
+by_margin = multivar.anova_rda(data, env_data, by='margin', random_state=0)
+print(by_margin['table'])
+
+# Partial ordination: test env_data while holding spatial structure constant
+spatial = env_data[['Elevation']]
+partial = multivar.anova_rda(
+    data, env_data[['Temperature', 'pH']],
+    conditioning=spatial, random_state=0
+)
+
+# anova_cca() takes the same arguments for a CCA
+cca_test = multivar.anova_cca(data, env_data, by='margin', random_state=0)
+```
+
+### Variance Partitioning (new in v1.5.0)
+
+How much of the community pattern is explained by climate, how much by soil, and
+how much by the two jointly? `varpart()` answers this for two or three tables
+(Peres-Neto et al. 2006), using adjusted R-squared so the fractions are
+comparable across tables with different numbers of variables.
+
+```python
+climate = env_data[['Temperature', 'Precipitation']]
+soil = env_data[['pH']]
+topography = env_data[['Elevation']]
+
+# Two tables
+vp2 = multivar.varpart(data, climate, soil,
+                       table_names=['Climate', 'Soil'], random_state=0)
+print(vp2['fractions'])            # unique, shared and residual fractions
+print(vp2['individual_adj_r2'])    # adjusted R-squared per table
+
+# Three tables
+vp3 = multivar.varpart(data, climate, soil, topography,
+                       table_names=['Climate', 'Soil', 'Topography'],
+                       random_state=0)
+print(vp3['fractions'])
+```
+
+The unique, shared and unexplained fractions sum to exactly 1.0. A negative
+shared fraction is not a bug - it means the tables together explain *more* than
+the sum of their parts, and is conventionally read as zero.
+
+### Forward Selection (new in v1.5.0)
+
+```python
+# Permutation-based selection with the Blanchet et al. (2008) double stopping
+# criterion: stop at alpha, and never exceed the R-squared of the full model.
+selection = multivar.forward_selection(
+    data, env_data, alpha=0.05, permutations=199, random_state=0
+)
+print(f"Selected: {selection['selected']}")
+
+# `history` is a DataFrame recording every candidate considered, with the
+# pseudo-F and permutation p-value that led to it being kept or rejected.
+print(selection['history'])
 ```
 
 ### Environmental Vector Fitting
@@ -470,6 +724,78 @@ print(f"A statistic: {mrpp['a_statistic']:.3f}")
 print(f"p-value: {mrpp['p_value']:.3f}")
 ```
 
+### PERMDISP - Checking the PERMANOVA Assumption (new in v1.5.0)
+
+PERMANOVA assumes groups have comparable multivariate dispersion. If they do
+not, a significant PERMANOVA may reflect differing *spread* rather than
+differing *location* - a well-known trap. `permdisp()` (Anderson 2006) tests
+this directly; `betadisper()` is an alias for users coming from `vegan`.
+
+```python
+dispersion = stats.permdisp(
+    distance_matrix=distance_matrix,
+    groups=groups,
+    permutations=999,
+    random_state=0
+)
+
+print(f"F = {dispersion['f_statistic']:.3f}, p = {dispersion['p_value']:.3f}")
+
+# Mean distance to the group centroid, with its SD and n, per group
+for group, stats_ in dispersion['group_dispersions'].items():
+    print(f"{group}: {stats_['mean_distance_to_centroid']:.3f} "
+          f"(sd {stats_['sd']:.3f}, n {stats_['n']})")
+
+# A non-significant result here means a significant PERMANOVA can be read as a
+# genuine difference in composition.
+
+# Median centring is more robust to outlying sites than the centroid
+robust = stats.permdisp(distance_matrix, groups, centroid_type='median',
+                        random_state=0)
+
+# Which groups differ? Holm-adjusted pairwise comparisons
+pairwise = stats.permdisp(distance_matrix, groups, pairwise=True,
+                          random_state=0)
+print(pairwise['pairwise'])   # DataFrame of Holm-adjusted p-values
+```
+
+### Multi-Factor PERMANOVA with adonis (new in v1.5.0)
+
+`permanova()` handles one grouping factor. `adonis()` takes a model formula, so
+you can fit crossed and nested designs, mix categorical and continuous terms,
+and choose how the sums of squares are apportioned.
+
+```python
+design = pd.DataFrame({
+    'treatment': np.repeat(['control', 'burned'], n_sites // 2),
+    'block': np.tile(['A', 'B'], n_sites // 2),
+    'elevation': env_data['Elevation'].values,
+})
+
+# Main effects plus their interaction ('a*b' expands to a + b + a:b)
+model = stats.adonis(
+    distance_matrix=distance_matrix,
+    data=design,
+    terms=['treatment*block', 'elevation'],
+    by='terms',            # sequential (Type I) SS - order matters
+    permutations=999,
+    random_state=0
+)
+print(model['table'])
+
+# Marginal (Type III) SS: each term tested against all the others
+marginal = stats.adonis(distance_matrix, design,
+                        terms=['treatment', 'block'],
+                        by='margin', random_state=0)
+
+# Restricted permutation: shuffle only within blocks, for a split-plot design
+nested = stats.adonis(distance_matrix, design, terms=['treatment'],
+                      strata=design['block'], random_state=0)
+```
+
+With a single categorical term and `by='terms'`, `adonis()` reproduces
+`permanova()` exactly.
+
 ### Mantel Tests
 
 ```python
@@ -478,6 +804,7 @@ env_distances = pdist(env_data, metric='euclidean')
 env_distance_matrix = squareform(env_distances)
 
 # Mantel test
+# alternative defaults to 'greater', the ecological convention
 mantel = stats.mantel_test(
     matrix1=distance_matrix,
     matrix2=env_distance_matrix,
@@ -1451,6 +1778,12 @@ print(f"Large dataset analysis completed: {large_diversity.shape}")
 ## Summary
 
 This manual provides complete, verified examples for all major VegZ functionality:
+
+- All method names are correct
+- All parameter names match the actual API
+- All imports are accurate
+- All examples have been tested and work
+- Complete workflow examples included
 
 ### Key Classes and Their Main Methods:
 

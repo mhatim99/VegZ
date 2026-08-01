@@ -6,16 +6,49 @@ Copyright (c) 2025 Mohamed Z. Hatim
 
 import numpy as np
 import pandas as pd
-from typing import Union, List, Dict, Tuple, Optional, Any
-from scipy.cluster.hierarchy import linkage, fcluster, dendrogram, cophenet
+from typing import List, Dict, Tuple, Optional, Any
+from scipy.cluster.hierarchy import linkage, fcluster, cophenet
 from scipy.spatial.distance import pdist, squareform
-from scipy import stats
-from scipy.optimize import curve_fit
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.mixture import GaussianMixture
-from sklearn.metrics import silhouette_score, calinski_harabasz_score
+from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
 import matplotlib.pyplot as plt
 import warnings
+
+from ._compat import as_generator
+
+#: VegZ distance names mapped onto SciPy pdist metrics.
+_PDIST_ALIASES = {
+    'bray_curtis': 'braycurtis',
+    'braycurtis': 'braycurtis',
+    'sorensen': 'dice',
+    'manhattan': 'cityblock',
+    'city_block': 'cityblock',
+}
+
+
+def _condensed_distances(values: np.ndarray, metric: str) -> np.ndarray:
+    """Condensed distance vector honouring VegZ metric aliases."""
+    key = str(metric).lower()
+    scipy_metric = _PDIST_ALIASES.get(key, key)
+    values = np.asarray(values, dtype=float)
+    if scipy_metric in ('jaccard', 'dice'):
+        values = (values > 0).astype(bool)
+    return pdist(values, metric=scipy_metric)
+
+
+def _total_sum_of_squares(data: np.ndarray) -> float:
+    """
+    Total within-cluster sum of squares for a single cluster (k = 1).
+
+    This is the natural k=1 value of KMeans ``inertia_`` and must be on the
+    same scale as it, otherwise the elbow curve is not monotone decreasing and
+    every elbow detector is thrown off.
+    """
+    data = np.asarray(data, dtype=float)
+    if data.size == 0:
+        return 0.0
+    return float(np.sum((data - data.mean(axis=0)) ** 2))
 
 
 class VegetationClustering:
@@ -43,272 +76,353 @@ class VegetationClustering:
 
     
     def twinspan(self, data: pd.DataFrame,
-                 cut_levels: List[float] = [0, 2, 5, 10, 20],
+                 cut_levels: Optional[List[float]] = None,
                  max_divisions: int = 6,
-                 min_group_size: int = 5) -> Dict[str, Any]:
+                 min_group_size: int = 5,
+                 max_depth: Optional[int] = None,
+                 min_eigenvalue: float = 0.05) -> Dict[str, Any]:
         """
         Two-Way Indicator Species Analysis (TWINSPAN).
-        
+
+        A divisive hierarchical classification. At each step the current group
+        of sites is ordinated by correspondence analysis of its pseudospecies
+        table and split at the centroid of the first (non-trivial) axis; the
+        split is then refined using the pseudospecies that best discriminate
+        the two halves.
+
         Parameters:
         -----------
         data : pd.DataFrame
-            Species abundance matrix (sites x species)
-        cut_levels : list
-            Pseudospecies cut levels
+            Species abundance matrix (sites x species), non-negative.
+        cut_levels : list, optional
+            Pseudospecies cut levels; the first level denotes mere presence.
+            Defaults to ``[0, 2, 5, 10, 20]``.
         max_divisions : int
-            Maximum number of divisions
+            Maximum number of splits performed in total.
         min_group_size : int
-            Minimum group size for division
-            
+            A group is only split if both halves would have at least this many
+            sites.
+        max_depth : int, optional
+            Maximum depth of the classification hierarchy. Defaults to
+            unlimited (bounded by ``max_divisions``).
+        min_eigenvalue : float
+            Minimum first-axis eigenvalue required to accept a split. Groups
+            with weaker internal structure become terminal.
+
         Returns:
         --------
         dict
-            TWINSPAN results including classification and indicator species
+            ``site_classification`` (terminal group per site, numbered from 1),
+            ``classification_tree`` (divisions, terminal groups and their
+            indicator pseudospecies) and the pseudospecies table.
+
+        Notes
+        -----
+        This follows the logic of Hill's (1979) TWINSPAN but is not a
+        line-by-line port of DECORANA/TWINSPAN: the species classification is
+        derived from the indicator pseudospecies of each division rather than a
+        separate two-way ordination, so group memberships can differ slightly
+        from the original FORTRAN program.
         """
-        # Copyright (c) 2025 Mohamed Z. Hatim
+        if cut_levels is None:
+            cut_levels = [0, 2, 5, 10, 20]
+        if (data.values < 0).any():
+            raise ValueError("TWINSPAN requires non-negative abundance data")
+        if min_group_size < 2:
+            raise ValueError("min_group_size must be at least 2")
+
         pseudo_species_data = self._create_pseudospecies(data, cut_levels)
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
-        classification_tree = {
+
+        classification_tree: Dict[str, Any] = {
             'divisions': [],
             'groups': {},
             'indicator_species': {}
         }
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
-        initial_group = {
+
+        root = {
             'sites': data.index.tolist(),
             'level': 0,
             'parent': None,
-            'eigenvalue': 0
+            'eigenvalue': np.inf,   # always considered first
+            'path': '',
         }
-        
-        groups_to_process = [initial_group]
+
+        pending = [root]
+        divisions_done = 0
         group_id = 1
-        
-        for division in range(max_divisions):
-            if not groups_to_process:
-                break
-            
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            current_group = max(groups_to_process, key=lambda x: x['eigenvalue'])
-            groups_to_process.remove(current_group)
-            
-            if len(current_group['sites']) < min_group_size * 2:
-# Copyright (c) 2025 Mohamed Z. Hatim
-                classification_tree['groups'][group_id] = current_group
+
+        while pending and divisions_done < max_divisions:
+            # Split the group with the strongest internal gradient first.
+            current = max(pending, key=lambda g: g['eigenvalue'])
+            pending.remove(current)
+
+            too_small = len(current['sites']) < 2 * min_group_size
+            too_deep = max_depth is not None and current['level'] >= max_depth
+
+            if too_small or too_deep:
+                classification_tree['groups'][group_id] = current
                 group_id += 1
                 continue
-            
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            division_result = self._twinspan_division(
-                pseudo_species_data.loc[current_group['sites']]
+
+            division = self._twinspan_division(
+                pseudo_species_data.loc[current['sites']],
+                min_group_size=min_group_size
             )
-            
-            if division_result['eigenvalue'] < 0.1:  # Minimum eigenvalue threshold
-                classification_tree['groups'][group_id] = current_group
+
+            if (division['eigenvalue'] < min_eigenvalue
+                    or not division['group1_indices']
+                    or not division['group2_indices']):
+                classification_tree['groups'][group_id] = current
                 group_id += 1
                 continue
-            
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            group1_sites = [current_group['sites'][i] for i in division_result['group1_indices']]
-            group2_sites = [current_group['sites'][i] for i in division_result['group2_indices']]
-            
-            group1 = {
-                'sites': group1_sites,
-                'level': current_group['level'] + 1,
-                'parent': group_id,
-                'eigenvalue': division_result['eigenvalue'] * 0.8  # Decay for next iteration
-            }
-            
-            group2 = {
-                'sites': group2_sites,
-                'level': current_group['level'] + 1,
-                'parent': group_id,
-                'eigenvalue': division_result['eigenvalue'] * 0.8
-            }
-            
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            if len(group1_sites) >= min_group_size:
-                groups_to_process.append(group1)
-            else:
-                classification_tree['groups'][group_id + 1] = group1
-            
-            if len(group2_sites) >= min_group_size:
-                groups_to_process.append(group2)
-            else:
-                classification_tree['groups'][group_id + 2] = group2
-            
-            # Copyright (c) 2025 Mohamed Z. Hatim
+
+            sites = current['sites']
+            children = []
+            for side, indices in (('0', division['group1_indices']),
+                                  ('1', division['group2_indices'])):
+                children.append({
+                    'sites': [sites[i] for i in indices],
+                    'level': current['level'] + 1,
+                    'parent': current['path'],
+                    'eigenvalue': division['eigenvalue'],
+                    'path': current['path'] + side,
+                })
+
             classification_tree['divisions'].append({
-                'division_id': division,
-                'parent_group': group_id,
-                'child_groups': [group_id + 1, group_id + 2],
-                'eigenvalue': division_result['eigenvalue'],
-                'indicator_species': division_result['indicator_species']
+                'division_id': divisions_done,
+                'level': current['level'],
+                'parent_path': current['path'],
+                'child_paths': [c['path'] for c in children],
+                'group_sizes': [len(c['sites']) for c in children],
+                'eigenvalue': division['eigenvalue'],
+                'indicator_species': division['indicator_species'],
             })
-            
-            group_id += 3
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
-        for remaining_group in groups_to_process:
-            classification_tree['groups'][group_id] = remaining_group
+            classification_tree['indicator_species'][current['path'] or 'root'] = \
+                division['indicator_species']
+
+            pending.extend(children)
+            divisions_done += 1
+
+        # Anything still pending is terminal.
+        for remaining in pending:
+            classification_tree['groups'][group_id] = remaining
             group_id += 1
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
+
         site_classification = self._assign_final_groups(classification_tree, data.index)
-        
-        results = {
+
+        return {
             'site_classification': site_classification,
             'classification_tree': classification_tree,
             'pseudospecies_data': pseudo_species_data,
             'cut_levels': cut_levels,
+            'n_divisions': divisions_done,
+            'n_groups': int(site_classification.nunique()),
             'method': 'TWINSPAN'
         }
-        
-        return results
-    
-    def _create_pseudospecies(self, data: pd.DataFrame, 
-                            cut_levels: List[float]) -> pd.DataFrame:
-        """Create pseudospecies from abundance data."""
-        pseudo_data = pd.DataFrame(index=data.index)
-        
+
+    def _create_pseudospecies(self, data: pd.DataFrame,
+                              cut_levels: List[float]) -> pd.DataFrame:
+        """
+        Expand abundances into binary pseudospecies.
+
+        The first cut level denotes presence (abundance > 0); each subsequent
+        level ``c`` adds a pseudospecies flagging ``abundance >= c``. Encoding
+        presence explicitly matters - without it a species recorded only at low
+        cover contributes nothing to the classification.
+        """
+        columns = {}
+
         for species in data.columns:
-            species_data = data[species]
-            
-            for i, cut_level in enumerate(cut_levels[1:], 1):
-                pseudo_name = f"{species}_{i}"
-                pseudo_data[pseudo_name] = (species_data >= cut_level).astype(int)
-        
-        return pseudo_data
-    
-    def _twinspan_division(self, pseudo_data: pd.DataFrame) -> Dict[str, Any]:
-        """Perform a single TWINSPAN division."""
-        # Copyright (c) 2025 Mohamed Z. Hatim
-        try:
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            data_matrix = pseudo_data.values.astype(float)
-            
-            if data_matrix.sum() == 0:
-                return {
-                    'group1_indices': list(range(len(pseudo_data)//2)),
-                    'group2_indices': list(range(len(pseudo_data)//2, len(pseudo_data))),
-                    'eigenvalue': 0.0,
-                    'indicator_species': []
-                }
-            
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            row_totals = data_matrix.sum(axis=1)
-            col_totals = data_matrix.sum(axis=0)
-            
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            row_totals[row_totals == 0] = 1
-            col_totals[col_totals == 0] = 1
-            
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            row_profiles = data_matrix / row_totals[:, np.newaxis]
-            col_profiles = data_matrix.T / col_totals[:, np.newaxis]
-            
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            scores = np.ones(len(pseudo_data))
-            
-            for iteration in range(20):  # Power iteration
-                old_scores = scores.copy()
-                
-                # Copyright (c) 2025 Mohamed Z. Hatim
-                species_scores = col_profiles @ scores
-                species_scores = species_scores / np.linalg.norm(species_scores)
-                
-                # Copyright (c) 2025 Mohamed Z. Hatim
-                scores = row_profiles @ species_scores
-                
-                # Copyright (c) 2025 Mohamed Z. Hatim
-                if np.corrcoef(scores, old_scores)[0, 1] > 0.999:
-                    break
-            
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            sorted_indices = np.argsort(scores)
-            best_division = len(scores) // 2
-            best_eigenvalue = 0
-            
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            for div_point in range(len(scores)//4, 3*len(scores)//4):
-                group1_idx = sorted_indices[:div_point]
-                group2_idx = sorted_indices[div_point:]
-                
-                if len(group1_idx) < 2 or len(group2_idx) < 2:
-                    continue
-                
-                # Copyright (c) 2025 Mohamed Z. Hatim
-                group1_mean = scores[group1_idx].mean()
-                group2_mean = scores[group2_idx].mean()
-                separation = abs(group1_mean - group2_mean)
-                
-                if separation > best_eigenvalue:
-                    best_eigenvalue = separation
-                    best_division = div_point
-            
-            group1_indices = sorted_indices[:best_division].tolist()
-            group2_indices = sorted_indices[best_division:].tolist()
-            
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            indicator_species = self._identify_indicator_pseudospecies(
-                pseudo_data, group1_indices, group2_indices
-            )
-            
-        except Exception as e:
-            warnings.warn(f"TWINSPAN division failed: {e}")
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            mid_point = len(pseudo_data) // 2
-            group1_indices = list(range(mid_point))
-            group2_indices = list(range(mid_point, len(pseudo_data)))
-            best_eigenvalue = 0.1
-            indicator_species = []
-        
-        return {
-            'group1_indices': group1_indices,
-            'group2_indices': group2_indices,
-            'eigenvalue': best_eigenvalue,
-            'indicator_species': indicator_species
+            values = data[species]
+            for i, cut_level in enumerate(cut_levels):
+                if i == 0:
+                    indicator = (values > 0)
+                else:
+                    indicator = (values >= cut_level)
+                columns[f"{species}_{i + 1}"] = indicator.astype(int)
+
+        pseudo = pd.DataFrame(columns, index=data.index)
+        # Drop pseudospecies that are constant: they cannot discriminate.
+        informative = pseudo.columns[(pseudo.sum(axis=0) > 0) &
+                                     (pseudo.sum(axis=0) < len(pseudo))]
+        return pseudo[informative] if len(informative) else pseudo
+
+    def _twinspan_division(self, pseudo_data: pd.DataFrame,
+                           min_group_size: int = 2) -> Dict[str, Any]:
+        """
+        One TWINSPAN division of a group of sites.
+
+        Uses the first non-trivial correspondence-analysis axis of the
+        pseudospecies table, cut at the weighted centroid, then refines the
+        split with an indicator-pseudospecies score.
+        """
+        n_sites = len(pseudo_data)
+        empty = {
+            'group1_indices': [],
+            'group2_indices': [],
+            'eigenvalue': 0.0,
+            'indicator_species': [],
+            'ordination_scores': np.zeros(n_sites),
         }
-    
+
+        matrix = pseudo_data.values.astype(float)
+        if n_sites < 2 * min_group_size or matrix.size == 0 or matrix.sum() == 0:
+            return empty
+
+        try:
+            scores, eigenvalue = self._first_ca_axis(matrix)
+        except (np.linalg.LinAlgError, ValueError) as exc:  # pragma: no cover
+            warnings.warn(f"TWINSPAN ordination failed: {exc}")
+            return empty
+
+        if not np.isfinite(scores).all() or np.allclose(scores, scores[0]):
+            return empty
+
+        # Split at the centroid, then move the cut if either side is too small.
+        order = np.argsort(scores)
+        n_left = int(np.sum(scores < scores.mean()))
+        n_left = int(np.clip(n_left, min_group_size, n_sites - min_group_size))
+
+        group1_indices = order[:n_left].tolist()
+        group2_indices = order[n_left:].tolist()
+
+        indicator_species = self._identify_indicator_pseudospecies(
+            pseudo_data, group1_indices, group2_indices
+        )
+
+        # Refinement: rescore sites on the indicator pseudospecies alone and
+        # reassign, keeping the group-size constraint. This is what makes the
+        # classification reproducible from a handful of named indicators, which
+        # is the practical point of TWINSPAN.
+        refined1, refined2 = self._refine_division(
+            pseudo_data, indicator_species, group1_indices, group2_indices,
+            min_group_size
+        )
+
+        return {
+            'group1_indices': refined1,
+            'group2_indices': refined2,
+            'eigenvalue': float(eigenvalue),
+            'indicator_species': indicator_species,
+            'ordination_scores': scores,
+        }
+
+    @staticmethod
+    def _first_ca_axis(matrix: np.ndarray) -> Tuple[np.ndarray, float]:
+        """
+        First non-trivial correspondence-analysis axis of a count matrix.
+
+        Returns ``(site_scores, eigenvalue)``. Subtracting the outer product of
+        the row and column masses removes the trivial all-ones axis; a plain
+        reciprocal-averaging power iteration converges to that trivial axis
+        instead and yields no separation at all.
+        """
+        total = matrix.sum()
+        if total <= 0:
+            raise ValueError("empty pseudospecies table")
+
+        P = matrix / total
+        r = P.sum(axis=1)
+        c = P.sum(axis=0)
+
+        keep_rows = r > 0
+        keep_cols = c > 0
+        if keep_rows.sum() < 2 or keep_cols.sum() < 2:
+            raise ValueError("insufficient non-empty rows/columns")
+
+        expected = np.outer(r, c)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            S = (P - expected) / np.sqrt(expected)
+        S = np.nan_to_num(S, nan=0.0, posinf=0.0, neginf=0.0)
+
+        U, s, _ = np.linalg.svd(S, full_matrices=False)
+
+        safe_r = np.where(r > 0, r, 1.0)
+        scores = U[:, 0] / np.sqrt(safe_r)
+        scores = np.where(r > 0, scores, 0.0)
+
+        return scores, float(s[0] ** 2)
+
+    @staticmethod
+    def _refine_division(pseudo_data: pd.DataFrame,
+                         indicator_species: List[Dict[str, Any]],
+                         group1_indices: List[int],
+                         group2_indices: List[int],
+                         min_group_size: int) -> Tuple[List[int], List[int]]:
+        """Reassign sites using a signed indicator-pseudospecies score."""
+        if not indicator_species:
+            return group1_indices, group2_indices
+
+        values = pseudo_data.values.astype(float)
+        columns = list(pseudo_data.columns)
+
+        score = np.zeros(values.shape[0])
+        for indicator in indicator_species:
+            col = columns.index(indicator['species'])
+            # Positive weight => species favours group 2.
+            sign = 1.0 if indicator['group2_frequency'] > indicator['group1_frequency'] else -1.0
+            score += sign * values[:, col]
+
+        if np.allclose(score, score[0]):
+            return group1_indices, group2_indices
+
+        order = np.argsort(score, kind='stable')
+        n_sites = values.shape[0]
+        n_left = int(np.sum(score < score.mean()))
+        n_left = int(np.clip(n_left, min_group_size, n_sites - min_group_size))
+
+        return order[:n_left].tolist(), order[n_left:].tolist()
+
     def _identify_indicator_pseudospecies(self, pseudo_data: pd.DataFrame,
-                                        group1_indices: List[int],
-                                        group2_indices: List[int]) -> List[str]:
-        """Identify indicator pseudospecies for division."""
-        indicators = []
-        
-        for species in pseudo_data.columns:
-            group1_freq = pseudo_data.iloc[group1_indices][species].mean()
-            group2_freq = pseudo_data.iloc[group2_indices][species].mean()
-            
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            freq_diff = abs(group1_freq - group2_freq)
-            
-            if freq_diff > 0.3:  # Threshold for indicator species
-                indicators.append({
-                    'species': species,
-                    'frequency_difference': freq_diff,
-                    'group1_frequency': group1_freq,
-                    'group2_frequency': group2_freq
-                })
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
+                                          group1_indices: List[int],
+                                          group2_indices: List[int],
+                                          max_indicators: int = 5,
+                                          min_difference: float = 0.2) -> List[Dict[str, Any]]:
+        """Pseudospecies whose frequency differs most between the two halves."""
+        if not group1_indices or not group2_indices:
+            return []
+
+        values = pseudo_data.values.astype(float)
+        freq1 = values[group1_indices].mean(axis=0)
+        freq2 = values[group2_indices].mean(axis=0)
+        difference = np.abs(freq1 - freq2)
+
+        indicators = [
+            {
+                'species': column,
+                'frequency_difference': float(difference[j]),
+                'group1_frequency': float(freq1[j]),
+                'group2_frequency': float(freq2[j]),
+            }
+            for j, column in enumerate(pseudo_data.columns)
+            if difference[j] > min_difference
+        ]
+
         indicators.sort(key=lambda x: x['frequency_difference'], reverse=True)
-        
-        return indicators[:5]  # Copyright (c) 2025 Mohamed Z. Hatim
+        return indicators[:max_indicators]
+
     
     def _assign_final_groups(self, classification_tree: Dict[str, Any],
-                           site_index: pd.Index) -> pd.Series:
-        """Assign sites to final groups."""
-        site_groups = pd.Series(index=site_index, dtype=int)
-        
+                             site_index: pd.Index) -> pd.Series:
+        """Assign sites to final (terminal) groups, numbered from 1."""
+        # Start from 0 = unassigned rather than an uninitialised int Series,
+        # which pandas fills with arbitrary memory contents.
+        site_groups = pd.Series(0, index=site_index, dtype=int, name='twinspan_group')
+
         group_counter = 1
-        for group_id, group_info in classification_tree['groups'].items():
+        for _group_id, group_info in classification_tree['groups'].items():
             for site in group_info['sites']:
-                site_groups[site] = group_counter
+                if site in site_groups.index:
+                    site_groups.loc[site] = group_counter
             group_counter += 1
-        
+
+        unassigned = int((site_groups == 0).sum())
+        if unassigned:
+            warnings.warn(
+                f"{unassigned} site(s) were not placed in a TWINSPAN group and "
+                "are labelled 0."
+            )
+
         return site_groups
     
     # Copyright (c) 2025 Mohamed Z. Hatim
@@ -317,10 +431,11 @@ class VegetationClustering:
                                n_clusters: int = 3,
                                fuzziness: float = 2.0,
                                max_iter: int = 100,
-                               tol: float = 1e-4) -> Dict[str, Any]:
+                               tol: float = 1e-4,
+                               random_state: Optional[int] = 42) -> Dict[str, Any]:
         """
         Fuzzy C-means clustering.
-        
+
         Parameters:
         -----------
         data : pd.DataFrame
@@ -328,27 +443,41 @@ class VegetationClustering:
         n_clusters : int
             Number of clusters
         fuzziness : float
-            Fuzziness parameter (> 1)
+            Fuzziness parameter (must be > 1)
         max_iter : int
             Maximum iterations
         tol : float
             Convergence tolerance
-            
+        random_state : int, optional
+            Seed for the random membership initialisation. Without this the
+            algorithm returns a different partition on every call.
+
         Returns:
         --------
         dict
             Fuzzy clustering results
         """
-        X = data.values
+        if fuzziness <= 1:
+            raise ValueError("fuzziness must be greater than 1")
+        if max_iter < 1:
+            raise ValueError("max_iter must be at least 1")
+
+        X = data.values.astype(float)
         n_samples, n_features = X.shape
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
-        membership = np.random.rand(n_samples, n_clusters)
+
+        if n_clusters < 1 or n_clusters > n_samples:
+            raise ValueError(
+                f"n_clusters must be between 1 and {n_samples} (got {n_clusters})"
+            )
+
+        rng = as_generator(random_state)
+        membership = rng.random((n_samples, n_clusters))
         membership = membership / membership.sum(axis=1)[:, np.newaxis]
-        
+
         centers = np.zeros((n_clusters, n_features))
-        
-        for iteration in range(max_iter):
+        iteration = 0
+
+        for iteration in range(max_iter):  # noqa: B007 - used after the loop
             # Copyright (c) 2025 Mohamed Z. Hatim
             for c in range(n_clusters):
                 weights = membership[:, c] ** fuzziness
@@ -520,82 +649,93 @@ class VegetationClustering:
         return calinski_harabasz_score(data.values, labels)
     
     def _gap_statistic(self, data: pd.DataFrame,
-                      k_range: range = range(1, 11),
-                      n_refs: int = 10) -> Dict[str, Any]:
-        """Gap statistic for optimal number of clusters."""
-        gaps = []
-        errors = []
-        
-        for k in k_range:
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            if k == 1:
-                wk_actual = np.sum((data.values - data.values.mean(axis=0))**2)
-            else:
-                kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
-                labels = kmeans.fit_predict(data.values)
-                wk_actual = kmeans.inertia_
-            
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            wk_refs = []
-            
-            for _ in range(n_refs):
-                # Copyright (c) 2025 Mohamed Z. Hatim
-                random_data = np.random.uniform(
-                    data.values.min(axis=0),
-                    data.values.max(axis=0),
-                    size=data.values.shape
-                )
-                
-                if k == 1:
-                    wk_ref = np.sum((random_data - random_data.mean(axis=0))**2)
-                else:
-                    kmeans_ref = KMeans(n_clusters=k, random_state=42, n_init=10)
-                    kmeans_ref.fit(random_data)
-                    wk_ref = kmeans_ref.inertia_
-                
-                wk_refs.append(wk_ref)
-            
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            gap = np.log(np.mean(wk_refs)) - np.log(wk_actual)
-            gaps.append(gap)
-            
-# Copyright (c) 2025 Mohamed Z. Hatim
-            se = np.std(np.log(wk_refs)) * np.sqrt(1 + 1/n_refs)
-            errors.append(se)
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
-        optimal_k = 1
+                       k_range: range = range(1, 11),
+                       n_refs: int = 10,
+                       random_state: Optional[int] = 42) -> Dict[str, Any]:
+        """
+        Gap statistic (Tibshirani, Walther & Hastie 2001).
+
+        Parameters:
+        -----------
+        data : pd.DataFrame
+            Data matrix
+        k_range : range
+            Candidate cluster counts
+        n_refs : int
+            Number of uniform reference data sets per k
+        random_state : int, optional
+            Seed for the reference data sets. Without it the gap statistic is
+            not reproducible between calls.
+        """
+        rng = as_generator(random_state)
+        X = np.asarray(data.values, dtype=float)
+        lows, highs = X.min(axis=0), X.max(axis=0)
+
+        k_values = list(k_range)
+        gaps, errors = [], []
+
+        for k in k_values:
+            wk_actual = self._within_dispersion(X, k)
+
+            wk_refs = np.empty(n_refs, dtype=float)
+            for r in range(n_refs):
+                reference = rng.uniform(lows, highs, size=X.shape)
+                wk_refs[r] = self._within_dispersion(reference, k)
+
+            log_refs = np.log(np.where(wk_refs > 0, wk_refs, np.finfo(float).tiny))
+            gaps.append(float(np.mean(log_refs) - np.log(max(wk_actual, np.finfo(float).tiny))))
+            errors.append(float(np.std(log_refs) * np.sqrt(1 + 1 / n_refs)))
+
+        # Tibshirani's 1-SE rule: smallest k with Gap(k) >= Gap(k+1) - s(k+1).
+        optimal_k = k_values[-1]
         for i in range(len(gaps) - 1):
             if gaps[i] >= gaps[i + 1] - errors[i + 1]:
-                optimal_k = k_range[i]
+                optimal_k = k_values[i]
                 break
-        
-        results = {
+
+        return {
             'gap_values': gaps,
             'standard_errors': errors,
             'optimal_k': optimal_k,
-            'k_range': list(k_range)
+            'k_range': k_values
         }
-        
-        return results
+
+    @staticmethod
+    def _within_dispersion(X: np.ndarray, k: int) -> float:
+        """Pooled within-cluster sum of squares for a given k."""
+        if k <= 1:
+            return _total_sum_of_squares(X)
+        kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+        kmeans.fit(X)
+        return float(kmeans.inertia_)
     
     def _cophenetic_correlation(self, data: pd.DataFrame,
-                              linkage_matrix: np.ndarray) -> float:
-        """Cophenetic correlation coefficient."""
-        # Copyright (c) 2025 Mohamed Z. Hatim
-        distances = pdist(data.values)
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
-        cophenetic_distances = cophenet(linkage_matrix)
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
-        correlation = np.corrcoef(distances, cophenetic_distances)[0, 1]
-        
-        return correlation
+                                linkage_matrix: np.ndarray,
+                                distances: Optional[np.ndarray] = None) -> float:
+        """
+        Cophenetic correlation coefficient.
+
+        Parameters:
+        -----------
+        data : pd.DataFrame
+            Data used for the clustering (ignored when ``distances`` is given).
+        linkage_matrix : np.ndarray
+            SciPy linkage matrix.
+        distances : np.ndarray, optional
+            The *same* condensed distance vector the linkage was built from.
+            Supplying it matters: correlating the tree against Euclidean
+            distances when it was built from, say, Bray-Curtis distances gives
+            a meaningless number.
+        """
+        if distances is None:
+            distances = pdist(np.asarray(data.values, dtype=float))
+
+        correlation, _ = cophenet(linkage_matrix, np.asarray(distances, dtype=float))
+        return float(correlation)
     
     def optimal_clusters_analysis(self, data: pd.DataFrame,
                                 k_range: range = range(2, 11),
-                                methods: List[str] = ['silhouette', 'gap_statistic']) -> Dict[str, Any]:
+                                methods: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Comprehensive analysis for optimal number of clusters.
         
@@ -613,6 +753,9 @@ class VegetationClustering:
         dict
             Optimal cluster analysis results
         """
+        if methods is None:
+            methods = ['silhouette', 'gap_statistic']
+
         results = {
             'k_range': list(k_range),
             'validation_scores': {},
@@ -650,69 +793,98 @@ class VegetationClustering:
             
             results['validation_scores']['wcss'] = wcss
             
-            # Copyright (c) 2025 Mohamed Z. Hatim
+            # Second difference of the WCSS curve; index i of the double diff
+            # corresponds to k_values[i + 1], so the offset is +1 (not +2).
+            k_values = list(k_range)
             if len(wcss) > 2:
-                diffs = np.diff(wcss)
-                diff2 = np.diff(diffs)
-                elbow_idx = np.argmax(diff2) + 2  # +2 because of double diff
-                if elbow_idx < len(k_range):
-                    results['recommendations']['elbow'] = k_range[elbow_idx]
-        
+                diff2 = np.diff(np.diff(wcss))
+                elbow_idx = int(np.argmax(diff2)) + 1
+                elbow_idx = min(elbow_idx, len(k_values) - 1)
+                results['recommendations']['elbow'] = k_values[elbow_idx]
+
         return results
     
     def hierarchical_clustering(self, data: pd.DataFrame,
-                               method: str = 'ward',
-                               metric: str = 'euclidean',
-                               n_clusters: Optional[int] = None) -> Dict[str, Any]:
+                                method: Optional[str] = None,
+                                metric: Optional[str] = None,
+                                n_clusters: Optional[int] = None,
+                                linkage_method: Optional[str] = None,
+                                distance_metric: Optional[str] = None) -> Dict[str, Any]:
         """
         Enhanced hierarchical clustering with validation.
-        
+
         Parameters:
         -----------
         data : pd.DataFrame
-            Data matrix
-        method : str
-            Linkage method
-        metric : str
-            Distance metric
+            Data matrix, or a square distance matrix when the metric is
+            ``'precomputed'``.
+        method, linkage_method : str
+            Linkage method ('ward', 'average', 'complete', 'single', ...).
+            ``linkage_method`` is an alias kept in step with
+            :meth:`VegZ.hierarchical_clustering`; default ``'ward'``.
+        metric, distance_metric : str
+            Distance metric; ``distance_metric`` is an alias. Default
+            ``'euclidean'``.
         n_clusters : int, optional
             Number of clusters to extract
-            
+
         Returns:
         --------
         dict
             Hierarchical clustering results with validation
         """
-        # Copyright (c) 2025 Mohamed Z. Hatim
+        if method is not None and linkage_method is not None and method != linkage_method:
+            raise ValueError("Pass only one of 'method' or 'linkage_method'")
+        if metric is not None and distance_metric is not None and metric != distance_metric:
+            raise ValueError("Pass only one of 'metric' or 'distance_metric'")
+
+        method = method or linkage_method or 'ward'
+        metric = metric or distance_metric or 'euclidean'
+
         if metric == 'precomputed':
-            distances = data.values
+            values = np.asarray(data.values, dtype=float)
+            distances = squareform(values, checks=False) if values.ndim == 2 and \
+                values.shape[0] == values.shape[1] else values
+            silhouette_input = None
         else:
-            distances = pdist(data.values, metric=metric)
-        
+            if method == 'ward' and metric != 'euclidean':
+                warnings.warn(
+                    "Ward linkage is only defined for Euclidean distances; "
+                    "switching distance metric to 'euclidean'."
+                )
+                metric = 'euclidean'
+            distances = _condensed_distances(data.values, metric)
+            silhouette_input = data
+
         linkage_matrix = linkage(distances, method=method)
-        
+
         results = {
             'linkage_matrix': linkage_matrix,
+            'distances': distances,
             'method': method,
-            'metric': metric
+            'metric': metric,
+            'linkage_method': method,
+            'distance_metric': metric,
+            'site_labels': data.index.tolist(),
         }
-        
+
         if n_clusters:
-            # Copyright (c) 2025 Mohamed Z. Hatim
             cluster_labels = fcluster(linkage_matrix, n_clusters, criterion='maxclust')
             results['cluster_labels'] = pd.Series(cluster_labels, index=data.index, name='cluster')
-            
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            if len(set(cluster_labels)) > 1:
-                silhouette_results = self._silhouette_analysis(data, cluster_labels)
+
+            if len(set(cluster_labels)) > 1 and silhouette_input is not None:
+                silhouette_results = self._silhouette_analysis(silhouette_input, cluster_labels)
                 results['silhouette_score'] = silhouette_results['mean_silhouette_score']
                 results['silhouette_scores'] = silhouette_results['silhouette_scores']
-                
-                results['calinski_harabasz_score'] = self._calinski_harabasz_score(data, cluster_labels)
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
-        results['cophenetic_correlation'] = self._cophenetic_correlation(data, linkage_matrix)
-        
+                results['calinski_harabasz_score'] = self._calinski_harabasz_score(
+                    silhouette_input, cluster_labels
+                )
+
+        # Correlate the tree against the distances it was actually built from.
+        results['cophenetic_correlation'] = self._cophenetic_correlation(
+            data, linkage_matrix, distances
+        )
+
         return results
     
     def kmeans_clustering(self, data: pd.DataFrame,
@@ -747,15 +919,20 @@ class VegetationClustering:
         
         cluster_labels = kmeans.fit_predict(data.values)
         
+        cluster_centers = pd.DataFrame(
+            kmeans.cluster_centers_,
+            columns=data.columns,
+            index=[f'Cluster_{i}' for i in range(n_clusters)]
+        )
+
         results = {
             'cluster_labels': pd.Series(cluster_labels, index=data.index, name='cluster'),
-            'cluster_centers': pd.DataFrame(
-                kmeans.cluster_centers_,
-                columns=data.columns,
-                index=[f'Cluster_{i}' for i in range(n_clusters)]
-            ),
+            'cluster_centers': cluster_centers,
+            # 'centroids' is the name used by VegZ.kmeans_clustering; expose both.
+            'centroids': cluster_centers,
             'inertia': kmeans.inertia_,
             'n_iter': kmeans.n_iter_,
+            'kmeans_object': kmeans,
             'method': 'K_means'
         }
         
@@ -769,9 +946,9 @@ class VegetationClustering:
         
         return results
     
-    def optimal_k_analysis(self, data: pd.DataFrame, 
+    def optimal_k_analysis(self, data: pd.DataFrame,
                           k_range: range = range(2, 11),
-                          methods: List[str] = ['elbow', 'silhouette', 'gap']) -> Dict[str, Any]:
+                          methods: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Find optimal number of clusters using multiple methods.
         
@@ -789,6 +966,9 @@ class VegetationClustering:
         dict
             Optimal k analysis results
         """
+        if methods is None:
+            methods = ['elbow', 'silhouette', 'gap']
+
         results = {
             'k_range': list(k_range),
             'metrics': {},
@@ -852,7 +1032,7 @@ class VegetationClustering:
     
     def comprehensive_elbow_analysis(self, data: pd.DataFrame,
                                     k_range: range = range(1, 16),
-                                    methods: List[str] = ['knee_locator', 'derivative', 'variance_explained', 'distortion_jump'],
+                                    methods: Optional[List[str]] = None,
                                     transform: str = 'hellinger',
                                     plot_results: bool = True) -> Dict[str, Any]:
         """
@@ -876,50 +1056,54 @@ class VegetationClustering:
         dict
             Comprehensive elbow analysis results
         """
-        # Copyright (c) 2025 Mohamed Z. Hatim
-        if transform == 'hellinger':
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            row_sums = data.sum(axis=1)
-            row_sums[row_sums == 0] = 1
-            transformed_data = np.sqrt(data.div(row_sums, axis=0).fillna(0))
-        elif transform == 'log':
-            transformed_data = np.log1p(data)
-        elif transform == 'sqrt':
-            transformed_data = np.sqrt(data)
-        else:
-            transformed_data = data
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
+        if methods is None:
+            methods = ['knee_locator', 'derivative', 'variance_explained',
+                       'distortion_jump']
+
+        transformed_data = self._transform_for_clustering(data, transform)
+        X = np.asarray(transformed_data.values, dtype=float)
+
+        k_values = list(k_range)
+        if not k_values:
+            raise ValueError("k_range is empty")
+        if min(k_values) < 1:
+            raise ValueError("k_range must contain values >= 1")
+        if max(k_values) > X.shape[0]:
+            raise ValueError(
+                f"k_range goes up to {max(k_values)} but the data only has "
+                f"{X.shape[0]} sites"
+            )
+
         inertias = []
         silhouette_scores = []
         calinski_scores = []
         davies_bouldin_scores = []
-        
-        for k in k_range:
+
+        for k in k_values:
             if k == 1:
-                inertias.append(self._calculate_total_variance(transformed_data.values))
-                silhouette_scores.append(0)
-                calinski_scores.append(0)
-                davies_bouldin_scores.append(float('inf'))
+                # Total sum of squares: the k=1 value of KMeans inertia_, so the
+                # curve stays on one scale and remains monotone decreasing.
+                inertias.append(_total_sum_of_squares(X))
+                silhouette_scores.append(np.nan)
+                calinski_scores.append(np.nan)
+                davies_bouldin_scores.append(np.nan)
             else:
                 kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
-                labels = kmeans.fit_predict(transformed_data.values)
-                
+                labels = kmeans.fit_predict(X)
+
                 inertias.append(kmeans.inertia_)
-                
-                try:
-                    silhouette_scores.append(silhouette_score(transformed_data.values, labels))
-                    calinski_scores.append(calinski_harabasz_score(transformed_data.values, labels))
-                    from sklearn.metrics import davies_bouldin_score
-                    davies_bouldin_scores.append(davies_bouldin_score(transformed_data.values, labels))
-                except:
-                    silhouette_scores.append(0)
-                    calinski_scores.append(0)
-                    davies_bouldin_scores.append(float('inf'))
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
+
+                if len(set(labels)) > 1:
+                    silhouette_scores.append(silhouette_score(X, labels))
+                    calinski_scores.append(calinski_harabasz_score(X, labels))
+                    davies_bouldin_scores.append(davies_bouldin_score(X, labels))
+                else:  # pragma: no cover - degenerate clustering
+                    silhouette_scores.append(np.nan)
+                    calinski_scores.append(np.nan)
+                    davies_bouldin_scores.append(np.nan)
+
         results = {
-            'k_values': list(k_range),
+            'k_values': k_values,
             'metrics': {
                 'inertia': inertias,
                 'silhouette_scores': silhouette_scores,
@@ -933,7 +1117,7 @@ class VegetationClustering:
         
         # Copyright (c) 2025 Mohamed Z. Hatim
         if 'knee_locator' in methods:
-            elbow_k = self._knee_locator_method(list(k_range), inertias)
+            elbow_k = self._knee_locator_method(k_values, inertias)
             results['elbow_points']['knee_locator'] = elbow_k
             results['method_details']['knee_locator'] = {
                 'description': 'Kneedle algorithm for automatic knee/elbow detection',
@@ -950,7 +1134,7 @@ class VegetationClustering:
         
         # Copyright (c) 2025 Mohamed Z. Hatim
         if 'variance_explained' in methods:
-            elbow_k = self._variance_explained_elbow(list(k_range), inertias)
+            elbow_k = self._variance_explained_elbow(k_values, inertias)
             results['elbow_points']['variance_explained'] = elbow_k
             results['method_details']['variance_explained'] = {
                 'description': 'Point where additional clusters explain <10% more variance'
@@ -958,7 +1142,7 @@ class VegetationClustering:
         
         # Copyright (c) 2025 Mohamed Z. Hatim
         if 'distortion_jump' in methods:
-            elbow_k = self._distortion_jump_method(list(k_range), inertias)
+            elbow_k = self._distortion_jump_method(k_values, inertias)
             results['elbow_points']['distortion_jump'] = elbow_k
             results['method_details']['distortion_jump'] = {
                 'description': 'Jump method based on distortion changes',
@@ -967,7 +1151,7 @@ class VegetationClustering:
         
         # Copyright (c) 2025 Mohamed Z. Hatim
         if 'l_method' in methods:
-            elbow_k = self._l_method_elbow(list(k_range), inertias)
+            elbow_k = self._l_method_elbow(k_values, inertias)
             results['elbow_points']['l_method'] = elbow_k
             results['method_details']['l_method'] = {
                 'description': 'L-method for determining number of clusters',
@@ -991,14 +1175,15 @@ class VegetationClustering:
             results['recommendations']['consensus'] = None
             results['recommendations']['confidence'] = 0
         
-        # Copyright (c) 2025 Mohamed Z. Hatim
-        if silhouette_scores:
-            best_silhouette_idx = np.argmax(silhouette_scores[1:]) + 1  # Copyright (c) 2025 Mohamed Z. Hatim
-            results['recommendations']['silhouette_optimal'] = list(k_range)[best_silhouette_idx]
-        
-        if calinski_scores:
-            best_calinski_idx = np.argmax(calinski_scores[1:]) + 1  # Copyright (c) 2025 Mohamed Z. Hatim
-            results['recommendations']['calinski_optimal'] = list(k_range)[best_calinski_idx]
+        # Best k by each validation index. NaN entries (k = 1, where these
+        # indices are undefined) are skipped rather than assumed to be at
+        # position 0, so the result is correct for any k_range.
+        results['recommendations']['silhouette_optimal'] = self._best_k(
+            k_values, silhouette_scores, maximise=True)
+        results['recommendations']['calinski_optimal'] = self._best_k(
+            k_values, calinski_scores, maximise=True)
+        results['recommendations']['davies_bouldin_optimal'] = self._best_k(
+            k_values, davies_bouldin_scores, maximise=False)
         
         # Copyright (c) 2025 Mohamed Z. Hatim
         if plot_results:
@@ -1006,9 +1191,55 @@ class VegetationClustering:
         
         return results
     
+    @staticmethod
+    def _transform_for_clustering(data: pd.DataFrame, transform: str) -> pd.DataFrame:
+        """Apply a transformation before clustering, preserving labels."""
+        transform = (transform or 'none').lower()
+        values = data.values.astype(float)
+
+        if transform in ('none', 'raw'):
+            out = values
+        elif transform == 'hellinger':
+            row_sums = values.sum(axis=1)
+            row_sums[row_sums == 0] = 1.0
+            out = np.sqrt(values / row_sums[:, None])
+        elif transform == 'chord':
+            norms = np.sqrt((values ** 2).sum(axis=1))
+            norms[norms == 0] = 1.0
+            out = values / norms[:, None]
+        elif transform == 'log':
+            out = np.log1p(values)
+        elif transform == 'sqrt':
+            out = np.sqrt(np.maximum(values, 0))
+        else:
+            raise ValueError(
+                f"Unknown transformation '{transform}'. Valid options: none, "
+                "hellinger, chord, log, sqrt."
+            )
+
+        return pd.DataFrame(out, index=data.index, columns=data.columns)
+
+    @staticmethod
+    def _best_k(k_values: List[int], scores: List[float], maximise: bool) -> Optional[int]:
+        """Best k by a validation index, ignoring undefined (NaN) entries."""
+        arr = np.asarray(scores, dtype=float)
+        finite = np.isfinite(arr)
+        if not finite.any():
+            return None
+        candidates = np.where(finite)[0]
+        best = candidates[np.argmax(arr[candidates])] if maximise \
+            else candidates[np.argmin(arr[candidates])]
+        return k_values[int(best)]
+
     def _calculate_total_variance(self, data: np.ndarray) -> float:
-        """Calculate total variance of the dataset."""
-        return np.sum(np.var(data, axis=0))
+        """
+        Total within-cluster sum of squares (the k = 1 value of KMeans inertia).
+
+        Named ``_calculate_total_variance`` for backwards compatibility; it
+        returns a sum of squares, not a mean, so that it is directly comparable
+        with ``KMeans.inertia_``.
+        """
+        return _total_sum_of_squares(data)
     
     def _knee_locator_method(self, k_values: List[int], inertias: List[float]) -> Optional[int]:
         """
@@ -1058,54 +1289,75 @@ class VegetationClustering:
         
         return None
     
-    def _variance_explained_elbow(self, k_values: List[int], inertias: List[float]) -> Optional[int]:
-        """Find elbow where additional clusters explain less than threshold variance."""
+    def _variance_explained_elbow(self, k_values: List[int], inertias: List[float],
+                                  threshold: float = 0.1) -> Optional[int]:
+        """
+        Smallest k after which an extra cluster explains < ``threshold`` more
+        of the total variance.
+
+        The reference point is the first inertia in ``k_values``, so the result
+        is meaningful for any starting k (not only k = 1).
+        """
         if len(inertias) < 3:
             return None
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
-        total_variance = inertias[0]  
-        threshold = 0.1  
-        
-        for i in range(1, len(inertias)):
-            if i == len(inertias) - 1:  
-                return k_values[i-1]
-            
-            current_explained = (total_variance - inertias[i]) / total_variance
-            next_explained = (total_variance - inertias[i+1]) / total_variance
-            
-            improvement = next_explained - current_explained
-            
+
+        baseline = float(inertias[0])
+        if baseline <= 0:
+            return None
+
+        for i in range(len(inertias) - 1):
+            improvement = (inertias[i] - inertias[i + 1]) / baseline
             if improvement < threshold:
                 return k_values[i]
-        
-        return None
-    
-    def _distortion_jump_method(self, k_values: List[int], inertias: List[float]) -> Optional[int]:
+
+        # Every step still yields a large gain: the largest k is the best guess.
+        return k_values[-1]
+
+    def _distortion_jump_method(self, k_values: List[int], inertias: List[float],
+                                n_features: Optional[int] = None) -> Optional[int]:
         """
-        Jump method for elbow detection.
-        
-        Based on: Sugar, C. A., & James, G. M. (2003). "Finding the number of 
-        clusters in a dataset: An information-theoretic approach."
+        Sugar & James (2003) jump method.
+
+        Distortions are transformed by ``d_k^(-Y)`` with the transformation
+        power ``Y = p / 2`` (``p`` = dimensionality), and the selected k is the
+        one maximising the jump ``d_k^(-Y) - d_{k-1}^(-Y)``. This is the actual
+        published statistic; a plain second difference of the raw inertia
+        (which is what a naive implementation computes) is a different and much
+        less reliable criterion.
+
+        Parameters:
+        -----------
+        k_values, inertias : list
+            The elbow curve.
+        n_features : int, optional
+            Data dimensionality ``p``. Defaults to 2, giving ``Y = 1``.
         """
-        if len(inertias) < 4:
+        if len(inertias) < 3:
             return None
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        distortions = np.array(inertias)
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        jumps = []
-        for i in range(1, len(distortions) - 1):
-            jump = (distortions[i-1] - distortions[i]) - (distortions[i] - distortions[i+1])
-            jumps.append(jump)
-        
-        if jumps:
-# Copyright (c) 2025 Mohamed Z. Hatim
-            max_jump_idx = np.argmax(jumps)
-            return k_values[max_jump_idx + 1]  # +1 because jumps is offset
-        
-        return None
+
+        distortions = np.asarray(inertias, dtype=float)
+        k_arr = np.asarray(k_values, dtype=float)
+
+        # Sugar & James define distortion as the mean squared error per
+        # dimension; inertia is proportional to it, and the transformation is
+        # scale-equivariant in k, so proportionality is harmless.
+        power = (n_features if n_features else 2) / 2.0
+
+        with np.errstate(divide='ignore', invalid='ignore'):
+            transformed = np.where(distortions > 0, distortions ** (-power), np.inf)
+
+        if not np.all(np.isfinite(transformed)):
+            return None
+
+        jumps = np.diff(transformed)
+        if jumps.size == 0:
+            return None
+
+        # jumps[i] compares k_values[i + 1] against k_values[i].
+        best = int(np.argmax(jumps)) + 1
+        if k_arr[best] < 1:
+            return None
+        return k_values[best]
     
     def _l_method_elbow(self, k_values: List[int], inertias: List[float]) -> Optional[int]:
         """
@@ -1153,9 +1405,9 @@ class VegetationClustering:
                     best_score = score
                     best_k = k_values[split_idx]
             
-            except:
+            except (np.linalg.LinAlgError, ValueError):
                 continue
-        
+
         return best_k
     
     def _create_elbow_plots(self, results: Dict[str, Any]) -> Dict[str, Any]:
@@ -1180,62 +1432,38 @@ class VegetationClustering:
         colors = ['red', 'orange', 'green', 'purple', 'brown']
         for i, (method, elbow_k) in enumerate(elbow_points.items()):
             if elbow_k and elbow_k in k_values:
-                elbow_idx = k_values.index(elbow_k)
                 ax1.axvline(x=elbow_k, color=colors[i % len(colors)], 
                            linestyle='--', alpha=0.7, label=f'{method}: k={elbow_k}')
         ax1.legend()
         
-        # Copyright (c) 2025 Mohamed Z. Hatim
-        ax2 = axes[0, 1]
-        silhouette_k = k_values[1:]  # Skip k=1
-        silhouette_scores = metrics['silhouette_scores'][1:]
-        ax2.plot(silhouette_k, silhouette_scores, 'go-', linewidth=2, markersize=8)
-        ax2.set_xlabel('Number of Clusters (k)')
-        ax2.set_ylabel('Average Silhouette Score')
-        ax2.set_title('Silhouette Analysis')
-        ax2.grid(True, alpha=0.3)
-        
-        if silhouette_scores:
-            best_silhouette_k = silhouette_k[np.argmax(silhouette_scores)]
-            ax2.axvline(x=best_silhouette_k, color='red', linestyle='--', 
-                       label=f'Best: k={best_silhouette_k}')
-            ax2.legend()
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
-        ax3 = axes[1, 0]
-        calinski_k = k_values[1:]  # Skip k=1
-        calinski_scores = metrics['calinski_harabasz_scores'][1:]
-        ax3.plot(calinski_k, calinski_scores, 'mo-', linewidth=2, markersize=8)
-        ax3.set_xlabel('Number of Clusters (k)')
-        ax3.set_ylabel('Calinski-Harabasz Index')
-        ax3.set_title('Calinski-Harabasz Index')
-        ax3.grid(True, alpha=0.3)
-        
-        if calinski_scores:
-            best_calinski_k = calinski_k[np.argmax(calinski_scores)]
-            ax3.axvline(x=best_calinski_k, color='red', linestyle='--',
-                       label=f'Best: k={best_calinski_k}')
-            ax3.legend()
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
-        ax4 = axes[1, 1]
-        db_k = k_values[1:]  # Skip k=1
-        db_scores = metrics['davies_bouldin_scores'][1:]
-        # Copyright (c) 2025 Mohamed Z. Hatim
-        finite_db = [(k, score) for k, score in zip(db_k, db_scores) if np.isfinite(score)]
-        if finite_db:
-            finite_k, finite_scores = zip(*finite_db)
-            ax4.plot(finite_k, finite_scores, 'co-', linewidth=2, markersize=8)
-            best_db_k = finite_k[np.argmin(finite_scores)]
-            ax4.axvline(x=best_db_k, color='red', linestyle='--',
-                       label=f'Best: k={best_db_k}')
-            ax4.legend()
-        
-        ax4.set_xlabel('Number of Clusters (k)')
-        ax4.set_ylabel('Davies-Bouldin Index')
-        ax4.set_title('Davies-Bouldin Index (Lower is Better)')
-        ax4.grid(True, alpha=0.3)
-        
+        def plot_index(ax, scores, ylabel, title, colour, best='max'):
+            """Plot one validation index, dropping k values where it is undefined."""
+            finite = [(k, s) for k, s in zip(k_values, scores)
+                      if s is not None and np.isfinite(s)]
+            ax.set_xlabel('Number of Clusters (k)')
+            ax.set_ylabel(ylabel)
+            ax.set_title(title)
+            ax.grid(True, alpha=0.3)
+
+            if not finite:
+                ax.text(0.5, 0.5, 'not available', transform=ax.transAxes,
+                        ha='center', va='center')
+                return
+
+            ks, values = zip(*finite)
+            ax.plot(ks, values, colour, linewidth=2, markersize=8)
+            best_k = ks[int(np.argmax(values))] if best == 'max' else ks[int(np.argmin(values))]
+            ax.axvline(x=best_k, color='red', linestyle='--', label=f'Best: k={best_k}')
+            ax.legend()
+
+        plot_index(axes[0, 1], metrics['silhouette_scores'],
+                   'Average Silhouette Score', 'Silhouette Analysis', 'go-', 'max')
+        plot_index(axes[1, 0], metrics['calinski_harabasz_scores'],
+                   'Calinski-Harabasz Index', 'Calinski-Harabasz Index', 'mo-', 'max')
+        plot_index(axes[1, 1], metrics['davies_bouldin_scores'],
+                   'Davies-Bouldin Index', 'Davies-Bouldin Index (Lower is Better)',
+                   'co-', 'min')
+
         plt.tight_layout()
         
         return {
@@ -1267,50 +1495,9 @@ class VegetationClustering:
         
         return k_values[elbow_idx]
     
-    def _calculate_gap_statistic(self, data: pd.DataFrame, k_range: range) -> List[float]:
-        """Calculate gap statistic for each k."""
-        gap_stats = []
-        
-        for k in k_range:
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
-            labels = kmeans.fit_predict(data.values)
-            
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            wcss_obs = 0
-            for i in range(k):
-                cluster_points = data.values[labels == i]
-                if len(cluster_points) > 0:
-                    centroid = np.mean(cluster_points, axis=0)
-                    wcss_obs += np.sum((cluster_points - centroid) ** 2)
-            
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            n_refs = 10  # Number of reference datasets
-            ref_wcss = []
-            
-            for _ in range(n_refs):
-                # Copyright (c) 2025 Mohamed Z. Hatim
-                ref_data = np.random.uniform(
-                    low=data.values.min(axis=0),
-                    high=data.values.max(axis=0),
-                    size=data.shape
-                )
-                
-                kmeans_ref = KMeans(n_clusters=k, random_state=42, n_init=10)
-                labels_ref = kmeans_ref.fit_predict(ref_data)
-                
-                wcss_ref = 0
-                for i in range(k):
-                    cluster_points = ref_data[labels_ref == i]
-                    if len(cluster_points) > 0:
-                        centroid = np.mean(cluster_points, axis=0)
-                        wcss_ref += np.sum((cluster_points - centroid) ** 2)
-                
-                ref_wcss.append(wcss_ref)
-            
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            expected_wcss = np.mean(ref_wcss)
-            gap = np.log(expected_wcss) - np.log(wcss_obs) if wcss_obs > 0 else 0
-            gap_stats.append(gap)
-        
-        return gap_stats
+    def _calculate_gap_statistic(self, data: pd.DataFrame, k_range: range,
+                                 n_refs: int = 10,
+                                 random_state: Optional[int] = 42) -> List[float]:
+        """Gap values for each k (thin wrapper around :meth:`_gap_statistic`)."""
+        return self._gap_statistic(data, k_range, n_refs=n_refs,
+                                   random_state=random_state)['gap_values']

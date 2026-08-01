@@ -6,9 +6,32 @@
 
 **VegZ** is a comprehensive, professional-grade Python package designed specifically for vegetation data analysis and environmental modeling. It provides a complete suite of tools for ecologists, environmental scientists, and researchers working with biodiversity and vegetation data.
 
+> ### New in 1.5.0
+>
+> 1.5.0 adds the methods most often reached for after an ordination -
+> **PERMDISP/betadisper**, **multi-factor PERMANOVA (`adonis`)**,
+> **`anova.cca`-style permutation tests** for constrained ordinations,
+> **variance partitioning**, **forward selection**, **Baselga turnover /
+> nestedness partitioning**, and **coverage-based rarefaction and extrapolation
+> of Hill numbers** - plus **`VegData`**, a container that keeps species,
+> environment, trait and phylogeny tables aligned.
+>
+> It also lands a full scientific audit of the existing code base, correcting
+> methods that ran without error but returned wrong numbers - among them NMDS
+> (which was silently running *metric* MDS), the PERMANOVA sum-of-squares
+> decomposition, the ANOSIM R statistic, TWINSPAN, NODF, FEve, FDiv, Moran's I,
+> Geary's C and the ACE richness estimator. Every corrected formula is pinned by
+> a test that checks it against an analytically known answer. See the
+> [CHANGELOG](https://github.com/mhatim99/VegZ/blob/main/CHANGELOG.md).
+
 ## Complete Feature List
 
 ### Data Management & Preprocessing
+- **`VegData` aligned container** (New in v1.5.0) - holds a species matrix with
+  its environmental, trait and phylogeny tables, intersects them once in a
+  stable order, and reports exactly which sites and species each table lost.
+  Misaligned tables are the most common source of a confident, wrong community
+  analysis
 - Parse vegetation survey data from multiple formats (CSV, Excel, Turboveg)
 - Integration with remote sensing APIs (Landsat, MODIS, Sentinel)
 - Darwin Core biodiversity standards compliance
@@ -46,14 +69,24 @@
   - Batch processing capabilities for large datasets
 
 ### Diversity Analysis (15+ Indices)
-- **Basic indices**: Shannon, Simpson, Simpson inverse, richness, evenness
+- **Basic indices**: Shannon, Simpson (concentration), Gini-Simpson, Simpson inverse, richness, evenness
 - **Advanced indices**: Fisher's alpha, Berger-Parker, McIntosh, Brillouin
 - **Additional indices**: Menhinick, Margalef
 - **Richness estimators**: Chao1, ACE, Jackknife1, Jackknife2
 - **Hill numbers** for multiple diversity orders (q = 0, 0.5, 1, 1.5, 2, etc.)
-- **Beta diversity** analysis (Whittaker, Sørensen, Jaccard methods)
-- **Rarefaction curves** and extrapolation
-- **Species accumulation curves**
+- **Beta diversity** analysis (Whittaker, Sørensen, Jaccard methods) - returns a
+  pairwise dissimilarity matrix; `whittaker_beta()` gives the whole-dataset scalar
+- **Rarefaction curves** - exact Hurlbert expectation with variance, computed in
+  log space so it is stable for large counts
+- **Species accumulation curves** with permutation confidence bands
+- **Beta diversity partitioning** (New in v1.5.0) - Baselga (2010, 2012)
+  separation into turnover (beta_sim / beta_jtu) and nestedness-resultant
+  (beta_sne / beta_jne) components, pairwise and multi-site
+- **Coverage-based standardization** (New in v1.5.0) - Chao & Jost (2012)
+  sample coverage, and diversity compared at equal completeness rather than
+  equal sampling effort
+- **Hill number rarefaction and extrapolation** (New in v1.5.0) - Chao et al.
+  (2014) interpolation/extrapolation for q = 0, 1, 2
 - **Diversity profiles**
 
 ### Complete Multivariate Analysis Suite
@@ -62,8 +95,9 @@
 - **DCA** - Detrended Correspondence Analysis with segment control
 - **CCA** - Canonical Correspondence Analysis with constraints
 - **RDA** - Redundancy Analysis for linear relationships
-- **NMDS** - Non-metric Multidimensional Scaling with stress assessment
-- **PCoA** - Principal Coordinates Analysis (metric MDS)
+- **NMDS** - genuine Non-metric Multidimensional Scaling with stress assessment
+- **PCoA** - Principal Coordinates Analysis with Lingoes/Cailliez corrections for
+  negative eigenvalues
 - **Scientific Method Names** (New in v1.2.0) - Professional abbreviated method names:
   - `ca_analysis()` for Correspondence Analysis
   - `dca_analysis()` for Detrended Correspondence Analysis
@@ -71,8 +105,16 @@
   - `rda_analysis()` for Redundancy Analysis
   - `pcoa_analysis()` for Principal Coordinates Analysis
   - Full backward compatibility with existing method names
-- **Environmental vector fitting** to ordination axes
-- **Procrustes analysis** for ordination comparison
+- **Constrained-ordination significance tests** (New in v1.5.0) - `anova_cca()`
+  and `anova_rda()` in `vegan`'s `anova.cca` idiom: overall, by axis, by term
+  (sequential) and by margin, with partial ordinations via `conditioning`
+- **Variance partitioning** (New in v1.5.0) - `varpart()` across two or three
+  explanatory tables (Peres-Neto et al. 2006) with adjusted R-squared
+- **Forward selection** (New in v1.5.0) - permutation-based, with the Blanchet
+  et al. (2008) double stopping criterion
+- **Environmental vector fitting** (`envfit`-style) with unit-length direction
+  vectors and permutation p-values
+- **Procrustes analysis** for ordination comparison, with a PROTEST permutation test
 - **Goodness-of-fit diagnostics**
 - **Multiple ecological distance matrices** (Bray-Curtis, Jaccard, Sørensen, Euclidean, Manhattan, Canberra, Chord, Hellinger)
 
@@ -96,9 +138,17 @@
 - **Gaussian Mixture Models** for probabilistic clustering
 - **Clustering validation** metrics (silhouette, gap statistic, Calinski-Harabasz, Davies-Bouldin)
 - **Optimal k determination** with multiple methods
+- **Reproducible by default** - every stochastic method accepts `random_state`
 
 ### Statistical Analysis
 - **PERMANOVA** - Permutational multivariate analysis of variance
+- **PERMDISP / betadisper** (New in v1.5.0) - Anderson (2006) test of
+  homogeneity of multivariate dispersions, the assumption PERMANOVA depends on;
+  centroid or spatial-median centring, with Holm-adjusted pairwise comparisons
+- **adonis** (New in v1.5.0) - multi-factor PERMANOVA from a model formula:
+  crossed and nested designs, interactions, sequential (Type I) and marginal
+  (Type III) sums of squares, continuous terms, and restricted permutation
+  within `strata`
 - **ANOSIM** - Analysis of similarities
 - **MRPP** - Multi-response permutation procedures
 - **Mantel tests** and partial Mantel tests for matrix correlation
@@ -140,7 +190,8 @@
   - Edge density
   - Contagion index
   - Shannon diversity index for landscapes
-- **Spatial autocorrelation** analysis (Moran's I, Geary's C)
+- **Spatial autocorrelation** analysis (Moran's I with randomisation-based
+  significance test, Geary's C)
 - **Point pattern analysis**
 - **Spatial clustering** detection
 
@@ -391,15 +442,79 @@ SITE_001,44.2619,-72.5806,850,6.2,18.5,...
 - Requests >= 2.25.0
 
 **Optional (for extended functionality):**
-- GeoPandas (spatial analysis)
-- PyProj (coordinate transformations)
-- Earth Engine API (remote sensing)
-- FuzzyWuzzy (fuzzy string matching)
-- Plotly/Bokeh (interactive visualizations)
+
+`import VegZ` never requires any of these and never warns about them; each is
+only needed when you call a feature that uses it.
+
+| Extra | Provides | Needed for |
+|---|---|---|
+| `VegZ[excel]` | openpyxl, xlrd | Reading `.xlsx` / `.xls` files |
+| `VegZ[spatial]` | geopandas, pyproj, shapely, rasterio | Coordinate transforms, geospatial validation |
+| `VegZ[fuzzy]` | fuzzywuzzy, python-Levenshtein | Faster fuzzy name matching (falls back to `difflib`) |
+| `VegZ[network]` | networkx | Advanced co-occurrence network metrics |
+| `VegZ[timeseries]` | statsmodels | LOWESS smoothing, STL decomposition |
+| `VegZ[interactive]` | plotly, bokeh | Interactive dashboards |
+| `VegZ[remote-sensing]` | earthengine-api, geemap, xarray | Remote sensing integration |
+| `VegZ[all]` | the common subset of the above | Everything except remote sensing |
 
 **Tested with:**
 - Python 3.8 - 3.13
 - All major operating systems (Windows, macOS, Linux)
+
+## Reproducibility
+
+Every stochastic routine accepts a `random_state`, and VegZ never mutates
+NumPy's global random state:
+
+```python
+from VegZ.statistics import EcologicalStatistics
+
+stats = EcologicalStatistics()
+result = stats.permanova(distance_matrix, groups, permutations=999, random_state=42)
+# Re-running with the same seed reproduces the p-value exactly.
+```
+
+`random_state` is available on PERMANOVA, ANOSIM, MRPP, Mantel and partial
+Mantel tests, indicator species analysis, Procrustes/PROTEST, environmental
+vector fitting, fuzzy c-means, the gap statistic, null models and species
+accumulation curves.
+
+## Validation
+
+The corrected statistics are pinned by regression tests that check them against
+analytically known answers rather than against previously recorded output:
+
+- PERMANOVA reproduces the classical one-way ANOVA F exactly on univariate
+  Euclidean distances
+- PCoA on Euclidean distances reproduces PCA scores exactly
+- CA total inertia x N equals `scipy.stats.chi2_contingency`'s chi-square
+- ANOSIM R equals 1 for perfectly separated groups
+- NODF equals 100 for a perfectly nested matrix and 0 with no fill gradient
+- FEve equals 1 for a perfectly even community
+- Geary's C equals 1 under no spatial autocorrelation
+- Landscape shape index equals 1 for a square patch
+- Rarefaction at full sample size returns the observed richness with zero variance
+- TWINSPAN recovers three known vegetation types exactly (adjusted Rand = 1.0)
+- PERMDISP's F equals `scipy.stats.levene(center='mean')` to ten decimal places
+  on univariate Euclidean data
+- `adonis()` reproduces `permanova()` exactly for one factor, and classical
+  sequential ANOVA sums of squares exactly for two
+- `anova_rda()`'s pseudo-F equals the regression F to ten decimal places on
+  univariate data
+- Variance-partitioning fractions sum to exactly 1.0 for two and three tables
+- Baselga turnover and nestedness sum to the total beta diversity exactly
+- Hill rarefaction at q = 0 equals Hurlbert rarefaction exactly, and
+  extrapolation is continuous with the observed value at the reference size
+
+The suite runs on Python 3.9-3.13 across Linux, macOS and Windows in CI, with
+additional jobs for the oldest declared dependency floors, a
+no-optional-dependencies install, and pre-release dependencies.
+
+Run them with:
+
+```bash
+pytest tests/
+```
 
 ## Scientific Background
 
@@ -409,7 +524,13 @@ VegZ implements methods from key ecological and statistical literature:
 - **Elbow Analysis**: Multiple algorithms including Satopaa et al. (2011) "Finding a kneedle in a haystack"
 - **Ordination**: Methods from Legendre & Legendre "Numerical Ecology"
 - **Diversity**: Comprehensive indices from Magurran "Measuring Biological Diversity"
-- **Statistical tests**: From Anderson (2001) PERMANOVA and related methods
+- **Statistical tests**: Anderson (2001) PERMANOVA; Clarke (1993) ANOSIM
+- **Indicator species**: Dufrêne & Legendre (1997) IndVal
+- **Nestedness**: Almeida-Neto et al. (2008) NODF; Atmar & Patterson (1993) temperature
+- **Functional diversity**: Villéger et al. (2008) FRic/FEve/FDiv; Laliberté & Legendre (2010) FDis
+- **Constrained ordination**: ter Braak (1986) CCA
+- **Landscape metrics**: O'Neill et al. (1988) contagion; FRAGSTATS conventions
+- **Metacommunity structure**: Leibold & Mikkelson (2002) elements of metacommunity structure
 
 ## Contributing
 
@@ -434,7 +555,7 @@ If you use VegZ in your research, please cite:
     author = {Hatim, Mohamed Z.},
     title = {VegZ: A comprehensive Python package for vegetation data analysis and environmental modeling},
     year = {2025},
-    version = {1.3.0},
+    version = {1.5.0},
     url = {https://github.com/mhatim99/VegZ}
 }
 ```

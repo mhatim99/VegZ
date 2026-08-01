@@ -7,13 +7,10 @@ Copyright (c) 2025 Mohamed Z. Hatim
 """
 
 import pandas as pd
-import numpy as np
-from typing import Dict, List, Optional, Union, Any, Tuple
+from typing import Dict, List, Optional, Union, Any
 import requests
 import time
 import warnings
-from functools import lru_cache
-import json
 import re
 
 
@@ -224,9 +221,12 @@ class TaxonomicResolver:
             except Exception as e:
                 warnings.warn(f"Error querying {source.upper()} for '{name}': {str(e)}")
 
-                if not self.use_fallback:
-                    break
-                continue
+            # `use_fallback` governs moving on to the next source at all - not
+            # just after an exception. Previously a source that simply returned
+            # no match still fell through to the next one, so use_fallback=False
+            # did not restrict which databases were contacted.
+            if not self.use_fallback:
+                break
 
 # Copyright (c) 2025 Mohamed Z. Hatim
         if self.cache_results:

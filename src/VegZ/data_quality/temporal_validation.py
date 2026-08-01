@@ -5,7 +5,6 @@ Copyright (c) 2025 Mohamed Z. Hatim
 """
 
 import pandas as pd
-import numpy as np
 from typing import Dict, List, Optional, Tuple, Union, Any
 from datetime import datetime, timedelta
 import warnings
@@ -133,7 +132,6 @@ class TemporalValidator:
         valid_mask = parse_success & ~missing
         
         if valid_mask.any():
-            valid_dates = parsed_dates[valid_mask]
             
 # Copyright (c) 2025 Mohamed Z. Hatim
             suspicious_defaults = self._detect_suspicious_default_dates(parsed_dates)
@@ -167,6 +165,34 @@ class TemporalValidator:
         
         return results
     
+    @staticmethod
+    def _to_nanoseconds(parsed: pd.Series) -> pd.Series:
+        """
+        Bring parsed dates to nanosecond resolution, NaT-ing what will not fit.
+
+        pandas 3 parses out-of-range dates at second or microsecond resolution
+        instead of coercing them to NaT, and assigning those into a
+        ``datetime64[ns]`` accumulator then raises `OutOfBoundsDatetime`. Dates
+        outside 1677-2262 are reported as unparseable on every pandas version,
+        which keeps the behaviour consistent rather than dependent on which
+        pandas the user happens to have installed.
+        """
+        if parsed.dtype == 'datetime64[ns]':
+            return parsed
+        try:
+            return parsed.astype('datetime64[ns]')
+        except (ValueError, OverflowError, TypeError):
+            pass
+
+        coerced = []
+        for value in parsed:
+            try:
+                coerced.append(pd.NaT if pd.isna(value)
+                               else pd.Timestamp(value).as_unit('ns'))
+            except (ValueError, OverflowError, TypeError):
+                coerced.append(pd.NaT)
+        return pd.Series(coerced, index=parsed.index, dtype='datetime64[ns]')
+
     def _parse_dates_robust(self, date_series: pd.Series) -> Tuple[pd.Series, pd.Series]:
         """Robustly parse dates trying multiple formats."""
         parsed_dates = pd.Series(pd.NaT, index=date_series.index, dtype='datetime64[ns]')
@@ -174,7 +200,8 @@ class TemporalValidator:
         
 # Copyright (c) 2025 Mohamed Z. Hatim
         try:
-            default_parsed = pd.to_datetime(date_series, errors='coerce', infer_datetime_format=True)
+            default_parsed = pd.to_datetime(date_series, errors='coerce', format='mixed', dayfirst=False)
+            default_parsed = self._to_nanoseconds(default_parsed)
             success_mask = ~default_parsed.isna()
             parsed_dates[success_mask] = default_parsed[success_mask]
             parse_success[success_mask] = True
@@ -202,6 +229,7 @@ class TemporalValidator:
                         format=date_format,
                         errors='coerce'
                     )
+                    format_parsed = self._to_nanoseconds(format_parsed)
                     format_success = ~format_parsed.isna()
 
                     if format_success.any():
@@ -234,10 +262,16 @@ class TemporalValidator:
         """Detect dates in the future."""
         return parsed_dates > self.suspicious_patterns['future_threshold']
     
-    def _detect_very_old_dates(self, parsed_dates: pd.Series, 
+    def _detect_very_old_dates(self, parsed_dates: pd.Series,
                               min_year: int = 1800) -> pd.Series:
-        """Detect unrealistically old dates."""
-        return parsed_dates < pd.to_datetime(f'{min_year}-01-01')
+        """
+        Detect unrealistically old dates.
+
+        Note that pandas' nanosecond timestamps cannot represent dates before
+        1677-09-21; anything earlier parses to NaT and is reported under
+        ``unparseable`` rather than here.
+        """
+        return parsed_dates < pd.Timestamp(year=min_year, month=1, day=1)
     
     def _detect_impossible_dates(self, original_series: pd.Series,
                                 parsed_dates: pd.Series,
@@ -413,9 +447,13 @@ class TemporalValidator:
 # Copyright (c) 2025 Mohamed Z. Hatim
                 extreme_diff = abs(time_diff) > timedelta(days=365)
                 
+                # Assign by label, not through the boolean mask: `extreme_diff`
+                # is indexed only by the valid rows, and masked assignment of a
+                # shorter Series goes down a path pandas has deprecated.
                 flag_series = pd.Series(False, index=df.index)
-                flag_series[valid_mask] = extreme_diff
-                
+                flag_series.loc[extreme_diff.index] = extreme_diff
+
+
                 results['flags'][f'{date_col}_extreme_diff'] = flag_series
                 results['consistency_checks'][date_col] = {
                     'mean_difference_days': time_diff.dt.days.mean(),
@@ -561,10 +599,16 @@ class TemporalValidator:
                 valid_dates = parsed_dates[success]
                 
                 if len(valid_dates) > 0:
+                    earliest = valid_dates.min()
+                    latest = valid_dates.max()
+                    # Timedelta tops out at about 292 years, so subtracting two
+                    # Timestamps that are further apart overflows. Go through
+                    # datetime.datetime, whose difference has no such limit.
+                    span = latest.to_pydatetime() - earliest.to_pydatetime()
                     summary_stats[date_col] = {
-                        'earliest_date': valid_dates.min().strftime('%Y-%m-%d'),
-                        'latest_date': valid_dates.max().strftime('%Y-%m-%d'),
-                        'date_range_years': (valid_dates.max() - valid_dates.min()).days / 365.25,
+                        'earliest_date': earliest.strftime('%Y-%m-%d'),
+                        'latest_date': latest.strftime('%Y-%m-%d'),
+                        'date_range_years': span.days / 365.25,
                         'valid_date_count': len(valid_dates),
                         'valid_date_percentage': (len(valid_dates) / len(df)) * 100
                     }

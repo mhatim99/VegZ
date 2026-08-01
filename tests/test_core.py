@@ -203,22 +203,30 @@ class TestQuickFunctions:
     
     def test_quick_diversity_analysis(self, sample_data):
         """Test quick diversity analysis function."""
-        diversity = quick_diversity_analysis(sample_data)
-        
+        diversity = quick_diversity_analysis(
+            sample_data, species_cols=list(sample_data.columns))
+
         assert isinstance(diversity, pd.DataFrame)
         assert len(diversity) == len(sample_data)
         assert 'shannon' in diversity.columns
         assert 'simpson' in diversity.columns
         assert 'richness' in diversity.columns
-    
+
     def test_quick_elbow_analysis(self, sample_data):
         """Test quick elbow analysis function."""
-        results = quick_elbow_analysis(sample_data, max_k=6, plot_results=False)
-        
+        results = quick_elbow_analysis(
+            sample_data, species_cols=list(sample_data.columns),
+            max_k=6, plot_results=False)
+
         assert isinstance(results, dict)
         assert 'recommendations' in results
         assert 'elbow_points' in results
         assert results['recommendations']['consensus'] is not None
+
+    def test_quick_functions_warn_when_species_cols_omitted(self, sample_data):
+        """Auto-detecting species columns is a guess, so it must be flagged."""
+        with pytest.warns(UserWarning, match='species_cols'):
+            quick_diversity_analysis(sample_data)
 
 
 class TestDataTransformations:

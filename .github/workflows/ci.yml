@@ -1,0 +1,199 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Weekly, so upstream deprecations surface before a release rather than
+    # after one. The SciPy 1.18 deprecation that broke spatial autocorrelation
+    # was only found by installing into a clean environment.
+    - cron: '17 5 * * 1'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  MPLBACKEND: Agg
+
+jobs:
+  test:
+    name: py${{ matrix.python-version }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+        include:
+          # Check the package is not quietly Linux-only.
+          - os: macos-latest
+            python-version: '3.12'
+          - os: windows-latest
+            python-version: '3.12'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install package and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run tests
+        run: pytest tests -v --cov=VegZ --cov-report=xml --cov-report=term
+
+      - name: Upload coverage
+        if: matrix.python-version == '3.12' && matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.xml
+
+  minimum-dependencies:
+    # The version floors in pyproject are a promise. Without this job they are
+    # only ever a guess, because development happens on the newest releases.
+    name: oldest supported dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: Install the declared minimum versions
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install \
+            "numpy==1.21.*" "pandas==1.3.*" "scipy==1.7.*" \
+            "matplotlib==3.4.*" "scikit-learn==1.0.*" "seaborn==0.11.*" \
+            "requests==2.25.*"
+          python -m pip install --no-deps -e .
+          python -m pip install pytest
+
+      - name: Run tests
+        run: pytest tests -q
+
+  no-optional-dependencies:
+    # Installing the built wheel with only the core requirements. This is the
+    # job that catches modules importing an undeclared optional package at
+    # module scope, which used to make `import VegZ` fail outright.
+    name: wheel install, core deps only
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build the wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+
+      - name: Install the wheel with no extras
+        run: python -m pip install dist/*.whl
+
+      - name: Importing VegZ must be silent
+        run: python -W error::UserWarning -c "import VegZ; print(VegZ.__version__)"
+
+      - name: Optional dependencies must genuinely be absent
+        run: |
+          python - <<'PY'
+          import importlib
+          for name in ('openpyxl', 'xlrd', 'fuzzywuzzy', 'geopandas',
+                       'networkx', 'statsmodels', 'plotly', 'bokeh'):
+              try:
+                  importlib.import_module(name)
+              except ImportError:
+                  continue
+              raise SystemExit(f"{name} is installed; this job must run without it")
+          print("confirmed: no optional dependencies present")
+          PY
+
+      - name: Core analyses must still work
+        run: |
+          python -m pip install pytest
+          pytest tests -q
+
+  pre-release-dependencies:
+    # Deprecations should be found here, not by a user on a newer SciPy.
+    name: pre-release dependencies
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pre-release scientific stack
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --pre --upgrade \
+            numpy pandas scipy scikit-learn matplotlib
+          python -m pip install --no-deps -e .
+          python -m pip install pytest seaborn requests
+      - name: Run tests, treating our own deprecations as errors
+        run: pytest tests -q -W "error::DeprecationWarning:VegZ.*"
+
+  lint:
+    name: lint and types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+          python -m pip install mypy ruff
+
+      - name: Ruff
+        # examples/ is included: those scripts ship in the sdist and are
+        # documentation, so they need to stay runnable.
+        run: ruff check src tests examples
+
+      - name: mypy
+        run: mypy src/VegZ
+
+  build:
+    name: build and verify distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+
+      - name: Check metadata
+        run: python -m twine check dist/*
+
+      - name: Tests must pass from the installed sdist, not the source tree
+        run: |
+          python -m pip install dist/*.tar.gz
+          python -m pip install pytest
+          mkdir -p /tmp/from-sdist && cd /tmp/from-sdist
+          tar xzf "$GITHUB_WORKSPACE"/dist/*.tar.gz --strip-components=1
+          pytest tests -q
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/

@@ -9,21 +9,18 @@ import pandas as pd
 from typing import Tuple, Union, List, Optional, Dict
 import warnings
 
-try:
-    import pyproj
-    from pyproj import CRS, Transformer
-    PYPROJ_AVAILABLE = True
-except ImportError:
-    PYPROJ_AVAILABLE = False
-    warnings.warn("PyProj not available. Install with: pip install pyproj")
+from .._compat import optional_import
 
-try:
-    import geopandas as gpd
-    from shapely.geometry import Point
-    GEOPANDAS_AVAILABLE = True
-except ImportError:
-    GEOPANDAS_AVAILABLE = False
-    warnings.warn("GeoPandas not available. Install with: pip install geopandas")
+# Optional geospatial stack, resolved without warning at import time.
+pyproj = optional_import('pyproj')
+PYPROJ_AVAILABLE = pyproj is not None
+if PYPROJ_AVAILABLE:
+    from pyproj import CRS, Transformer
+else:  # pragma: no cover - exercised only without pyproj installed
+    CRS = Transformer = None
+
+gpd = optional_import('geopandas')
+GEOPANDAS_AVAILABLE = gpd is not None
 
 
 class CoordinateTransformer:
@@ -131,11 +128,11 @@ class CoordinateTransformer:
             try:
                 epsg_code = int(crs)
                 return f"EPSG:{epsg_code}"
-            except ValueError:
+            except ValueError as exc:
 # Copyright (c) 2025 Mohamed Z. Hatim
                 available_crs = list(self.common_crs.keys())
                 raise ValueError(f"Unknown CRS: {crs}. Available CRS names: {available_crs[:10]}... "
-                               f"or use EPSG codes (e.g., 'EPSG:4326') or PROJ strings")
+                               f"or use EPSG codes (e.g., 'EPSG:4326') or PROJ strings") from exc
     
     def _transform_dataframe(self, 
                            df: pd.DataFrame, 
@@ -199,10 +196,15 @@ class CoordinateTransformer:
         str
             UTM zone EPSG code
         """
-# Copyright (c) 2025 Mohamed Z. Hatim
+        if not -90 <= latitude <= 90:
+            raise ValueError(f"latitude must be between -90 and 90 (got {latitude})")
+
+        # Wrap longitude into [-180, 180) so that exactly 180 degrees maps to
+        # zone 1 rather than the non-existent zone 61.
+        longitude = ((longitude + 180) % 360) - 180
         zone_number = int((longitude + 180) / 6) + 1
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+        zone_number = min(max(zone_number, 1), 60)
+
         if 56 <= latitude < 64 and 3 <= longitude < 12:
             zone_number = 32
         elif 72 <= latitude < 84:
@@ -306,11 +308,14 @@ class CoordinateTransformer:
             Coordinate pairs
         method : str
             Distance calculation method ('great_circle', 'euclidean', 'geodesic')
-            
+
         Returns:
         --------
         np.ndarray
-            Distance matrix
+            Symmetric distance matrix in **metres**. All three methods use the
+            same unit: 'great_circle' is spherical (R = 6371 km), 'euclidean'
+            is measured in an equal-area projection and 'geodesic' is the
+            WGS84 ellipsoidal distance.
         """
         if isinstance(coordinates, pd.DataFrame):
             coords = [(row['longitude'], row['latitude']) for _, row in coordinates.iterrows()]

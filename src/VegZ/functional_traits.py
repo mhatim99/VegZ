@@ -10,7 +10,7 @@ Copyright (c) 2025 Mohamed Z. Hatim
 import numpy as np
 import pandas as pd
 import warnings
-from typing import Dict, List, Optional, Tuple, Union, Any
+from typing import Dict, List, Tuple, Any
 from scipy import stats
 from scipy.spatial.distance import pdist, squareform
 from scipy.cluster.hierarchy import linkage, fcluster
@@ -18,21 +18,13 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
-import seaborn as sns
 
-try:
-    from scipy.spatial import ConvexHull
-    CONVEX_HULL_AVAILABLE = True
-except ImportError:
-    CONVEX_HULL_AVAILABLE = False
-    warnings.warn("ConvexHull not available, some functional diversity metrics will be limited")
+from .dataset import _ordered_intersection
+from scipy.spatial import ConvexHull, QhullError
+from scipy.sparse.csgraph import minimum_spanning_tree
 
-try:
-    from sklearn.neighbors import NearestNeighbors
-    NEAREST_NEIGHBORS_AVAILABLE = True
-except ImportError:
-    NEAREST_NEIGHBORS_AVAILABLE = False
-    warnings.warn("NearestNeighbors not available, some trait analysis methods will be limited")
+CONVEX_HULL_AVAILABLE = True
+NEAREST_NEIGHBORS_AVAILABLE = True
 
 
 class FunctionalTraitAnalyzer:
@@ -79,13 +71,38 @@ class FunctionalTraitAnalyzer:
         
 # Copyright (c) 2025 Mohamed Z. Hatim
         if self.abundance_data is not None:
-            common_species = set(self.trait_data.index) & set(self.abundance_data.columns)
+            common_species = _ordered_intersection(self.trait_data.index,
+                                                   self.abundance_data.columns)
             if len(common_species) == 0:
                 warnings.warn("No common species found between trait and abundance data")
             else:
-                self.trait_data = self.trait_data.loc[list(common_species)]
-                self.abundance_data = self.abundance_data[list(common_species)]
+                dropped = len(self.trait_data.index) - len(common_species)
+                if dropped:
+                    warnings.warn(
+                        f"{dropped} species in the trait table have no abundance "
+                        "data and were dropped."
+                    )
+                self.trait_data = self.trait_data.loc[common_species]
+                self.abundance_data = self.abundance_data[common_species]
     
+    def load_dataset(self, dataset) -> None:
+        """
+        Load traits and abundances from a :class:`~VegZ.dataset.VegData`.
+
+        The container has already aligned species labels across the trait and
+        abundance tables, so nothing has to be re-intersected here.
+
+        Parameters
+        ----------
+        dataset : VegData
+            Must carry a trait table.
+        """
+        if dataset.traits is None:
+            raise ValueError("VegData has no trait table to load")
+
+        self.trait_data = dataset.traits
+        self.abundance_data = dataset.species
+
     def calculate_functional_diversity(self,
                                      sites: List[str] = None,
                                      traits: List[str] = None,
@@ -177,96 +194,154 @@ class FunctionalTraitAnalyzer:
         self.trait_diversity_results = results
         return results
     
-    def _calculate_fd_indices(self, 
-                             traits: pd.DataFrame, 
-                             weights: pd.Series,
-                             distances: pd.DataFrame) -> Dict[str, float]:
-        """Calculate functional diversity indices for a single site."""
-        indices = {}
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        if len(traits) >= len(traits.columns) + 1 and CONVEX_HULL_AVAILABLE:
-            try:
-                if len(traits) > 3:
-# Copyright (c) 2025 Mohamed Z. Hatim
-                    pca = PCA(n_components=min(3, len(traits.columns)))
-                    traits_pca = pca.fit_transform(traits.values)
-                    hull = ConvexHull(traits_pca)
-                    indices['FRic'] = hull.volume
-                else:
-                    hull = ConvexHull(traits.values)
-                    indices['FRic'] = hull.volume if traits.shape[1] >= 2 else 0
-            except:
-                indices['FRic'] = 0
-        else:
-# Copyright (c) 2025 Mohamed Z. Hatim
-            trait_ranges = traits.max() - traits.min()
-            indices['FRic'] = trait_ranges.prod()
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        if len(traits) > 1:
-# Copyright (c) 2025 Mohamed Z. Hatim
-            try:
-                mst_distances = []
-                for i in range(len(traits)):
-                    min_dist = float('inf')
-                    for j in range(len(traits)):
-                        if i != j:
-                            min_dist = min(min_dist, distances.iloc[i, j])
-                    if min_dist != float('inf'):
-                        mst_distances.append(min_dist * weights.iloc[i])
-                
-                if mst_distances:
-                    partial_weighted_evenness = np.array(mst_distances)
-                    S = len(traits)
-                    EW = min(partial_weighted_evenness)
-                    indices['FEve'] = (sum(min(partial_weighted_evenness) - partial_weighted_evenness) / 
-                                     (sum(min(partial_weighted_evenness) - partial_weighted_evenness) + 
-                                      (S - 1) * EW)) if S > 1 else 0
-                else:
-                    indices['FEve'] = 0
-            except:
-                indices['FEve'] = 0
-        else:
-            indices['FEve'] = 0
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        if len(traits) > 0:
-# Copyright (c) 2025 Mohamed Z. Hatim
-            cwm_traits = (traits * weights.values.reshape(-1, 1)).sum(axis=0)
-            
-# Copyright (c) 2025 Mohamed Z. Hatim
-            centroid_distances = np.sqrt(((traits - cwm_traits) ** 2).sum(axis=1))
-            
-# Copyright (c) 2025 Mohamed Z. Hatim
-            mean_dist = (centroid_distances * weights).sum()
-            
-# Copyright (c) 2025 Mohamed Z. Hatim
-            abs_deviations = np.abs(centroid_distances - mean_dist)
-            
-# Copyright (c) 2025 Mohamed Z. Hatim
-            if mean_dist > 0:
-                indices['FDiv'] = (abs_deviations * weights).sum() / mean_dist
-            else:
-                indices['FDiv'] = 0
-        else:
-            indices['FDiv'] = 0
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        if len(traits) > 0:
-            cwm_traits = (traits * weights.values.reshape(-1, 1)).sum(axis=0)
-            centroid_distances = np.sqrt(((traits - cwm_traits) ** 2).sum(axis=1))
-            indices['FDis'] = (centroid_distances * weights).sum()
-        else:
-            indices['FDis'] = 0
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        indices['RaoQ'] = 0
-        for i in range(len(weights)):
-            for j in range(len(weights)):
-                indices['RaoQ'] += weights.iloc[i] * weights.iloc[j] * distances.iloc[i, j]
-        
+    def _calculate_fd_indices(self,
+                              traits: pd.DataFrame,
+                              weights: pd.Series,
+                              distances: pd.DataFrame) -> Dict[str, float]:
+        """
+        Functional diversity indices for a single site.
+
+        Follows Villeger, Mason & Mouillot (2008) for FRic, FEve and FDiv,
+        Laliberte & Legendre (2010) for FDis, and Rao (1982) for RaoQ.
+        """
+        indices: Dict[str, float] = {}
+
+        trait_values = np.asarray(traits.values, dtype=float)
+        w = np.asarray(weights.values, dtype=float)
+        if w.sum() > 0:
+            w = w / w.sum()
+        dist = np.asarray(distances.values, dtype=float)
+        n_species, n_traits = trait_values.shape
+
+        indices['FRic'] = self._functional_richness(trait_values)
+        indices['FEve'] = self._functional_evenness(dist, w)
+        indices['FDis'], centroid_distances = self._functional_dispersion(trait_values, w)
+        indices['FDiv'] = self._functional_divergence(trait_values, w, centroid_distances)
+        # Rao's quadratic entropy: w' D w, vectorised.
+        indices['RaoQ'] = float(w @ dist @ w) if n_species else 0.0
+        indices['n_species'] = float(n_species)
+
         return indices
+
+    @staticmethod
+    def _functional_richness(trait_values: np.ndarray) -> float:
+        """
+        Convex-hull volume of the species in trait space (FRic).
+
+        Falls back to the product of trait ranges when there are too few
+        species to build a hull in the available dimensions.
+        """
+        n_species, n_traits = trait_values.shape
+        if n_species == 0:
+            return 0.0
+        if n_traits == 1:
+            return float(np.ptp(trait_values[:, 0]))
+
+        # A hull in d dimensions needs at least d + 1 points; reduce dimensions
+        # rather than give up when species are scarce.
+        n_dims = int(min(n_traits, max(1, n_species - 1), 3))
+        if n_dims < 2 or n_species < n_dims + 1:
+            return float(np.prod(np.ptp(trait_values, axis=0)))
+
+        points = trait_values
+        if n_dims < n_traits:
+            points = PCA(n_components=n_dims).fit_transform(trait_values)
+
+        try:
+            return float(ConvexHull(points).volume)
+        except (QhullError, ValueError):
+            # Degenerate (co-planar) configuration.
+            return float(np.prod(np.ptp(points, axis=0)))
+
+    @staticmethod
+    def _functional_evenness(dist: np.ndarray, weights: np.ndarray) -> float:
+        """
+        Functional evenness (Villeger et al. 2008), bounded in [0, 1].
+
+        Built on the minimum spanning tree of the trait-distance matrix: each
+        branch gets a partial weighted evenness ``PEW_l = EW_l / sum(EW)``, and
+        ``FEve = (sum_l min(PEW_l, 1/(S-1)) - 1/(S-1)) / (1 - 1/(S-1))``.
+        """
+        n_species = dist.shape[0]
+        if n_species < 3:
+            return 0.0
+
+        mst = minimum_spanning_tree(dist).toarray()
+        branches = np.argwhere(mst > 0)
+        if branches.size == 0:
+            return 0.0
+
+        # Branch length weighted by the summed abundance of its two endpoints.
+        ew = []
+        for i, j in branches:
+            weight_sum = weights[i] + weights[j]
+            if weight_sum > 0:
+                ew.append(mst[i, j] / weight_sum)
+        ew = np.asarray(ew, dtype=float)
+
+        if ew.size == 0 or ew.sum() <= 0:
+            return 0.0
+
+        pew = ew / ew.sum()
+        threshold = 1.0 / (n_species - 1)
+        numerator = float(np.sum(np.minimum(pew, threshold)) - threshold)
+        denominator = 1.0 - threshold
+
+        return float(np.clip(numerator / denominator, 0.0, 1.0)) if denominator > 0 else 0.0
+
+    @staticmethod
+    def _functional_dispersion(trait_values: np.ndarray, weights: np.ndarray):
+        """Abundance-weighted mean distance to the weighted centroid (FDis)."""
+        if trait_values.shape[0] == 0:
+            return 0.0, np.zeros(0)
+
+        centroid = weights @ trait_values
+        centroid_distances = np.sqrt(((trait_values - centroid) ** 2).sum(axis=1))
+        return float(weights @ centroid_distances), centroid_distances
+
+    @staticmethod
+    def _functional_divergence(trait_values: np.ndarray, weights: np.ndarray,
+                               centroid_distances: np.ndarray) -> float:
+        """
+        Functional divergence (Villeger et al. 2008), bounded in [0, 1].
+
+        ``FDiv = (delta_d + dG_bar) / (delta_|d| + dG_bar)``, where distances
+        are measured from the centre of gravity of the *vertices* of the trait
+        space and ``delta_d`` is the abundance-weighted mean deviation from
+        their mean distance. A plain
+        ``sum(w * |d - d_bar|) / d_bar`` is a coefficient of variation, not
+        FDiv, and is not bounded by 1.
+        """
+        n_species = trait_values.shape[0]
+        if n_species < 3:
+            return 0.0
+
+        # Centre of gravity of the vertices; with few species every point is a
+        # vertex, which is also what Villeger et al. specify for that case.
+        try:
+            if trait_values.shape[1] >= 2 and n_species > trait_values.shape[1]:
+                vertices = ConvexHull(trait_values).vertices
+            else:
+                vertices = np.arange(n_species)
+        except (QhullError, ValueError):
+            vertices = np.arange(n_species)
+
+        centre = trait_values[vertices].mean(axis=0)
+        dist_to_centre = np.sqrt(((trait_values - centre) ** 2).sum(axis=1))
+
+        mean_distance = float(dist_to_centre.mean())
+        if mean_distance <= 0:
+            return 0.0
+
+        deviations = dist_to_centre - mean_distance
+        delta_d = float(np.sum(weights * deviations))
+        delta_abs_d = float(np.sum(weights * np.abs(deviations)))
+
+        denominator = delta_abs_d + mean_distance
+        if denominator <= 0:
+            return 0.0
+
+        return float(np.clip((delta_d + mean_distance) / denominator, 0.0, 1.0))
     
     def identify_functional_groups(self,
                                  n_groups: int = None,
@@ -317,8 +392,8 @@ class FunctionalTraitAnalyzer:
 # Copyright (c) 2025 Mohamed Z. Hatim
                 from sklearn.metrics import silhouette_score
                 silhouette_scores = []
-                K_range = range(2, min(11, len(trait_matrix) // 2))
-                
+                K_range = range(2, max(3, min(11, len(trait_matrix) // 2 + 1)))
+
                 for k in K_range:
                     cluster_labels = fcluster(linkage_matrix, k, criterion='maxclust')
                     if len(np.unique(cluster_labels)) > 1:
@@ -327,7 +402,7 @@ class FunctionalTraitAnalyzer:
                     else:
                         silhouette_scores.append(0)
                 
-                n_groups = K_range[np.argmax(silhouette_scores)] if silhouette_scores else 3
+                n_groups = list(K_range)[int(np.argmax(silhouette_scores))] if silhouette_scores else 2
             
             cluster_labels = fcluster(linkage_matrix, n_groups, criterion='maxclust')
             
@@ -335,16 +410,22 @@ class FunctionalTraitAnalyzer:
             if n_groups is None:
 # Copyright (c) 2025 Mohamed Z. Hatim
                 inertias = []
-                K_range = range(2, min(11, len(trait_matrix) // 2))
+                K_range = range(2, max(3, min(11, len(trait_matrix) // 2 + 1)))
                 for k in K_range:
                     kmeans = KMeans(n_clusters=k, random_state=self.random_state)
                     kmeans.fit(trait_matrix_scaled)
                     inertias.append(kmeans.inertia_)
                 
 # Copyright (c) 2025 Mohamed Z. Hatim
-                deltas = np.diff(inertias)
-                delta_deltas = np.diff(deltas)
-                n_groups = K_range[np.argmax(delta_deltas) + 2] if len(delta_deltas) > 0 else 3
+                # Index i of the double difference maps to K_range[i + 1];
+                # a +2 offset overruns the list for small ranges.
+                k_list = list(K_range)
+                delta_deltas = np.diff(np.diff(inertias))
+                if len(delta_deltas) > 0:
+                    idx = min(int(np.argmax(delta_deltas)) + 1, len(k_list) - 1)
+                    n_groups = k_list[idx]
+                else:
+                    n_groups = k_list[0] if k_list else 2
             
             kmeans = KMeans(n_clusters=n_groups, random_state=self.random_state)
             cluster_labels = kmeans.fit_predict(trait_matrix_scaled)
@@ -418,12 +499,12 @@ class FunctionalTraitAnalyzer:
         cwm_traits = self._calculate_cwm_traits(traits)
         
 # Copyright (c) 2025 Mohamed Z. Hatim
-        common_sites = set(cwm_traits.index) & set(environmental_data.index)
+        common_sites = _ordered_intersection(cwm_traits.index, environmental_data.index)
         if len(common_sites) == 0:
             raise ValueError("No common sites found between CWM traits and environmental data")
-        
-        cwm_traits_common = cwm_traits.loc[list(common_sites)]
-        env_data_common = environmental_data.loc[list(common_sites), env_variables]
+
+        cwm_traits_common = cwm_traits.loc[common_sites]
+        env_data_common = environmental_data.loc[common_sites, env_variables]
         
 # Copyright (c) 2025 Mohamed Z. Hatim
         correlations = {}
@@ -516,7 +597,6 @@ class FunctionalTraitAnalyzer:
         
 # Copyright (c) 2025 Mohamed Z. Hatim
         explained_variance = []
-        canonical_axes = []
         
         for i in range(traits_scaled.shape[1]):
             reg = LinearRegression()
@@ -623,8 +703,10 @@ class FunctionalTraitAnalyzer:
             gamma_fd = self._calculate_fd_indices(
                 pooled_traits_scaled, pooled_abundances, pooled_dist_df
             )
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+        else:
+            # No species anywhere: there is no gamma diversity to report.
+            gamma_fd = {}
+
         mean_alpha_fd = site_fd.mean().to_dict()
         
 # Copyright (c) 2025 Mohamed Z. Hatim
@@ -736,7 +818,6 @@ class FunctionalTraitAnalyzer:
             
 # Copyright (c) 2025 Mohamed Z. Hatim
             mean_val = trait_values.mean()
-            std_val = trait_values.std()
             axes[i].axvline(mean_val, color='red', linestyle='--', 
                           label=f'Mean: {mean_val:.2f}')
             axes[i].legend()

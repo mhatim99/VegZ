@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "VegZ"
-version = "1.3.0"
+version = "1.5.0"
 authors = [
   {name="Mohamed Z. Hatim", email="mhatim4040@gmail.com"},
 ]
 description = "A comprehensive Python package for vegetation data analysis and environmental modeling"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = {text = "MIT"}
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -19,7 +19,6 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Information Analysis",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -63,10 +62,30 @@ fuzzy = [
     "fuzzywuzzy>=0.18.0",
     "python-levenshtein>=0.12.0",
 ]
+excel = [
+    "openpyxl>=3.0.0",
+    "xlrd>=2.0.1",
+]
+network = [
+    "networkx>=2.6",
+]
+timeseries = [
+    "statsmodels>=0.13.0",
+]
 interactive = [
     "plotly>=5.0.0",
     "bokeh>=2.4.0",
     "ipywidgets>=7.6.0",
+]
+all = [
+    "geopandas>=0.10.0",
+    "pyproj>=3.2.0",
+    "shapely>=1.8.0",
+    "fuzzywuzzy>=0.18.0",
+    "openpyxl>=3.0.0",
+    "networkx>=2.6",
+    "statsmodels>=0.13.0",
+    "plotly>=5.0.0",
 ]
 dev = [
     "pytest>=6.2.0",
@@ -75,6 +94,13 @@ dev = [
     "flake8>=3.9.0",
     "sphinx>=4.0.0",
     "sphinx-rtd-theme>=0.5.0",
+    "openpyxl>=3.0.0",
+    "statsmodels>=0.13.0",
+    "networkx>=2.6",
+    "mypy>=1.0",
+    "ruff>=0.1",
+    "build>=0.10",
+    "twine>=4.0",
 ]
 
 [project.urls]
@@ -93,6 +119,30 @@ path = "src/VegZ/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/VegZ"]
+# py.typed tells type checkers the inline annotations are meant to be used.
+artifacts = ["src/VegZ/py.typed"]
+
+# Ship the source, tests, docs and example data in the sdist - but nothing else.
+# Listing includes explicitly (rather than relying on excludes) keeps build
+# artefacts, caches and editor droppings out of the release by construction.
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src/VegZ",
+    "/tests",
+    "/examples",
+    "/docs",
+    "/test_data",
+    "/README.md",
+    "/CHANGELOG.md",
+    "/CONTRIBUTING.md",
+    "/LICENSE",
+    "/pyproject.toml",
+]
+exclude = [
+    "**/__pycache__",
+    "**/*.py[cod]",
+    "**/.ipynb_checkpoints",
+]
 
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -100,7 +150,7 @@ allow-direct-references = true
 # Black code formatting
 [tool.black]
 line-length = 88
-target-version = ['py38', 'py39', 'py310', 'py311']
+target-version = ['py39', 'py310', 'py311', 'py312', 'py313']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -120,6 +170,10 @@ extend-exclude = '''
 [tool.pytest.ini_options]
 minversion = "6.0"
 addopts = "-ra -q --strict-markers"
+filterwarnings = [
+    "error::FutureWarning:VegZ.*",
+    "error::DeprecationWarning:VegZ.*",
+]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
@@ -147,3 +201,63 @@ exclude_lines = [
     "class .*\\(Protocol\\):",
     "@(abc\\.)?abstractmethod",
 ]
+
+# Type checking
+#
+# The code base predates type checking and mypy reports ~330 issues in the
+# legacy modules, mostly pandas/numpy operator overloads it cannot follow.
+# Rather than blanket-disabling mypy (which enforces nothing) or committing a
+# failing config (which gets ignored), checking is switched ON per module and
+# the list grows as modules are cleaned up.
+[tool.mypy]
+python_version = "3.9"
+files = ["src/VegZ"]
+ignore_missing_imports = true       # the optional geospatial/ML stack is untyped
+warn_redundant_casts = true
+no_implicit_optional = true
+show_error_codes = true
+ignore_errors = true                # default off; enabled per module below
+
+[[tool.mypy.overrides]]
+# Modules written or rewritten with type checking in mind.
+module = ["VegZ._compat", "VegZ.dataset"]
+ignore_errors = false
+disallow_untyped_defs = true
+check_untyped_defs = true
+warn_unused_ignores = true
+
+# Linting
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+extend-exclude = ["docs", "examples"]
+
+[tool.ruff.lint]
+# Deliberately scoped to rules that catch real defects, so the gate is enabled
+# and green rather than aspirational. Cosmetic rules (whitespace, annotation
+# modernisation) would need a 3000-line mechanical diff across a code base that
+# is otherwise stable; they are listed below as explicit, revisitable debt.
+select = [
+    "F",    # pyflakes: undefined names, unused variables, bad f-strings
+    "B",    # bugbear: mutable defaults, loop-variable closures, bare raises
+    "E4",   # import errors
+    "E7",   # statement errors (bare except, comparisons to None/True)
+    "E9",   # syntax and IO errors
+]
+ignore = [
+    "E501",   # line length: not enforced, no formatter is run in CI
+    "B008",   # function call in argument default: used intentionally for range()
+    # --- Accepted debt, tracked rather than silently disabled ---------------
+    "B028",   # warnings.warn without stacklevel: 63 call sites; fixing them
+              # would improve where warnings point, but needs care with the
+              # multi-line calls. Worth doing, not worth a risky bulk regex.
+    "F541",   # f-string without placeholders: harmless, 10 sites
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The data_management/data_quality packages deliberately re-export via star
+# imports to keep the public API flat.
+"src/VegZ/__init__.py" = ["F401", "E402"]
+"src/VegZ/data_management/__init__.py" = ["F401", "F403", "F405"]
+"src/VegZ/data_quality/__init__.py" = ["F401", "F403", "F405"]
+"tests/*" = ["B011", "F401"]

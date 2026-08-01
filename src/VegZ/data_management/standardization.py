@@ -6,14 +6,84 @@ Copyright (c) 2025 Mohamed Z. Hatim
 
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Optional, Union, Tuple, Any
+from typing import Dict, List, Optional, Any
 import warnings
 
-# Copyright (c) 2025 Mohamed Z. Hatim
+import re
+import difflib
+
+from .._compat import optional_import
+
+# fuzzywuzzy is optional. It used to be imported at module scope, which made it
+# a hard requirement of `import VegZ` even though pyproject only lists it under
+# the [fuzzy] extra. When it is absent we fall back to difflib, which is in the
+# standard library and gives comparable ratios for short taxon names.
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", message=".*Using slow pure-python SequenceMatcher.*")
-    from fuzzywuzzy import fuzz, process
-import re
+    _fuzzywuzzy = optional_import('fuzzywuzzy.fuzz')
+    _fuzzywuzzy_process = optional_import('fuzzywuzzy.process')
+
+FUZZYWUZZY_AVAILABLE = _fuzzywuzzy is not None
+
+
+class _DifflibFuzz:
+    """Minimal stand-in for the parts of ``fuzzywuzzy.fuzz`` that VegZ uses."""
+
+    @staticmethod
+    def ratio(a: str, b: str) -> int:
+        return int(round(difflib.SequenceMatcher(None, a, b).ratio() * 100))
+
+    @classmethod
+    def partial_ratio(cls, a: str, b: str) -> int:
+        if not a or not b:
+            return 0
+        shorter, longer = (a, b) if len(a) <= len(b) else (b, a)
+        best = 0
+        window = len(shorter)
+        for start in range(max(1, len(longer) - window + 1)):
+            best = max(best, cls.ratio(shorter, longer[start:start + window]))
+        return best
+
+    @classmethod
+    def token_sort_ratio(cls, a: str, b: str) -> int:
+        return cls.ratio(' '.join(sorted(a.lower().split())),
+                         ' '.join(sorted(b.lower().split())))
+
+    @classmethod
+    def token_set_ratio(cls, a: str, b: str) -> int:
+        return cls.ratio(' '.join(sorted(set(a.lower().split()))),
+                         ' '.join(sorted(set(b.lower().split()))))
+
+    @classmethod
+    def WRatio(cls, a: str, b: str) -> int:
+        return max(cls.ratio(a, b), cls.partial_ratio(a, b), cls.token_sort_ratio(a, b))
+
+
+class _DifflibProcess:
+    """Minimal stand-in for the parts of ``fuzzywuzzy.process`` that VegZ uses."""
+
+    @staticmethod
+    def extractOne(query, choices, scorer=None, score_cutoff=0):
+        scorer = scorer or _DifflibFuzz.WRatio
+        best, best_score = None, -1
+        for choice in choices:
+            score = scorer(query, choice)
+            if score > best_score:
+                best, best_score = choice, score
+        if best is None or best_score < score_cutoff:
+            return None
+        return best, best_score
+
+    @staticmethod
+    def extract(query, choices, scorer=None, limit=5):
+        scorer = scorer or _DifflibFuzz.WRatio
+        scored = sorted(((choice, scorer(query, choice)) for choice in choices),
+                        key=lambda item: item[1], reverse=True)
+        return scored[:limit]
+
+
+fuzz = _fuzzywuzzy if FUZZYWUZZY_AVAILABLE else _DifflibFuzz
+process = _fuzzywuzzy_process if FUZZYWUZZY_AVAILABLE else _DifflibProcess
 
 
 class DataStandardizer:
@@ -106,14 +176,14 @@ class DataStandardizer:
         if dataset_names is None:
             dataset_names = [f"dataset_{i}" for i in range(len(datasets))]
         
-# Copyright (c) 2025 Mohamed Z. Hatim
+        # Work on copies: tagging the caller's DataFrames with a
+        # 'source_dataset' column is a surprising side effect.
+        datasets = [df.copy() for df in datasets]
         for i, df in enumerate(datasets):
             df['source_dataset'] = dataset_names[i]
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
         result = datasets[0].copy()
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
+
         for i, df in enumerate(datasets[1:], 1):
 # Copyright (c) 2025 Mohamed Z. Hatim
             common_cols = [col for col in join_columns if col in result.columns and col in df.columns]
@@ -188,7 +258,7 @@ class DataStandardizer:
         """Standardize date columns."""
         if 'date' in df.columns:
 # Copyright (c) 2025 Mohamed Z. Hatim
-            df['date'] = pd.to_datetime(df['date'], errors='coerce', infer_datetime_format=True)
+            df['date'] = pd.to_datetime(df['date'], errors='coerce', format='mixed', dayfirst=False)
             
 # Copyright (c) 2025 Mohamed Z. Hatim
             df['year'] = df['date'].dt.year

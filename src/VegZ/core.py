@@ -14,17 +14,20 @@ This module provides the core functionality for vegetation data analysis includi
 
 import pandas as pd
 import numpy as np
-from typing import Union, List, Dict, Tuple, Optional, Any
-from scipy import stats
+from typing import List, Dict, Optional, Any
 from scipy.spatial.distance import pdist, squareform
 from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
 from sklearn.decomposition import PCA
-from sklearn.manifold import MDS
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
-import seaborn as sns
 import warnings
+
+from ._compat import make_mds
+
+#: Transformations understood by :meth:`VegZ._transform_data`.
+TRANSFORMATIONS = ('hellinger', 'chord', 'wisconsin', 'log', 'sqrt',
+                   'standardize', 'none')
 
 
 class VegZ:
@@ -73,14 +76,18 @@ class VegZ:
         else:
             raise ValueError(f"Unsupported format: {format_type}")
         
-        # Copyright (c) 2025 Mohamed Z. Hatim
         if species_cols is None:
             numeric_cols = self.data.select_dtypes(include=[np.number]).columns
-            # Copyright (c) 2025 Mohamed Z. Hatim
             self.species_matrix = self.data[numeric_cols]
+            warnings.warn(
+                "species_cols was not supplied, so every numeric column was "
+                "treated as a species. Coordinate, elevation or ID columns "
+                "will corrupt the analysis - pass species_cols explicitly.",
+                UserWarning,
+            )
         else:
             self.species_matrix = self.data[species_cols]
-        
+
         return self.data
     
     def standardize_species_names(self, species_column: str = 'species') -> pd.DataFrame:
@@ -116,18 +123,21 @@ class VegZ:
         self.data[f'{species_column}_clean'] = self.data[species_column].apply(clean_name)
         return self.data
     
-    def filter_rare_species(self, min_occurrences: int = 3, 
-                           min_abundance: float = 0.0) -> pd.DataFrame:
+    def filter_rare_species(self, min_occurrences: int = 3,
+                           min_abundance: float = 0.0,
+                           verbose: bool = False) -> pd.DataFrame:
         """
         Filter out rare species based on occurrence frequency and abundance.
-        
+
         Parameters:
         -----------
         min_occurrences : int
             Minimum number of sites where species must occur
         min_abundance : float
             Minimum total abundance threshold
-            
+        verbose : bool
+            Print a one-line summary of how many species were retained.
+
         Returns:
         --------
         pd.DataFrame
@@ -135,27 +145,32 @@ class VegZ:
         """
         if self.species_matrix is None:
             raise ValueError("Species matrix not available")
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
+
         occurrences = (self.species_matrix > 0).sum(axis=0)
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
         total_abundance = self.species_matrix.sum(axis=0)
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
+
         keep_species = (occurrences >= min_occurrences) & (total_abundance >= min_abundance)
-        
+
+        n_kept, n_total = int(keep_species.sum()), len(keep_species)
         self.species_matrix = self.species_matrix.loc[:, keep_species]
-        
-        print(f"Retained {keep_species.sum()} species out of {len(keep_species)} original species")
-        
+        self.metadata['filter_rare_species'] = {
+            'min_occurrences': min_occurrences,
+            'min_abundance': min_abundance,
+            'n_retained': n_kept,
+            'n_original': n_total,
+        }
+
+        if verbose:
+            print(f"Retained {n_kept} species out of {n_total} original species")
+
         return self.species_matrix
     
     # Copyright (c) 2025 Mohamed Z. Hatim
     # Copyright (c) 2025 Mohamed Z. Hatim
     # Copyright (c) 2025 Mohamed Z. Hatim
     
-    def calculate_diversity(self, indices: List[str] = ['shannon', 'simpson', 'richness']) -> pd.DataFrame:
+    def calculate_diversity(self,
+                            indices: Optional[List[str]] = None) -> pd.DataFrame:
         """
         Calculate diversity indices.
         
@@ -171,9 +186,13 @@ class VegZ:
         """
         if self.species_matrix is None:
             raise ValueError("Species matrix not available")
-        
+
+        # A mutable default would be shared between every call.
+        if indices is None:
+            indices = ['shannon', 'simpson', 'richness']
+
         results = pd.DataFrame(index=self.species_matrix.index)
-        
+
         for index in indices:
             if index.lower() == 'shannon':
                 results['shannon'] = self._shannon_diversity()
@@ -225,61 +244,54 @@ class VegZ:
     
     def rarefaction_curve(self, sample_sizes: Optional[List[int]] = None) -> pd.DataFrame:
         """
-        Calculate rarefaction curves.
-        
+        Calculate individual-based (Hurlbert) rarefaction curves.
+
         Parameters:
         -----------
         sample_sizes : list, optional
-            Sample sizes for rarefaction
-            
+            Numbers of individuals to rarefy to.
+
         Returns:
         --------
         pd.DataFrame
-            Rarefaction curves data
+            Long-format rarefaction data with ``sample_id``, ``sample_size``,
+            ``expected_species`` and ``variance`` columns.
         """
         if self.species_matrix is None:
             raise ValueError("Species matrix not available")
-        
-        if sample_sizes is None:
-            max_individuals = int(self.species_matrix.sum(axis=1).max())
-            sample_sizes = list(range(1, max_individuals + 1, max(1, max_individuals // 50)))
-        
-        results = []
-        
-        for idx, row in self.species_matrix.iterrows():
-            species_counts = row[row > 0].astype(int)
-            total_individuals = species_counts.sum()
-            
-            for sample_size in sample_sizes:
-                if sample_size <= total_individuals:
-                    expected_species = self._rarefaction_expected_species(species_counts, sample_size)
-                    results.append({
-                        'sample_id': idx,
-                        'sample_size': sample_size,
-                        'expected_species': expected_species
-                    })
-        
-        return pd.DataFrame(results)
-    
-    def _rarefaction_expected_species(self, species_counts: pd.Series, sample_size: int) -> float:
-        """Calculate expected number of species for rarefaction."""
-        total = species_counts.sum()
-        expected = 0
 
-        for count in species_counts:
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            if sample_size > total - count:
-                prob_not_selected = 0
-            else:
-                prob_not_selected = 1
-                for i in range(sample_size):
-                    prob_not_selected *= (total - count - i) / (total - i)
+        from .diversity import DiversityAnalyzer
 
-            # Copyright (c) 2025 Mohamed Z. Hatim
-            prob_selected = 1 - prob_not_selected
-            expected += prob_selected
+        return DiversityAnalyzer().rarefaction_curve(
+            self.species_matrix, sample_sizes=sample_sizes
+        )
 
-        return expected
+    def species_accumulation_curve(self, n_permutations: int = 100,
+                                   random_state: Optional[int] = None) -> pd.DataFrame:
+        """
+        Sample-based species accumulation curve with permutation confidence bands.
+
+        Parameters:
+        -----------
+        n_permutations : int
+            Number of random site orderings.
+        random_state : int, optional
+            Seed for reproducible permutations.
+
+        Returns:
+        --------
+        pd.DataFrame
+            Columns ``n_sites``, ``mean``, ``std``, ``ci_lower``, ``ci_upper``.
+        """
+        if self.species_matrix is None:
+            raise ValueError("Species matrix not available")
+
+        from .diversity import DiversityAnalyzer
+
+        return DiversityAnalyzer().species_accumulation_curve(
+            self.species_matrix, n_permutations=n_permutations,
+            random_state=random_state
+        )
     
     # Copyright (c) 2025 Mohamed Z. Hatim
     # Copyright (c) 2025 Mohamed Z. Hatim
@@ -312,103 +324,152 @@ class VegZ:
         pca = PCA(n_components=n_components)
         scores = pca.fit_transform(transformed_data)
         
+        columns = [f'PC{i+1}' for i in range(scores.shape[1])]
+        site_scores = pd.DataFrame(scores, index=self.species_matrix.index,
+                                   columns=columns)
+        loadings = pd.DataFrame(pca.components_.T,
+                                index=self.species_matrix.columns,
+                                columns=[f'PC{i+1}' for i in range(pca.components_.shape[0])])
+
         results = {
-            'scores': pd.DataFrame(scores, 
-                                 index=self.species_matrix.index,
-                                 columns=[f'PC{i+1}' for i in range(scores.shape[1])]),
-            'loadings': pd.DataFrame(pca.components_.T,
-                                   index=self.species_matrix.columns,
-                                   columns=[f'PC{i+1}' for i in range(pca.components_.shape[0])]),
+            'scores': site_scores,
+            # 'site_scores'/'species_scores' are the names MultivariateAnalyzer
+            # and the plotting helpers use; exposing both keeps results from the
+            # two entry points interchangeable.
+            'site_scores': site_scores,
+            'loadings': loadings,
+            'species_scores': loadings * np.sqrt(pca.explained_variance_),
             'explained_variance_ratio': pca.explained_variance_ratio_,
+            'eigenvalues': pca.explained_variance_,
             'cumulative_variance': np.cumsum(pca.explained_variance_ratio_),
+            'method': 'PCA',
             'pca_object': pca
         }
-        
+
         return results
     
     def nmds_analysis(self, distance_metric: str = 'bray_curtis',
                       n_dimensions: int = 2,
-                      transform: str = 'hellinger') -> Dict[str, Any]:
+                      transform: str = 'none',
+                      n_init: int = 10,
+                      max_iter: int = 300,
+                      random_state: Optional[int] = 42) -> Dict[str, Any]:
         """
-        Non-metric Multidimensional Scaling.
-        
+        Non-metric Multidimensional Scaling (NMDS).
+
         Parameters:
         -----------
         distance_metric : str
-            Distance metric to use
+            Distance metric to use ('bray_curtis', 'euclidean', or any metric
+            accepted by :func:`scipy.spatial.distance.pdist`).
         n_dimensions : int
             Number of dimensions
         transform : str
-            Data transformation method
-            
+            Data transformation applied before computing distances. Defaults to
+            ``'none'``: Bray-Curtis is already a relativising measure, so
+            transforming first (e.g. Hellinger) changes what the distance means.
+        n_init : int
+            Number of random restarts of the stress minimisation.
+        max_iter : int
+            Maximum SMACOF iterations per restart.
+        random_state : int, optional
+            Seed for reproducible configurations.
+
         Returns:
         --------
         dict
-            NMDS results
+            NMDS results including scores, Kruskal stress-1 and the distance
+            matrix used.
         """
         if self.species_matrix is None:
             raise ValueError("Species matrix not available")
 
         if transform == 'standardize' and distance_metric == 'bray_curtis':
-            raise ValueError("Bray-Curtis distance requires non-negative data. Cannot use with 'standardize' transform. Use 'hellinger', 'log', or 'sqrt' instead.")
+            raise ValueError(
+                "Bray-Curtis distance requires non-negative data. Cannot use "
+                "with 'standardize' transform. Use 'hellinger', 'log', or "
+                "'sqrt' instead."
+            )
 
         transformed_data = self._transform_data(self.species_matrix, transform)
+        distances = self._pairwise_distances(transformed_data, distance_metric)
 
-        if distance_metric == 'bray_curtis':
-            distances = self._bray_curtis_distance(transformed_data)
-        elif distance_metric == 'euclidean':
-            distances = pdist(transformed_data, metric='euclidean')
-        else:
-            distances = pdist(transformed_data, metric=distance_metric)
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
-        mds = MDS(n_components=n_dimensions, dissimilarity='precomputed', random_state=42)
+        # metric=False gives *non*-metric MDS, which is what NMDS means.
+        mds = make_mds(n_components=n_dimensions, metric=False, precomputed=True,
+                       n_init=n_init, max_iter=max_iter, random_state=random_state)
         scores = mds.fit_transform(squareform(distances))
-        
+
+        site_scores = pd.DataFrame(
+            scores, index=self.species_matrix.index,
+            columns=[f'NMDS{i+1}' for i in range(n_dimensions)]
+        )
+
         results = {
-            'scores': pd.DataFrame(scores,
-                                 index=self.species_matrix.index,
-                                 columns=[f'NMDS{i+1}' for i in range(n_dimensions)]),
+            'scores': site_scores,
+            # Alias matching MultivariateAnalyzer / the plotting helpers.
+            'site_scores': site_scores,
             'stress': mds.stress_,
             'distances': distances,
+            'distance_metric': distance_metric,
+            'method': 'NMDS',
             'mds_object': mds
         }
-        
+
         return results
-    
+
     def _transform_data(self, data: pd.DataFrame, method: str) -> np.ndarray:
-        """Apply data transformation."""
+        """
+        Apply a data transformation and return a NumPy array.
+
+        Supported: ``hellinger``, ``chord``, ``wisconsin``, ``log`` (log1p),
+        ``sqrt``, ``standardize`` and ``none``.
+        """
+        method = (method or 'none').lower()
+        values = data.values.astype(float)
+
+        if method in ('none', 'raw'):
+            return values
         if method == 'hellinger':
-            row_sums = data.sum(axis=1)
-            row_sums[row_sums == 0] = 1
-            proportions = data.div(row_sums, axis=0)
-            return np.sqrt(proportions.values)
-        elif method == 'log':
-            return np.log1p(data.values)
-        elif method == 'sqrt':
-            return np.sqrt(data.values)
-        elif method == 'standardize':
-            scaler = StandardScaler()
-            return scaler.fit_transform(data.values)
-        else:
-            return data.values
-    
+            row_sums = values.sum(axis=1)
+            row_sums[row_sums == 0] = 1.0
+            return np.sqrt(values / row_sums[:, None])
+        if method == 'chord':
+            norms = np.sqrt((values ** 2).sum(axis=1))
+            norms[norms == 0] = 1.0
+            return values / norms[:, None]
+        if method == 'wisconsin':
+            col_max = values.max(axis=0)
+            col_max[col_max == 0] = 1.0
+            relativised = values / col_max
+            row_sums = relativised.sum(axis=1)
+            row_sums[row_sums == 0] = 1.0
+            return relativised / row_sums[:, None]
+        if method == 'log':
+            return np.log1p(values)
+        if method == 'sqrt':
+            return np.sqrt(np.maximum(values, 0))
+        if method == 'standardize':
+            return StandardScaler().fit_transform(values)
+
+        raise ValueError(
+            f"Unknown transformation '{method}'. Valid options: "
+            f"{', '.join(TRANSFORMATIONS)}"
+        )
+
+    @staticmethod
+    def _pairwise_distances(data: np.ndarray, metric: str) -> np.ndarray:
+        """Condensed pairwise distance vector for a site-by-species array."""
+        aliases = {
+            'bray_curtis': 'braycurtis',
+            'manhattan': 'cityblock',
+            'city_block': 'cityblock',
+        }
+        scipy_metric = aliases.get(metric, metric)
+        return pdist(np.asarray(data, dtype=float), metric=scipy_metric)
+
     def _bray_curtis_distance(self, data: np.ndarray) -> np.ndarray:
-        """Calculate Bray-Curtis distance."""
-        n_samples = data.shape[0]
-        distances = []
-        
-        for i in range(n_samples):
-            for j in range(i + 1, n_samples):
-                numerator = np.sum(np.abs(data[i] - data[j]))
-                denominator = np.sum(data[i] + data[j])
-                if denominator == 0:
-                    distance = 0
-                else:
-                    distance = numerator / denominator
-                distances.append(distance)
-        
-        return np.array(distances)
+        """Condensed Bray-Curtis distance vector (kept for backwards compatibility)."""
+        return self._pairwise_distances(np.asarray(data, dtype=float), 'bray_curtis')
     
     # Copyright (c) 2025 Mohamed Z. Hatim
     # Copyright (c) 2025 Mohamed Z. Hatim
@@ -441,17 +502,16 @@ class VegZ:
             warnings.warn("Ward linkage requires Euclidean distance. Switching to Euclidean.")
             distance_metric = 'euclidean'
 
-        if distance_metric == 'bray_curtis':
-            distances = self._bray_curtis_distance(self.species_matrix.values)
-        else:
-            distances = pdist(self.species_matrix.values, metric=distance_metric)
-        
-        # Copyright (c) 2025 Mohamed Z. Hatim
+        distances = self._pairwise_distances(self.species_matrix.values, distance_metric)
+
         linkage_matrix = linkage(distances, method=linkage_method)
-        
+
         results = {
             'linkage_matrix': linkage_matrix,
-            'distances': distances
+            'distances': distances,
+            'distance_metric': distance_metric,
+            'linkage_method': linkage_method,
+            'site_labels': self.species_matrix.index.tolist(),
         }
         
         if n_clusters is not None:
@@ -500,53 +560,48 @@ class VegZ:
         
         return results
     
-    def indicator_species_analysis(self, clusters: pd.Series) -> pd.DataFrame:
+    def indicator_species_analysis(self, clusters: pd.Series,
+                                   permutations: int = 0,
+                                   random_state: Optional[int] = None) -> pd.DataFrame:
         """
-        Indicator species analysis for clusters.
-        
+        Dufrene-Legendre indicator species analysis (IndVal) for clusters.
+
+        For species *j* and cluster *k*:
+
+        ``A_kj`` = mean abundance of *j* in *k* divided by the sum of its mean
+        abundances across all clusters (specificity), and ``B_kj`` = proportion
+        of sites within *k* where *j* occurs (fidelity). ``IndVal = A*B*100``.
+
         Parameters:
         -----------
         clusters : pd.Series
-            Cluster assignments
-            
+            Cluster assignments, indexed like the species matrix.
+        permutations : int
+            If > 0, run a permutation test of the maximum IndVal per species
+            and add a ``p_value`` column.
+        random_state : int, optional
+            Seed for the permutation test.
+
         Returns:
         --------
         pd.DataFrame
-            Indicator species results
+            One row per species x cluster combination with ``indicator_value``,
+            ``specificity`` (A), ``fidelity`` (B) and supporting counts.
         """
         if self.species_matrix is None:
             raise ValueError("Species matrix not available")
-        
-        results = []
-        
-        for species in self.species_matrix.columns:
-            for cluster in clusters.unique():
-                cluster_mask = clusters == cluster
-                
-                # Copyright (c) 2025 Mohamed Z. Hatim
-                freq_in_cluster = (self.species_matrix.loc[cluster_mask, species] > 0).mean()
-                freq_out_cluster = (self.species_matrix.loc[~cluster_mask, species] > 0).mean()
-                
-                abund_in_cluster = self.species_matrix.loc[cluster_mask, species].mean()
-                abund_out_cluster = self.species_matrix.loc[~cluster_mask, species].mean()
-                
-                # Copyright (c) 2025 Mohamed Z. Hatim
-                if freq_out_cluster + freq_in_cluster > 0 and abund_out_cluster + abund_in_cluster > 0:
-                    rel_freq = freq_in_cluster / (freq_in_cluster + freq_out_cluster)
-                    rel_abund = abund_in_cluster / (abund_in_cluster + abund_out_cluster)
-                    indicator_value = rel_freq * rel_abund * 100
-                else:
-                    indicator_value = 0
-                
-                results.append({
-                    'species': species,
-                    'cluster': cluster,
-                    'indicator_value': indicator_value,
-                    'frequency_in_cluster': freq_in_cluster,
-                    'abundance_in_cluster': abund_in_cluster
-                })
-        
-        return pd.DataFrame(results)
+
+        from .statistics import EcologicalStatistics
+
+        clusters = pd.Series(clusters)
+        if not clusters.index.equals(self.species_matrix.index):
+            clusters = clusters.set_axis(self.species_matrix.index)
+
+        return EcologicalStatistics().indicator_species_analysis(
+            self.species_matrix, clusters,
+            permutations=permutations, random_state=random_state,
+            as_frame=True,
+        )
     
     # Copyright (c) 2025 Mohamed Z. Hatim
     # Copyright (c) 2025 Mohamed Z. Hatim
@@ -600,10 +655,23 @@ class VegZ:
         plt.Figure
             Ordination plot
         """
-        scores = ordination_results['scores']
-        
+        if 'scores' in ordination_results:
+            scores = ordination_results['scores']
+        elif 'site_scores' in ordination_results:
+            scores = ordination_results['site_scores']
+        elif 'coordinates' in ordination_results:
+            scores = ordination_results['coordinates']
+        else:
+            raise ValueError("No ordination scores found in results")
+
+        if scores.shape[1] < 2:
+            raise ValueError(
+                "Ordination plot needs at least two axes; the supplied result "
+                f"has {scores.shape[1]}."
+            )
+
         fig, ax = plt.subplots(1, 1, figsize=(10, 8))
-        
+
         if color_by is not None:
             scatter = ax.scatter(scores.iloc[:, 0], scores.iloc[:, 1], 
                                c=color_by, cmap='viridis', alpha=0.7)
@@ -614,9 +682,8 @@ class VegZ:
         ax.set_xlabel(f'{scores.columns[0]}')
         ax.set_ylabel(f'{scores.columns[1]}')
         
-        # Copyright (c) 2025 Mohamed Z. Hatim
-        if 'explained_variance_ratio' in ordination_results:
-            var_exp = ordination_results['explained_variance_ratio']
+        var_exp = ordination_results.get('explained_variance_ratio')
+        if var_exp is not None and len(var_exp) >= 2:
             ax.set_xlabel(f'{scores.columns[0]} ({var_exp[0]:.1%})')
             ax.set_ylabel(f'{scores.columns[1]} ({var_exp[1]:.1%})')
         
@@ -700,7 +767,7 @@ class VegZ:
         if self.species_matrix is None:
             raise ValueError("Species matrix not available")
         
-        stats = {
+        summary = {
             'n_sites': len(self.species_matrix),
             'n_species': len(self.species_matrix.columns),
             'total_abundance': self.species_matrix.sum().sum(),
@@ -709,8 +776,8 @@ class VegZ:
             'species_occurrence_frequency': (self.species_matrix > 0).sum(axis=0).describe(),
             'site_abundance_distribution': self.species_matrix.sum(axis=1).describe()
         }
-        
-        return stats
+
+        return summary
     
     def export_results(self, results: Dict[str, Any], 
                       output_path: str, format_type: str = 'csv') -> None:
@@ -744,7 +811,7 @@ class VegZ:
     # Copyright (c) 2025 Mohamed Z. Hatim
     
     def elbow_analysis(self, k_range: range = range(1, 16),
-                      methods: List[str] = ['knee_locator', 'derivative', 'variance_explained'],
+                      methods: Optional[List[str]] = None,
                       transform: str = 'hellinger',
                       plot_results: bool = True) -> Dict[str, Any]:
         """
@@ -775,7 +842,10 @@ class VegZ:
         """
         if self.species_matrix is None:
             raise ValueError("Species matrix not available. Please load data first.")
-        
+
+        if methods is None:
+            methods = ['knee_locator', 'derivative', 'variance_explained']
+
         # Copyright (c) 2025 Mohamed Z. Hatim
         from .clustering import VegetationClustering
         clustering = VegetationClustering()
@@ -818,16 +888,27 @@ class VegZ:
             return results['recommendations'].get('silhouette_optimal', 3)
 
 
-# Copyright (c) 2025 Mohamed Z. Hatim
-def quick_diversity_analysis(data: pd.DataFrame, 
-                           species_cols: Optional[List[str]] = None) -> pd.DataFrame:
-    """Quick diversity analysis."""
+def _prepare(data: pd.DataFrame, species_cols: Optional[List[str]]) -> 'VegZ':
+    """Build a :class:`VegZ` instance for the quick_* helper functions."""
     veg = VegZ()
     veg.data = data
     if species_cols:
         veg.species_matrix = data[species_cols]
     else:
         veg.species_matrix = data.select_dtypes(include=[np.number])
+        warnings.warn(
+            "species_cols was not supplied, so every numeric column was "
+            "treated as a species. Coordinate, elevation or ID columns will "
+            "corrupt the analysis - pass species_cols explicitly.",
+            UserWarning,
+        )
+    return veg
+
+
+def quick_diversity_analysis(data: pd.DataFrame, 
+                           species_cols: Optional[List[str]] = None) -> pd.DataFrame:
+    """Quick diversity analysis."""
+    veg = _prepare(data, species_cols)
     
     return veg.calculate_diversity()
 
@@ -836,12 +917,7 @@ def quick_ordination(data: pd.DataFrame,
                     species_cols: Optional[List[str]] = None,
                     method: str = 'pca') -> Dict[str, Any]:
     """Quick ordination analysis."""
-    veg = VegZ()
-    veg.data = data
-    if species_cols:
-        veg.species_matrix = data[species_cols]
-    else:
-        veg.species_matrix = data.select_dtypes(include=[np.number])
+    veg = _prepare(data, species_cols)
     
     if method.lower() == 'pca':
         return veg.pca_analysis()
@@ -856,12 +932,7 @@ def quick_clustering(data: pd.DataFrame,
                     n_clusters: int = 3,
                     method: str = 'kmeans') -> Dict[str, Any]:
     """Quick clustering analysis."""
-    veg = VegZ()
-    veg.data = data
-    if species_cols:
-        veg.species_matrix = data[species_cols]
-    else:
-        veg.species_matrix = data.select_dtypes(include=[np.number])
+    veg = _prepare(data, species_cols)
     
     if method.lower() == 'kmeans':
         return veg.kmeans_clustering(n_clusters=n_clusters)
@@ -894,12 +965,7 @@ def quick_elbow_analysis(data: pd.DataFrame,
     dict
         Elbow analysis results including optimal k recommendation
     """
-    veg = VegZ()
-    veg.data = data
-    if species_cols:
-        veg.species_matrix = data[species_cols]
-    else:
-        veg.species_matrix = data.select_dtypes(include=[np.number])
+    veg = _prepare(data, species_cols)
     
     return veg.elbow_analysis(
         k_range=range(1, max_k + 1),

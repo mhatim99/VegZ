@@ -11,28 +11,18 @@ import numpy as np
 import pandas as pd
 import warnings
 from typing import Dict, List, Optional, Tuple, Union, Any
-from scipy import stats
-from scipy.spatial.distance import pdist, squareform
-from scipy.cluster.hierarchy import linkage, dendrogram
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
-import matplotlib.pyplot as plt
-import seaborn as sns
 
-try:
-    from scipy.sparse import csr_matrix
-    from scipy.sparse.csgraph import minimum_spanning_tree, dijkstra
-    GRAPH_METHODS_AVAILABLE = True
-except ImportError:
-    GRAPH_METHODS_AVAILABLE = False
-    warnings.warn("Scipy graph methods not available, some network analyses will be limited")
+from .dataset import _ordered_intersection
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import minimum_spanning_tree, dijkstra
 
-try:
-    import networkx as nx
-    NETWORKX_AVAILABLE = True
-except ImportError:
-    NETWORKX_AVAILABLE = False
-    warnings.warn("NetworkX not available, advanced network analyses will be limited")
+from ._compat import optional_import, as_generator
+
+GRAPH_METHODS_AVAILABLE = True
+
+# NetworkX is optional; resolve it without warning at import time.
+nx = optional_import('networkx')
+NETWORKX_AVAILABLE = nx is not None
 
 
 class PhylogeneticDiversityAnalyzer:
@@ -46,8 +36,12 @@ class PhylogeneticDiversityAnalyzer:
     def __init__(self, random_state: int = 42):
         """Initialize PhylogeneticDiversityAnalyzer."""
         self.random_state = random_state
+        self.rng = as_generator(random_state)
         self.phylo_tree = None
         self.distance_matrix = None
+        # Null expectations depend only on richness, so cache them per size
+        # instead of resampling 99 communities for every single site.
+        self._null_cache: Dict[int, Tuple[Dict[str, float], Dict[str, float]]] = {}
         
     def load_phylogeny(self, phylo_data: Union[pd.DataFrame, Dict[str, Any]], 
                       format: str = 'distance_matrix') -> None:
@@ -98,7 +92,7 @@ class PhylogeneticDiversityAnalyzer:
             raise ValueError("Phylogenetic data not loaded. Use load_phylogeny() first.")
         
 # Copyright (c) 2025 Mohamed Z. Hatim
-        common_species = list(set(community_data.columns) & set(self.distance_matrix.index))
+        common_species = _ordered_intersection(community_data.columns, self.distance_matrix.index)
         if len(common_species) == 0:
             raise ValueError("No common species between community data and phylogeny")
         
@@ -178,64 +172,100 @@ class PhylogeneticDiversityAnalyzer:
         
         return pd_value
     
-    def _calculate_mpd(self, phylo_distances: pd.DataFrame, 
-                      abundances: pd.Series) -> float:
-        """Calculate Mean Pairwise Distance."""
-        distances = phylo_distances.values
-        weights = abundances.values
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        total_weight = 0
-        weighted_distance = 0
-        
-        for i in range(len(distances)):
-            for j in range(i + 1, len(distances)):
-                weight = weights[i] * weights[j]
-                weighted_distance += distances[i, j] * weight
-                total_weight += weight
-        
-        return weighted_distance / total_weight if total_weight > 0 else 0
-    
-    def _calculate_mntd(self, phylo_distances: pd.DataFrame, 
+    def _calculate_mpd(self, phylo_distances: pd.DataFrame,
                        abundances: pd.Series) -> float:
-        """Calculate Mean Nearest Taxon Distance."""
-        distances = phylo_distances.values
-        np.fill_diagonal(distances, np.inf)  # Exclude self-distances
-        
-# Copyright (c) 2025 Mohamed Z. Hatim
-        nearest_distances = []
-        for i in range(len(distances)):
-            min_dist = np.min(distances[i, :])
-            if np.isfinite(min_dist):
-                nearest_distances.append(min_dist)
-        
-        return np.mean(nearest_distances) if nearest_distances else 0
+        """Abundance-weighted Mean Pairwise Distance (vectorised)."""
+        distances = np.asarray(phylo_distances.values, dtype=float)
+        weights = np.asarray(abundances.values, dtype=float)
+
+        n = distances.shape[0]
+        if n < 2:
+            return 0.0
+
+        i_idx, j_idx = np.triu_indices(n, k=1)
+        pair_weights = weights[i_idx] * weights[j_idx]
+        total_weight = float(pair_weights.sum())
+
+        if total_weight <= 0:
+            return 0.0
+
+        return float(np.sum(distances[i_idx, j_idx] * pair_weights) / total_weight)
+
+    def _calculate_mntd(self, phylo_distances: pd.DataFrame,
+                        abundances: pd.Series,
+                        abundance_weighted: bool = False) -> float:
+        """
+        Mean Nearest Taxon Distance.
+
+        Parameters
+        ----------
+        phylo_distances : pd.DataFrame
+            Phylogenetic distances among the species present.
+        abundances : pd.Series
+            Species abundances, used only when ``abundance_weighted`` is True.
+        abundance_weighted : bool
+            Weight each species' nearest-neighbour distance by its relative
+            abundance.
+        """
+        # Work on a copy: np.fill_diagonal on `.values` would write through to
+        # the caller's DataFrame.
+        distances = np.array(phylo_distances.values, dtype=float, copy=True)
+        n = distances.shape[0]
+        if n < 2:
+            return 0.0
+
+        np.fill_diagonal(distances, np.inf)
+        nearest = distances.min(axis=1)
+        finite = np.isfinite(nearest)
+        if not finite.any():
+            return 0.0
+
+        if abundance_weighted:
+            weights = np.asarray(abundances.values, dtype=float)[finite]
+            if weights.sum() > 0:
+                return float(np.average(nearest[finite], weights=weights))
+
+        return float(nearest[finite].mean())
     
-    def _calculate_null_phylo_metrics(self, phylo_matrix: pd.DataFrame, 
-                                    n_species: int, 
-                                    n_iterations: int = 99) -> Tuple[Dict[str, float], Dict[str, float]]:
-        """Calculate null model expectations for phylogenetic metrics."""
-        null_mpd_values = []
-        null_mntd_values = []
-        
-        for _ in range(n_iterations):
-# Copyright (c) 2025 Mohamed Z. Hatim
-            sampled_species = np.random.choice(
-                phylo_matrix.index, size=n_species, replace=False
-            )
-            null_phylo = phylo_matrix.loc[sampled_species, sampled_species]
-            null_abundances = pd.Series(1, index=sampled_species)  # Equal abundances
-            
-            null_mpd = self._calculate_mpd(null_phylo, null_abundances)
-            null_mntd = self._calculate_mntd(null_phylo, null_abundances)
-            
-            null_mpd_values.append(null_mpd)
-            null_mntd_values.append(null_mntd)
-        
-        return (
-            {'mean': np.mean(null_mpd_values), 'std': np.std(null_mpd_values)},
-            {'mean': np.mean(null_mntd_values), 'std': np.std(null_mntd_values)}
+    def _calculate_null_phylo_metrics(self, phylo_matrix: pd.DataFrame,
+                                      n_species: int,
+                                      n_iterations: int = 99
+                                      ) -> Tuple[Dict[str, float], Dict[str, float]]:
+        """
+        Null expectations for MPD and MNTD from random species draws.
+
+        Results are cached by richness: the null distribution depends only on
+        how many species are drawn, so recomputing it for every site is wasted
+        work on datasets with many sites.
+        """
+        cache_key = int(n_species)
+        if cache_key in self._null_cache:
+            return self._null_cache[cache_key]
+
+        pool = np.asarray(phylo_matrix.index)
+        if n_species > len(pool) or n_species < 2:
+            empty = ({'mean': np.nan, 'std': 0.0}, {'mean': np.nan, 'std': 0.0})
+            self._null_cache[cache_key] = empty
+            return empty
+
+        null_mpd_values = np.empty(n_iterations, dtype=float)
+        null_mntd_values = np.empty(n_iterations, dtype=float)
+
+        for i in range(n_iterations):
+            # Local generator; never disturbs NumPy's global random state.
+            sampled = self.rng.choice(pool, size=n_species, replace=False)
+            null_phylo = phylo_matrix.loc[sampled, sampled]
+            null_abundances = pd.Series(1.0, index=sampled)
+
+            null_mpd_values[i] = self._calculate_mpd(null_phylo, null_abundances)
+            null_mntd_values[i] = self._calculate_mntd(null_phylo, null_abundances)
+
+        result = (
+            {'mean': float(np.mean(null_mpd_values)), 'std': float(np.std(null_mpd_values))},
+            {'mean': float(np.mean(null_mntd_values)), 'std': float(np.std(null_mntd_values))}
         )
+        self._null_cache[cache_key] = result
+        return result
 
 
 class MetacommunityAnalyzer:
@@ -344,9 +374,11 @@ class MetacommunityAnalyzer:
         pairwise_turnover = []
         for i, site1 in enumerate(pa_data.index):
             for site2 in pa_data.index[i+1:]:
-                shared = (pa_data.loc[site1] & pa_data.loc[site2]).sum()
-                unique1 = (pa_data.loc[site1] & ~pa_data.loc[site2]).sum()
-                unique2 = (~pa_data.loc[site1] & pa_data.loc[site2]).sum()
+                s1 = pa_data.loc[site1].astype(bool)
+                s2 = pa_data.loc[site2].astype(bool)
+                shared = int((s1 & s2).sum())
+                unique1 = int((s1 & ~s2).sum())
+                unique2 = int((~s1 & s2).sum())
                 
 # Copyright (c) 2025 Mohamed Z. Hatim
                 turnover = (unique1 + unique2) / (2 * shared + unique1 + unique2) if (shared + unique1 + unique2) > 0 else 0
@@ -359,47 +391,95 @@ class MetacommunityAnalyzer:
         }
     
     def _calculate_boundary_clumping(self, pa_data: pd.DataFrame) -> Dict[str, Any]:
-        """Calculate boundary clumping."""
-# Copyright (c) 2025 Mohamed Z. Hatim
-# Copyright (c) 2025 Mohamed Z. Hatim
-        
-        site_richness = pa_data.sum(axis=1).sort_values(ascending=False)
-        species_ranges = {}
-        
+        """
+        Boundary clumping via Morisita's index of dispersion.
+
+        Species range boundaries are tallied along the ordinated site gradient
+        and Morisita's I is computed over them: ``I > 1`` means boundaries are
+        clumped (Clementsian gradients), ``I < 1`` hyperdispersed (Gleasonian),
+        ``I ~ 1`` random.
+
+        Notes
+        -----
+        The earlier "range size / number of occurrences" ratio could never fall
+        below 1 by construction, so the ``clumped`` structure type it fed into
+        was unreachable. Morisita's index is the statistic Leibold & Mikkelson
+        (2002) actually specify.
+        """
+        # Order sites by richness (a proxy for position along the gradient).
+        ordered_sites = pa_data.sum(axis=1).sort_values(ascending=False).index
+        position = {site: i for i, site in enumerate(ordered_sites)}
+        n_sites = len(ordered_sites)
+
+        boundary_counts = np.zeros(n_sites, dtype=float)
+        species_ranges: Dict[Any, Dict[str, float]] = {}
+
         for species in pa_data.columns:
-            presence_sites = pa_data[pa_data[species] == 1].index
+            presence_sites = pa_data.index[pa_data[species] == 1]
             if len(presence_sites) == 0:
                 continue
-            
-# Copyright (c) 2025 Mohamed Z. Hatim
-            positions = [list(site_richness.index).index(site) for site in presence_sites]
-            range_size = max(positions) - min(positions) + 1
-            species_ranges[species] = range_size / len(presence_sites)
-        
-        mean_clumping = np.mean(list(species_ranges.values())) if species_ranges else 1
-        
+
+            positions = [position[site] for site in presence_sites]
+            first, last = min(positions), max(positions)
+
+            species_ranges[species] = {
+                'range_start': first,
+                'range_end': last,
+                'range_size': last - first + 1,
+                'n_occurrences': len(positions),
+            }
+
+            # Each species contributes two range boundaries.
+            boundary_counts[first] += 1
+            boundary_counts[last] += 1
+
+        total_boundaries = boundary_counts.sum()
+        if total_boundaries < 2 or n_sites < 2:
+            morisita = 1.0
+        else:
+            numerator = float(np.sum(boundary_counts * (boundary_counts - 1)))
+            denominator = total_boundaries * (total_boundaries - 1)
+            morisita = float(n_sites * numerator / denominator) if denominator > 0 else 1.0
+
+        if morisita > 1:
+            interpretation = 'clumped'
+        elif morisita < 1:
+            interpretation = 'hyperdispersed'
+        else:
+            interpretation = 'random'
+
         return {
-            'mean_clumping': mean_clumping,
-            'species_clumping': species_ranges
+            'morisita_index': morisita,
+            'interpretation': interpretation,
+            # Retained for backwards compatibility with earlier result dicts.
+            'mean_clumping': morisita,
+            'boundary_counts': boundary_counts,
+            'species_ranges': species_ranges,
+            'species_clumping': {k: v['range_size'] / v['n_occurrences']
+                                 for k, v in species_ranges.items()},
         }
     
-    def _classify_metacommunity_structure(self, coherence: Dict, turnover: Dict, 
-                                        boundary_clumping: Dict) -> str:
-        """Classify metacommunity structure type."""
+    def _classify_metacommunity_structure(self, coherence: Dict, turnover: Dict,
+                                          boundary_clumping: Dict) -> str:
+        """
+        Classify metacommunity structure (Leibold & Mikkelson 2002).
+
+        Non-coherent metacommunities are random. Coherent ones are then split by
+        turnover (nested when low) and, when turnover is high, by whether range
+        boundaries are clumped (Clementsian) or hyperdispersed (evenly spaced /
+        Gleasonian).
+        """
         coherent = coherence['value'] > 0.5
         high_turnover = turnover['whittaker_beta'] > 1.5
-        clumped = boundary_clumping['mean_clumping'] < 0.5
-        
+        # Morisita's index: > 1 means clumped boundaries.
+        clumped = boundary_clumping.get('morisita_index',
+                                        boundary_clumping.get('mean_clumping', 1.0)) > 1.0
+
         if not coherent:
             return "random"
-        elif coherent and not high_turnover:
+        if not high_turnover:
             return "nested"
-        elif coherent and high_turnover and not clumped:
-            return "evenly_spaced"
-        elif coherent and high_turnover and clumped:
-            return "clumped"
-        else:
-            return "intermediate"
+        return "clumped" if clumped else "evenly_spaced"
     
     def _interpret_structure(self, structure_type: str) -> str:
         """Provide interpretation of metacommunity structure."""
@@ -452,8 +532,17 @@ class NetworkAnalyzer:
             raise ValueError(f"Unknown method: {method}")
         
 # Copyright (c) 2025 Mohamed Z. Hatim
-        np.fill_diagonal(associations.values, 0)
-        
+        # Zero the self-associations on a fresh array. Writing through
+        # `associations.values` relies on that being a mutable view, which is
+        # not guaranteed in pandas 2 and is forbidden outright in pandas 3
+        # (copy-on-write makes the array read-only).
+        association_values = associations.to_numpy(dtype=float, copy=True)
+        np.fill_diagonal(association_values, 0)
+        associations = pd.DataFrame(association_values,
+                                    index=associations.index,
+                                    columns=associations.columns)
+
+
 # Copyright (c) 2025 Mohamed Z. Hatim
         adjacency = (np.abs(associations) >= threshold).astype(int)
         
@@ -521,15 +610,20 @@ class NetworkAnalyzer:
         density = n_edges / max_edges if max_edges > 0 else 0
         
 # Copyright (c) 2025 Mohamed Z. Hatim
-        if GRAPH_METHODS_AVAILABLE:
-# Copyright (c) 2025 Mohamed Z. Hatim
-            distance_matrix = 1 / (np.abs(associations.values) + 1e-10)
-            np.fill_diagonal(distance_matrix, 0)
-            
-# Copyright (c) 2025 Mohamed Z. Hatim
-            dist_matrix = dijkstra(distance_matrix, directed=False)
-            finite_distances = dist_matrix[np.isfinite(dist_matrix) & (dist_matrix > 0)]
-            avg_path_length = np.mean(finite_distances) if len(finite_distances) > 0 else np.inf
+        if GRAPH_METHODS_AVAILABLE and n_edges > 0:
+            # Shortest paths must traverse only the edges that survived the
+            # threshold; using every pairwise association turns the graph
+            # complete and makes the path length meaningless.
+            strengths = np.abs(associations.values)
+            edge_costs = np.where(adjacency_values > 0,
+                                  1.0 / np.maximum(strengths, 1e-10), 0.0)
+            np.fill_diagonal(edge_costs, 0)
+
+            dist_matrix = dijkstra(csr_matrix(edge_costs), directed=False,
+                                   unweighted=False)
+            off_diagonal = ~np.eye(n_nodes, dtype=bool)
+            reachable = np.isfinite(dist_matrix) & off_diagonal
+            avg_path_length = float(np.mean(dist_matrix[reachable]))                 if reachable.any() else np.inf
         else:
             avg_path_length = np.nan
         
@@ -569,38 +663,82 @@ class NetworkAnalyzer:
             return {}
         
         props = {}
-        
+        n_nodes = G.number_of_nodes()
+        if n_nodes == 0:
+            return props
+
         try:
 # Copyright (c) 2025 Mohamed Z. Hatim
             props['clustering_coefficient'] = nx.average_clustering(G)
-            
+
 # Copyright (c) 2025 Mohamed Z. Hatim
             props['betweenness_centrality'] = nx.betweenness_centrality(G)
-            
+
 # Copyright (c) 2025 Mohamed Z. Hatim
             try:
                 props['eigenvector_centrality'] = nx.eigenvector_centrality(G, max_iter=1000)
-            except:
+            except (nx.NetworkXException, ValueError):
+                # Power iteration does not converge on every graph.
                 props['eigenvector_centrality'] = {}
-            
+
 # Copyright (c) 2025 Mohamed Z. Hatim
             props['n_components'] = nx.number_connected_components(G)
             props['largest_component_size'] = len(max(nx.connected_components(G), key=len))
-            
+
 # Copyright (c) 2025 Mohamed Z. Hatim
             if nx.is_connected(G):
                 props['average_shortest_path'] = nx.average_shortest_path_length(G)
-                
+
 # Copyright (c) 2025 Mohamed Z. Hatim
-                random_G = nx.erdos_renyi_graph(G.number_of_nodes(), 
-                                              G.number_of_edges() / (G.number_of_nodes() * (G.number_of_nodes() - 1) / 2))
-                if nx.is_connected(random_G):
-                    props['small_world_sigma'] = (props['clustering_coefficient'] / nx.average_clustering(random_G)) / (props['average_shortest_path'] / nx.average_shortest_path_length(random_G))
-            
+                props['small_world_sigma'] = self._small_world_sigma(
+                    G, props['clustering_coefficient'],
+                    props['average_shortest_path'])
+
         except Exception as e:
             warnings.warn(f"Some network properties could not be calculated: {str(e)}")
-        
+
         return props
+
+    def _small_world_sigma(self, G: 'nx.Graph', clustering: float,
+                           path_length: float,
+                           n_random: int = 20) -> Optional[float]:
+        """
+        Small-world sigma against an ensemble of Erdos-Renyi graphs.
+
+        Sigma is (C/C_rand) / (L/L_rand). A single random graph is a noisy
+        reference and is frequently triangle-free, which makes C_rand zero and
+        sigma undefined; averaging over an ensemble and skipping the degenerate
+        draws gives a usable estimate. Returns None when no random draw yields
+        a finite reference.
+        """
+        n_nodes = G.number_of_nodes()
+        n_edges = G.number_of_edges()
+        max_edges = n_nodes * (n_nodes - 1) / 2
+        if max_edges == 0:
+            return None
+
+        p = n_edges / max_edges
+        clustering_ref = []
+        path_ref = []
+        for i in range(n_random):
+            # Seed each draw from the analyzer's own state: this keeps the
+            # result reproducible without touching the global RNG.
+            random_G = nx.erdos_renyi_graph(n_nodes, p,
+                                            seed=self.random_state + i)
+            if not nx.is_connected(random_G):
+                continue
+            clustering_ref.append(nx.average_clustering(random_G))
+            path_ref.append(nx.average_shortest_path_length(random_G))
+
+        if not clustering_ref:
+            return None
+
+        mean_clustering = float(np.mean(clustering_ref))
+        mean_path = float(np.mean(path_ref))
+        if mean_clustering <= 0 or mean_path <= 0 or path_length <= 0:
+            return None
+
+        return (clustering / mean_clustering) / (path_length / mean_path)
 
 
 class CommunityAssemblyAnalyzer:
@@ -609,9 +747,9 @@ class CommunityAssemblyAnalyzer:
     """
     
     def __init__(self, random_state: int = 42):
-        """Initialize CommunityAssemblyAnalyzer."""
+        """Initialize CommunityAssemblyAnalyzer with a private generator."""
         self.random_state = random_state
-        np.random.seed(random_state)
+        self.rng = as_generator(random_state)
         
     def assembly_process_analysis(self, 
                                 community_data: pd.DataFrame,
@@ -686,7 +824,7 @@ class CommunityAssemblyAnalyzer:
                                trait_data: pd.DataFrame) -> Dict[str, Any]:
         """Analyze trait-based assembly patterns."""
 # Copyright (c) 2025 Mohamed Z. Hatim
-        common_species = list(set(community_data.columns) & set(trait_data.index))
+        common_species = _ordered_intersection(community_data.columns, trait_data.index)
         if len(common_species) == 0:
             return {'error': 'No common species between community and trait data'}
         
