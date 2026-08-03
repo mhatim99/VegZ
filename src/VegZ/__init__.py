@@ -222,10 +222,10 @@ ordination_plot = veg.plot_ordination(pca_results)
 Requirements:
 =============
 - Python >= 3.9
-- NumPy >= 1.21.0
-- Pandas >= 1.3.0
-- SciPy >= 1.7.0
-- Matplotlib >= 3.4.0
+- NumPy >= 1.22.4
+- Pandas >= 2.2.0
+- SciPy >= 1.8.0
+- Matplotlib >= 3.5.0
 - scikit-learn >= 1.0.0
 
 Optional dependencies for extended functionality:
