@@ -901,13 +901,49 @@ class TestSpecializedCorrectness:
 class TestPackageHygiene:
 
     def test_importing_vegz_emits_no_warnings(self):
-        """A library must not warn merely because optional extras are absent."""
+        """
+        A library must not warn merely because optional extras are absent.
+
+        Only warnings raised from VegZ's own source count. Turning every
+        UserWarning into an error instead makes this a test of the whole
+        dependency tree: on Python 3.9 the newest matplotlib that still
+        installs there calls a pyparsing function that pyparsing now warns
+        about, which is nothing VegZ can act on.
+        """
         import subprocess
         import sys
 
+        # Ownership is decided by the warning's source file sitting inside the
+        # installed package directory. Matching the string 'VegZ' against the
+        # path is not good enough: a checkout or virtualenv can itself live
+        # under a directory of that name, which makes every third-party
+        # warning look like ours.
+        probe = '''
+import pathlib, sys, warnings
+
+with warnings.catch_warnings(record=True) as caught:
+    warnings.simplefilter('always')
+    import VegZ
+
+package_dir = pathlib.Path(VegZ.__file__).resolve().parent
+
+
+def raised_by_vegz(record):
+    try:
+        return package_dir in pathlib.Path(record.filename).resolve().parents
+    except (OSError, ValueError):
+        return False
+
+
+ours = [w for w in caught if raised_by_vegz(w)]
+for w in ours:
+    print('%s:%s: %s: %s' % (w.filename, w.lineno, w.category.__name__,
+                             w.message), file=sys.stderr)
+sys.exit(1 if ours else 0)
+'''
+
         completed = subprocess.run(
-            [sys.executable, '-W', 'error::UserWarning', '-c', 'import VegZ'],
-            capture_output=True, text=True,
+            [sys.executable, '-c', probe], capture_output=True, text=True,
         )
         assert completed.returncode == 0, completed.stderr
 
