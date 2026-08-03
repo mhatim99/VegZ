@@ -54,7 +54,6 @@
 - Temporal data validation and date parsing
 - Geographic outlier detection with country boundary checks
 - Coordinate precision assessment
-- Duplicate record identification
 - Invalid coordinate range detection
 - Transposed coordinate detection
 - Country boundary consistency checks
@@ -173,41 +172,45 @@
 - **Environmental niche modeling**
 
 ### Temporal Analysis
-- **Phenology modeling** with multiple curve types
-- **Trend detection** using Mann-Kendall tests
-- **Time series decomposition** (seasonal, trend, residual)
-- **Seasonal pattern analysis**
-- **Temporal autocorrelation analysis**
-- **Change point detection**
+- **Phenology modeling** with sigmoid, double-sigmoid (Zhang et al. 2003),
+  Gaussian, beta and Weibull curves, fitted from data-driven starting values
+- **Trend detection** - linear, polynomial, spline and LOWESS trends, plus the
+  Mann-Kendall test with Sen's slope and a distribution-free confidence interval
+- **Time series decomposition** (seasonal, trend, residual) - classical, STL and
+  X-11, with a dependency-free fallback when `statsmodels` is absent
+- **Seasonal pattern analysis** with automatic period detection
+- **Climate-vegetation response** analysis across user-specified lags
+- **Growth curve fitting** - logistic, Gompertz, von Bertalanffy, exponential
+  and power models
 
 ### Spatial Analysis
-- **Spatial interpolation** methods:
+- **Spatial interpolation** methods, with leave-one-out cross-validated RMSE:
   - Inverse Distance Weighting (IDW)
-  - Kriging (ordinary, universal)
-  - Spline interpolation
+  - Simple kriging with exponential, Gaussian or spherical variograms
+  - Radial basis functions (thin-plate spline, multiquadric, Gaussian, linear)
+  - Nearest neighbour, linear and cubic
 - **Landscape metrics** calculation:
-  - Patch density
-  - Edge density
-  - Contagion index
-  - Shannon diversity index for landscapes
+  - Patch density, mean patch size, patch size coefficient of variation
+  - Edge density and largest patch index
+  - Landscape shape index and contagion (O'Neill et al. 1988)
+  - Shannon, Simpson and evenness indices for landscapes
 - **Spatial autocorrelation** analysis (Moran's I with randomisation-based
-  significance test, Geary's C)
-- **Point pattern analysis**
-- **Spatial clustering** detection
+  significance test, Geary's C, empirical variogram)
+- **Habitat suitability modeling** from point occurrences (Random Forest, GLM)
 
 ### Specialized Methods
 - **Phylogenetic diversity analysis**:
   - Faith's phylogenetic diversity
-  - Phylogenetic endemism
+  - Mean Pairwise Distance (MPD) and Mean Nearest Taxon Distance (MNTD)
   - Net Relatedness Index (NRI)
   - Nearest Taxon Index (NTI)
 - **Metacommunity analysis**:
   - Elements of metacommunity structure
   - Coherence, turnover, and boundary clumping
 - **Network analysis**:
-  - Co-occurrence networks
-  - Modularity analysis
-  - Network centrality measures
+  - Co-occurrence networks from correlation or Jaccard association
+  - Betweenness and eigenvector centrality, clustering coefficient
+  - Connected components and small-world sigma against a random-graph ensemble
 - **Nestedness analysis** with null models:
   - NODF (Nestedness based on Overlap and Decreasing Fill)
   - Temperature calculator
@@ -217,23 +220,26 @@
 - **Trait syndrome** identification
 - **Community-weighted means** (CWM)
 - **Functional diversity** indices:
-  - Functional richness (FRic)
-  - Functional evenness (FEve)
+  - Functional richness (FRic) - convex hull volume
+  - Functional evenness (FEve) - minimum spanning tree based
   - Functional divergence (FDiv)
+  - Functional dispersion (FDis)
   - Rao's quadratic entropy
+- **Functional beta diversity** between sites
 - **Trait-environment** relationships
-- **Fourth-corner analysis**
+- **Functional group** identification (hierarchical or k-means)
 
 ### Machine Learning & Predictive Modeling
 - **Species Distribution Modeling** (SDM):
-  - MaxEnt-style modeling
   - Random Forest models
-  - Gradient Boosting models
+  - Gradient Boosting models (LightGBM when installed)
+  - Logistic regression, including a simplified MaxEnt-style variant
 - **Classification algorithms** for vegetation types
-- **Regression models** for abundance prediction
+- **Regression models** for abundance and biomass prediction
+- **Anomaly detection** (Isolation Forest, DBSCAN)
+- **Dimensionality reduction** (PCA, t-SNE) for exploration
 - **Model validation** and performance metrics
 - **Variable importance** assessment
-- **Ensemble modeling**
 
 ### Visualization & Reporting
 - **Specialized ecological plots**:
@@ -241,19 +247,19 @@
   - Species accumulation curves
   - Rarefaction plots
 - **Ordination diagrams** with:
-  - Site scores plotting
+  - Site scores plotting, coloured by a continuous or categorical variable
   - Species loading arrows
   - Environmental vector overlays
-  - Convex hulls for groups
-  - Stress plots for NMDS
 - **Clustering visualizations**:
   - Dendrograms with customizable formatting
   - Silhouette plots
   - **Comprehensive elbow analysis plots** (4-panel layout)
   - Cluster validation plots
-- **Interactive dashboards** using Plotly/Bokeh
+- **Interactive dashboards** using Plotly, with static matplotlib fallbacks when
+  it is not installed
 - **Automated quality reports** with statistical summaries
-- **Export functions** (HTML, PDF, PNG, SVG, CSV)
+- **Export** to HTML (dashboards and reports) and CSV. Plotting functions return
+  matplotlib `Figure` objects, so `fig.savefig(...)` covers PNG, PDF and SVG
 
 ### Quick Analysis Functions
 - **quick_diversity_analysis()** - Instant diversity calculations
@@ -432,7 +438,7 @@ SITE_001,44.2619,-72.5806,850,6.2,18.5,...
 ## Requirements
 
 **Required:**
-- Python >= 3.8
+- Python >= 3.9
 - NumPy >= 1.21.0
 - Pandas >= 1.3.0
 - SciPy >= 1.7.0
@@ -458,7 +464,7 @@ only needed when you call a feature that uses it.
 | `VegZ[all]` | the common subset of the above | Everything except remote sensing |
 
 **Tested with:**
-- Python 3.8 - 3.13
+- Python 3.9 - 3.13
 - All major operating systems (Windows, macOS, Linux)
 
 ## Reproducibility
@@ -554,7 +560,7 @@ If you use VegZ in your research, please cite:
 @software{VegZ,
     author = {Hatim, Mohamed Z.},
     title = {VegZ: A comprehensive Python package for vegetation data analysis and environmental modeling},
-    year = {2025},
+    year = {2026},
     version = {1.5.0},
     url = {https://github.com/mhatim99/VegZ}
 }

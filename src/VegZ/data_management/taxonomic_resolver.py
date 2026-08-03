@@ -14,6 +14,22 @@ import warnings
 import re
 
 
+def _user_agent() -> str:
+    """
+    User-Agent identifying the running VegZ version to the taxonomic APIs.
+
+    The version is read from the package rather than hard-coded, so it cannot
+    drift out of step with ``VegZ.__version__`` the way a literal string does.
+    The import is deferred to call time to keep this module free of any
+    import-order coupling with the parent package.
+    """
+    try:
+        from .. import __version__
+    except ImportError:  # pragma: no cover - only if imported outside the package
+        __version__ = 'unknown'
+    return f'VegZ-Python-Package/{__version__} (vegetation data analysis)'
+
+
 class TaxonomicResolver:
     """
     Resolve and validate plant species names against online taxonomic databases.
@@ -106,7 +122,7 @@ class TaxonomicResolver:
 # Copyright (c) 2025 Mohamed Z. Hatim
         self._session = requests.Session()
         self._session.headers.update({
-            'User-Agent': 'VegZ-Python-Package/1.3.0 (vegetation data analysis)',
+            'User-Agent': _user_agent(),
             'Accept': 'application/json'
         })
 

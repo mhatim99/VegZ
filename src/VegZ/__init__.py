@@ -221,7 +221,7 @@ ordination_plot = veg.plot_ordination(pca_results)
 
 Requirements:
 =============
-- Python >= 3.8
+- Python >= 3.9
 - NumPy >= 1.21.0
 - Pandas >= 1.3.0
 - SciPy >= 1.7.0
@@ -296,19 +296,25 @@ def show_versions():
         except ImportError:
             print(f"{dep:15} : not installed")
 
+#: Release year of the current version, used in the citation block. Update it
+#: alongside __version__ so the citation never claims a year the release did
+#: not happen in.
+__release_year__ = 2026
+
+
 def citation():
     """Return citation information for VegZ."""
     return f"""
 To cite VegZ in publications, please use:
 
-Hatim, M.Z. (2025). VegZ: A comprehensive Python package for vegetation 
+Hatim, M.Z. ({__release_year__}). VegZ: A comprehensive Python package for vegetation
 data analysis and environmental modeling. Version {__version__}.
 
 BibTeX entry:
-@software{{vegz2025,
+@software{{vegz{__release_year__},
     author = {{Hatim, Mohamed Z.}},
     title = {{VegZ: A comprehensive Python package for vegetation data analysis and environmental modeling}},
-    year = {{2025}},
+    year = {{{__release_year__}}},
     version = {{{__version__}}},
     url = {{https://github.com/mhatim99/VegZ}}
 }}

@@ -10,7 +10,7 @@ This module provides functionality for:
 - Extracting and validating collection dates
 - Flagging suspicious temporal information
 - Detecting records at centroids, urban areas, institutions
-- Identifying geographic outliers and duplicate records
+- Identifying geographic outliers
 """
 
 from .spatial_validation import *
