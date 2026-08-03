@@ -696,14 +696,13 @@ class InteractiveVisualizer:
             plt.tight_layout()
             plots['cluster_sizes'] = fig
 
-        if not plots:
-            warnings.warn(
-                "No clustering plots could be produced: the results contain "
-                "none of 'cluster_labels', 'linkage_matrix' or "
-                "'silhouette_scores'."
-            )
-
-        return plots
+        # Route the empty case through the shared check, as the diversity,
+        # ordination and trait fallbacks already do. Warning in a different
+        # shape here made the clustering dashboard the one panel whose
+        # "nothing to plot" message callers could not match on.
+        return self._check_dashboard(
+            plots, 'clustering',
+            ['cluster_labels', 'linkage_matrix', 'silhouette_scores'])
     
     def save_dashboard(self, dashboard: Dict[str, Any], 
                       filename: str, 

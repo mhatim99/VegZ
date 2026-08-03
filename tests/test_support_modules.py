@@ -17,11 +17,21 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt  # noqa: E402
 
 from VegZ.data_management import remote_sensing as rs  # noqa: E402
-from VegZ.data_management.coordinate_systems import CoordinateTransformer  # noqa: E402
+from VegZ.data_management.coordinate_systems import (  # noqa: E402
+    PYPROJ_AVAILABLE, CoordinateTransformer)
 from VegZ.data_quality.temporal_validation import TemporalValidator  # noqa: E402
-from VegZ.interactive_viz import (InteractiveVisualizer, ReportGenerator,  # noqa: E402
+from VegZ.interactive_viz import (PLOTLY_AVAILABLE,  # noqa: E402
+                                  InteractiveVisualizer, ReportGenerator,
                                   quick_analysis_report,
                                   quick_diversity_dashboard)
+
+# CI deliberately runs the whole suite against an install with no optional
+# dependencies, so anything needing pyproj or plotly has to say so rather than
+# error. These mirror the convention already used in test_data_management.py.
+needs_pyproj = pytest.mark.skipif(not PYPROJ_AVAILABLE,
+                                  reason='pyproj not installed')
+needs_plotly = pytest.mark.skipif(not PLOTLY_AVAILABLE,
+                                  reason='plotly not installed')
 from VegZ.nestedness import (CooccurrenceAnalysis, NestednessAnalyzer,  # noqa: E402
                              NestednessSignificance, NullModels)
 from VegZ.visualization import VegetationPlotter  # noqa: E402
@@ -429,10 +439,20 @@ class TestInteractiveVisualizer:
         assert set(plots) == {'functional_diversity', 'trait_space'}
         assert all(isinstance(fig, plt.Figure) for fig in plots.values())
 
+    @needs_plotly
     def test_save_dashboard(self, visualizer, diversity_results, tmp_path):
         dashboard = visualizer.create_diversity_dashboard(diversity_results)
         saved = visualizer.save_dashboard(dashboard, str(tmp_path / 'dash'))
         assert saved
+
+    def test_save_dashboard_without_plotly_says_so(self, visualizer,
+                                                   diversity_results, tmp_path):
+        """The HTML writer needs plotly figures; without it, say so and return None."""
+        with mock.patch('VegZ.interactive_viz.PLOTLY_AVAILABLE', False):
+            with pytest.warns(UserWarning, match='Plotly not available'):
+                saved = visualizer.save_dashboard(dashboard={},
+                                                  filename=str(tmp_path / 'dash'))
+        assert saved is None
 
     def test_quick_diversity_dashboard(self, diversity_results):
         assert quick_diversity_dashboard(diversity_results)
@@ -578,18 +598,24 @@ class TestCoordinateTransformer:
         with pytest.raises(ValueError, match='latitude'):
             transformer.determine_utm_zone(0.0, 120.0)
 
+    @needs_pyproj
     def test_identity_transform_is_a_no_op(self, transformer, points):
         result = transformer.transform_coordinates(points, 'EPSG:4326',
                                                    'EPSG:4326')
         np.testing.assert_allclose(result['longitude'], points['longitude'])
         np.testing.assert_allclose(result['latitude'], points['latitude'])
 
+    @needs_pyproj
     def test_missing_columns_raise(self, transformer):
         with pytest.raises(ValueError, match='not found|missing'):
             transformer.transform_coordinates(pd.DataFrame({'x': [1.0]}),
                                               'EPSG:4326', 'EPSG:3857')
 
-    @pytest.mark.parametrize('method', ['great_circle', 'euclidean', 'geodesic'])
+    @pytest.mark.parametrize('method', [
+        'great_circle',
+        pytest.param('euclidean', marks=needs_pyproj),
+        pytest.param('geodesic', marks=needs_pyproj),
+    ])
     def test_distance_matrices_are_symmetric_with_a_zero_diagonal(
             self, transformer, points, method):
         distances = transformer.calculate_distances(points, method=method)
@@ -603,7 +629,11 @@ class TestCoordinateTransformer:
         distances = transformer.calculate_distances(frame, method='great_circle')
         assert distances[0, 1] == pytest.approx(344_000, rel=0.02)
 
-    @pytest.mark.parametrize('method', ['great_circle', 'euclidean', 'geodesic'])
+    @pytest.mark.parametrize('method', [
+        'great_circle',
+        pytest.param('euclidean', marks=needs_pyproj),
+        pytest.param('geodesic', marks=needs_pyproj),
+    ])
     def test_all_three_methods_agree_and_return_metres(self, transformer, method):
         """
         The spherical, projected and ellipsoidal distances differ only by the
@@ -636,6 +666,7 @@ class TestCoordinateTransformer:
         assert grid['y'].min() == pytest.approx(40.5)
         assert grid['y'].max() == pytest.approx(41.5)
 
+    @needs_pyproj
     def test_crs_info(self, transformer):
         info = transformer.get_crs_info('EPSG:4326')
         assert isinstance(info, dict) and info

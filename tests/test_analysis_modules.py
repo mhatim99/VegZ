@@ -602,9 +602,14 @@ class TestInteractiveVisualizer:
         assert {'dendrogram', 'cluster_sizes', 'silhouette_hist'} <= set(plots)
 
     def test_clustering_dashboard_warns_when_nothing_is_plottable(self, monkeypatch):
+        # The matplotlib fallback reports an empty dashboard through the same
+        # _check_dashboard message as the diversity, ordination and trait
+        # panels; this used to assert a clustering-only wording, which could
+        # not hold at the same time as the equivalent assertion in
+        # test_support_modules.py once plotly was absent.
         import VegZ.interactive_viz as module
         monkeypatch.setattr(module, 'PLOTLY_AVAILABLE', False)
-        with pytest.warns(UserWarning, match='No clustering plots'):
+        with pytest.warns(UserWarning, match='No plottable content.*clustering'):
             plots = InteractiveVisualizer().create_clustering_dashboard({'x': 1})
         assert plots == {}
 

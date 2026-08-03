@@ -94,9 +94,13 @@ dev = [
     "flake8>=3.9.0",
     "sphinx>=4.0.0",
     "sphinx-rtd-theme>=0.5.0",
+    # Optional runtime dependencies are included here on purpose: without them
+    # the code paths that use them are skipped in every CI job and go untested.
     "openpyxl>=3.0.0",
     "statsmodels>=0.13.0",
     "networkx>=2.6",
+    "plotly>=5.0.0",
+    "pyproj>=3.2.0",
     "mypy>=1.0",
     "ruff>=0.1",
     "build>=0.10",
@@ -210,7 +214,12 @@ exclude_lines = [
 # failing config (which gets ignored), checking is switched ON per module and
 # the list grows as modules are cleaned up.
 [tool.mypy]
-python_version = "3.9"
+# Not the package's minimum (3.9): mypy 2.0 dropped support for targeting
+# anything below 3.10, and NumPy's bundled stubs use PEP 695 `type` statements
+# that mypy cannot parse unless the target is 3.12 or higher - so 3.10 and 3.11
+# fail on numpy/__init__.pyi before reaching any VegZ code. Runtime support for
+# 3.9 is guaranteed by the CI matrix, which still runs the full suite there.
+python_version = "3.12"
 files = ["src/VegZ"]
 ignore_missing_imports = true       # the optional geospatial/ML stack is untyped
 warn_redundant_casts = true
