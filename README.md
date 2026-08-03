@@ -6,6 +6,15 @@
 
 **VegZ** is a comprehensive, professional-grade Python package designed specifically for vegetation data analysis and environmental modeling. It provides a complete suite of tools for ecologists, environmental scientists, and researchers working with biodiversity and vegetation data.
 
+> ### 1.5.1
+>
+> A metadata and documentation fix release; no analysis code changed. The
+> declared dependency floors were not installable - VegZ imports `QhullError`
+> from `scipy.spatial`, which SciPy only exposed in 1.8, so `import VegZ`
+> failed on the advertised `scipy>=1.7`. The floors are now the oldest versions
+> CI actually runs the suite against. See the
+> [CHANGELOG](https://github.com/mhatim99/VegZ/blob/main/CHANGELOG.md).
+>
 > ### New in 1.5.0
 >
 > 1.5.0 adds the methods most often reached for after an ordination -

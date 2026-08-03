@@ -5,6 +5,52 @@ All notable changes to VegZ will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-08-03
+
+A correctness release for the package metadata and documentation. No analysis
+code changed, so results are identical to 1.5.0.
+
+### Fixed
+
+- **The declared dependency floors were not installable.** VegZ imports
+  `QhullError` from `scipy.spatial`, which SciPy only exposed there in 1.8, so
+  `import VegZ` failed outright with `ImportError` on the declared
+  `scipy>=1.7.0`. Dates are parsed with `format='mixed'`, added in pandas 2.0,
+  and matplotlib below 3.5 cannot index a pandas 2 Series. The floors are now
+  the oldest versions the suite is actually run against in CI:
+  `numpy>=1.22.4`, `pandas>=2.2.0`, `scipy>=1.8.0`, `matplotlib>=3.5.0`.
+  scikit-learn, seaborn and requests were verified at their existing floors.
+- **Python 3.8 was named as the minimum** in the README and the package
+  docstring, contradicting `requires-python`, the classifiers and the CI
+  matrix, all of which say 3.9.
+- **The README advertised ten capabilities that do not exist**, among them
+  fourth-corner analysis, phylogenetic endemism, modularity analysis, change
+  point detection, point pattern analysis, universal kriging and ensemble
+  modelling. Each was checked against the source and removed; sections that
+  lost entries gained the capabilities that are present but were undocumented.
+  The same unimplemented duplicate-record claim is gone from the
+  `data_quality` module docstring.
+- `TaxonomicResolver` announced itself to the taxonomic APIs as version 1.3.0.
+  The User-Agent is now derived from `__version__`, and the citation year comes
+  from a constant beside it, so neither can drift from a release again.
+- The matplotlib fallback of `create_clustering_dashboard` reported an empty
+  dashboard through a bespoke warning rather than the shared `_check_dashboard`
+  message used by the diversity, ordination and trait panels, so callers could
+  not match on it.
+- Four changelog entries carried dates that disagreed with the PyPI upload
+  times, and 1.0.1 had no entry at all.
+
+### Infrastructure
+
+- The CI workflow had never passed. `python_version = "3.9"` aborts under
+  mypy 2.0, which dropped targets below 3.10; NumPy's stubs then need 3.12 or
+  higher, so the type-checking target is now 3.12 while the matrix keeps
+  running the suite on 3.9. Tests needing pyproj or plotly are guarded, and
+  both are added to the dev extra so those paths are exercised rather than
+  skipped everywhere. The import-warning check no longer promotes warnings
+  raised by the whole dependency tree, and is shared between the suite and the
+  workflow instead of being restated in YAML.
+
 ## [1.5.0] - 2026-08-01
 
 The largest release so far, and it does two things.
