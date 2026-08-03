@@ -102,8 +102,12 @@ jobs:
       - name: Install the wheel with no extras
         run: python -m pip install dist/*.whl
 
+      # Fails only on warnings raised from VegZ's own source. `-W
+      # error::UserWarning` was doing this before, but it promotes warnings
+      # from the whole dependency tree, so an unrelated deprecation anywhere
+      # under the import chain failed the job.
       - name: Importing VegZ must be silent
-        run: python -W error::UserWarning -c "import VegZ; print(VegZ.__version__)"
+        run: python tests/import_warning_probe.py
 
       - name: Optional dependencies must genuinely be absent
         run: |

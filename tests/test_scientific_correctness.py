@@ -910,40 +910,17 @@ class TestPackageHygiene:
         installs there calls a pyparsing function that pyparsing now warns
         about, which is nothing VegZ can act on.
         """
+        import pathlib
         import subprocess
         import sys
 
-        # Ownership is decided by the warning's source file sitting inside the
-        # installed package directory. Matching the string 'VegZ' against the
-        # path is not good enough: a checkout or virtualenv can itself live
-        # under a directory of that name, which makes every third-party
-        # warning look like ours.
-        probe = '''
-import pathlib, sys, warnings
-
-with warnings.catch_warnings(record=True) as caught:
-    warnings.simplefilter('always')
-    import VegZ
-
-package_dir = pathlib.Path(VegZ.__file__).resolve().parent
-
-
-def raised_by_vegz(record):
-    try:
-        return package_dir in pathlib.Path(record.filename).resolve().parents
-    except (OSError, ValueError):
-        return False
-
-
-ours = [w for w in caught if raised_by_vegz(w)]
-for w in ours:
-    print('%s:%s: %s: %s' % (w.filename, w.lineno, w.category.__name__,
-                             w.message), file=sys.stderr)
-sys.exit(1 if ours else 0)
-'''
+        # A subprocess, so VegZ is imported for the first time and the import
+        # warnings are actually observable. The probe is a file rather than an
+        # inline string because the CI workflow runs the very same check.
+        probe = pathlib.Path(__file__).with_name('import_warning_probe.py')
 
         completed = subprocess.run(
-            [sys.executable, '-c', probe], capture_output=True, text=True,
+            [sys.executable, str(probe)], capture_output=True, text=True,
         )
         assert completed.returncode == 0, completed.stderr
 
